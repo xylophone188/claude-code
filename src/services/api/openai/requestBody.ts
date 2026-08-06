@@ -111,6 +111,7 @@ export function buildOpenAIRequestBody(params: {
     stream: true,
     stream_options: { include_usage: true },
     // OpenAI-compatible reasoning effort (honored by OpenCode Zen / DeepSeek).
+    // Not sent alongside thinking-mode params: endpoints pick the format they know.
     ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
     // Enable chain-of-thought output for DeepSeek and MiMo models.
     // When active, temperature/top_p/presence_penalty/frequency_penalty are ignored.

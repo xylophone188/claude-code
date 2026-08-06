@@ -64,8 +64,9 @@ export function modelSupportsEffort(model: string): boolean {
   // OpenCode Free models route via the local Headroom gateway → 9router →
   // OpenCode Zen, which honors the OpenAI-compatible reasoning_effort
   // parameter (verified live: effort=max produced ~4x the reasoning content
-  // of effort=low). Matched by model name, not provider: ccb-real sets
-  // CLAUDE_CODE_USE_OPENAI=1 so the provider is 'openai' at runtime.
+  // of effort=low). Provider-wide, so future free models work automatically.
+  // Matched by model name, not provider: ccb-real sets CLAUDE_CODE_USE_OPENAI=1
+  // so the provider is 'openai' at runtime even for OpenCode Free models.
   if (m.includes('opencode/')) {
     return true
   }

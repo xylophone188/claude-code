@@ -52,10 +52,15 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
 /**
  * All built-in providers: the four core defaults plus the OmniRoute
  * collection of 9router openai-compat providers.
+ *
+ * Deduplicated by id with core defaults winning — OmniRoute's cerebras/groq/
+ * deepseek entries (OMNI_*_KEY env) only fill gaps, never override the core
+ * defaults' credential expectations.
  */
 export const BUILTIN_PROVIDERS: ProviderConfig[] = [
-  ...DEFAULT_PROVIDERS,
-  ...OMNIROUTE_PROVIDERS,
+  ...new Map(
+    [...OMNIROUTE_PROVIDERS, ...DEFAULT_PROVIDERS].map(p => [p.id, p]),
+  ).values(),
 ]
 
 /**

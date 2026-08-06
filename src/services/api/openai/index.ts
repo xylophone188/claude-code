@@ -26,6 +26,7 @@ import {
   isApisixModel,
   APISIX_BASE_URL,
 } from '../../../utils/model/opencodeFree.js'
+import { isChatGPTCodexReasoningModel } from '../../../utils/model/chatgptModels.js'
 import { getOpenAIClient } from './client.js'
 import {
   formatOpenAIPromptCacheKey,
@@ -434,7 +435,14 @@ export async function* queryModelOpenAI(
     )
 
     const isOpencodeFree = isOpencodeRoute
-    const useChatGPTResponses = !isOpencodeFree && isChatGPTAuthEnabled()
+    // Only route to the ChatGPT Responses (Codex) backend when the resolved
+    // model is actually a supported ChatGPT model. Otherwise fall back to the
+    // OpenAI-compatible path so provider-selected models (e.g. qwen3.5-plus,
+    // deepseek via 9router) do not get rejected by ChatGPT's whitelist.
+    const useChatGPTResponses =
+      !isOpencodeFree &&
+      isChatGPTAuthEnabled() &&
+      isChatGPTCodexReasoningModel(openaiModel)
     // opencode/* ids gain the `opencode/` prefix the gateway expects; gateway
     // ids (gemini/grok/openrouter/…) pass through raw; other opencode-free
     // provider models keep the env default override.

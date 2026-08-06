@@ -190,7 +190,7 @@ export function parseSkillFrontmatterFields(
 ): {
   displayName: string | undefined
   description: string
-  descriptionZh: string | undefined
+  description_zh: string | undefined
   hasUserSpecifiedDescription: boolean
   allowedTools: string[]
   argumentHint: string | undefined
@@ -213,7 +213,6 @@ export function parseSkillFrontmatterFields(
   const description =
     validatedDescription ??
     extractDescriptionFromMarkdown(markdownContent, descriptionFallbackLabel)
-
   const descriptionRaw =
     frontmatter['description-zh'] ?? frontmatter.description_zh
   const descriptionZh =
@@ -246,7 +245,7 @@ export function parseSkillFrontmatterFields(
     displayName:
       frontmatter.name != null ? String(frontmatter.name) : undefined,
     description,
-    descriptionZh,
+    description_zh: descriptionZh,
     hasUserSpecifiedDescription: validatedDescription !== null,
     allowedTools: parseSlashCommandToolsFromFrontmatter(
       frontmatter['allowed-tools'],
@@ -280,7 +279,7 @@ export function createSkillCommand({
   skillName,
   displayName,
   description,
-  descriptionZh,
+  description_zh,
   hasUserSpecifiedDescription,
   markdownContent,
   allowedTools,
@@ -304,7 +303,7 @@ export function createSkillCommand({
   skillName: string
   displayName: string | undefined
   description: string
-  descriptionZh: string | undefined
+  description_zh: string | undefined
   hasUserSpecifiedDescription: boolean
   markdownContent: string
   allowedTools: string[]
@@ -329,7 +328,7 @@ export function createSkillCommand({
     type: 'prompt',
     name: skillName,
     description,
-    description_zh: descriptionZh,
+    description_zh,
     hasUserSpecifiedDescription,
     allowedTools,
     argumentHint,

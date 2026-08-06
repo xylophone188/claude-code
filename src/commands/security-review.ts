@@ -6,6 +6,7 @@ import { createMovedToPluginCommand } from './createMovedToPluginCommand.js'
 const SECURITY_REVIEW_MARKDOWN = `---
 allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(git show:*), Bash(git remote show:*), Read, Glob, Grep, LS, Task
 description: Complete a security review of the pending changes on the current branch
+description_zh: 审查当前分支未提交变更的安全性（完整安全审查）
 ---
 
 You are a senior security engineer conducting a focused security review of the changes on this branch.
@@ -199,6 +200,7 @@ export default createMovedToPluginCommand({
   name: 'security-review',
   description:
     'Complete a security review of the pending changes on the current branch',
+  description_zh: '审查当前分支未提交变更的安全性（完整安全审查）',
   progressMessage: 'analyzing code changes for security risks',
   pluginName: 'security-review',
   pluginCommand: 'security-review',

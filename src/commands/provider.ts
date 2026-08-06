@@ -66,6 +66,18 @@ const call: LocalCommandCall = async (args, _context) => {
     }
   }
 
+  // list - show all available providers (built-in + user-defined)
+  if (arg === 'list') {
+    const providers = loadProviders()
+    const grouped = providers
+      .map(p => `${p.id}${p.apiKeyEnv ? ` [${p.apiKeyEnv}]` : ''}`)
+      .join('\n')
+    return {
+      type: 'text',
+      value: `Available providers (${providers.length}):\n${grouped}`,
+    }
+  }
+
   // Validate provider
   const validProviders = [
     'anthropic',
@@ -77,10 +89,24 @@ const call: LocalCommandCall = async (args, _context) => {
     'vertex',
     'foundry',
   ]
+
+  // OpenAI-compat provider from provider registry (e.g. cerebras/groq/qwen/...)
   if (!validProviders.includes(arg)) {
-    return {
-      type: 'text',
-      value: `Invalid provider: ${arg}\nValid: ${validProviders.join(', ')}`,
+    try {
+      const result = switchProvider(arg)
+      return {
+        type: 'text',
+        value: `Switched to OpenAI-compatible provider ${arg} (${result.provider.baseUrl}).\nAdd these to your shell profile, then restart:\n\n${buildShellExportBlock(
+          result,
+        )}`,
+      }
+    } catch (err) {
+      const providers = loadProviders()
+      const ids = providers.map(p => p.id).join(', ')
+      return {
+        type: 'text',
+        value: `Invalid provider: ${arg}\nValid: ${[...validProviders, ...ids].join(', ')}`,
+      }
     }
   }
 

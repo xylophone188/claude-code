@@ -15,6 +15,8 @@ import type { HooksSettings } from '../utils/settings/types.js'
 export type BundledSkillDefinition = {
   name: string
   description: string
+  /** Optional Chinese translation of `description`, used when display language is zh. */
+  description_zh?: string
   aliases?: string[]
   whenToUse?: string
   argumentHint?: string
@@ -76,6 +78,7 @@ export function registerBundledSkill(definition: BundledSkillDefinition): void {
     type: 'prompt',
     name: definition.name,
     description: definition.description,
+    description_zh: definition.description_zh,
     aliases: definition.aliases,
     hasUserSpecifiedDescription: true,
     allowedTools: definition.allowedTools ?? [],

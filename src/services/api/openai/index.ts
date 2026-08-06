@@ -1,3 +1,4 @@
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions/completions.mjs'
 import type {
   BetaToolUnion,
   BetaMessage,
@@ -14,6 +15,17 @@ import type {
 import type { AgentId } from '../../../types/ids.js'
 import type { Tools } from '../../../Tool.js'
 import { getSessionId } from '../../../bootstrap/state.js'
+import {
+  getOpencodeModelName,
+  isOpencodeModel,
+} from '../../../utils/model/model.js'
+import { getAPIProvider } from '../../../utils/model/providers.js'
+import { resolveAppliedEffort } from '../../../utils/effort.js'
+import {
+  isGatewayModel,
+  isApisixModel,
+  APISIX_BASE_URL,
+} from '../../../utils/model/opencodeFree.js'
 import { getOpenAIClient } from './client.js'
 import {
   formatOpenAIPromptCacheKey,
@@ -135,6 +147,57 @@ function prependDeferredToolListIfNeeded(
   ]
 }
 
+const OPENCODE_FREE_BASE_URL = 'http://127.0.0.1:8787/v1'
+const OPENCODE_FREE_MODEL = 'deepseek-v4-flash-free'
+const OPENCODE_FREE_RETRIES = 11 // 1 initial + 10 immediate retries
+
+export function createOpencodeFreeFetch(
+  fetchOverride?: typeof fetch,
+): typeof fetch {
+  const baseFetch = fetchOverride ?? (globalThis.fetch as typeof fetch)
+  return (async (...args: Parameters<typeof fetch>) => {
+    const response = await baseFetch(...args)
+    if (response.status !== 200) {
+      throw new Error(`opencode-free returned HTTP ${response.status}`)
+    }
+    return response
+  }) as typeof fetch
+}
+
+function isMeaningfulOpenAIEvent(event: ChatCompletionChunk): boolean {
+  const choice = event.choices[0]
+  if (!choice) return false
+  const delta = choice.delta
+  return Boolean(
+    delta.content ||
+      (delta as { reasoning_content?: string }).reasoning_content ||
+      delta.tool_calls?.length,
+  )
+}
+
+export async function* retryOpencodeFreeStream(
+  createStream: () => Promise<AsyncIterable<ChatCompletionChunk>>,
+): AsyncGenerator<Record<string, unknown>, void> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= OPENCODE_FREE_RETRIES; attempt++) {
+    try {
+      const events: Record<string, unknown>[] = []
+      let meaningful = false
+      for await (const event of await createStream()) {
+        events.push(event as unknown as Record<string, unknown>)
+        meaningful ||= isMeaningfulOpenAIEvent(event)
+      }
+      if (!meaningful) throw new Error('opencode-free returned an empty stream')
+      yield* events
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt === OPENCODE_FREE_RETRIES) throw error
+    }
+  }
+  throw lastError
+}
+
 function isOpenAIConvertibleMessage(
   msg: Message,
 ): msg is AssistantMessage | UserMessage {
@@ -228,8 +291,18 @@ export async function* queryModelOpenAI(
   void
 > {
   try {
-    // 1. Resolve model name
-    const openaiModel = resolveOpenAIModel(options.model)
+    // Route through the local gateway client when the model is a gateway id
+    // (any provider prefix) — the ChatGPT Responses backend would reject it.
+    const isOpencodeRoute =
+      isOpencodeModel(options.model) ||
+      isGatewayModel(options.model) ||
+      getAPIProvider() === 'opencode-free'
+
+    // 1. Resolve model name. Gateway ids pass through unchanged; opencode/*
+    //    ids get the prefix stripped for re-prefixing below.
+    const openaiModel = isOpencodeRoute
+      ? getOpencodeModelName(options.model)
+      : resolveOpenAIModel(options.model)
 
     // 2. Normalize messages using shared preprocessing
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)
@@ -313,6 +386,15 @@ export async function* queryModelOpenAI(
     const reasoningEffort = getChatGPTResponsesReasoningEffort(
       options.effortValue,
     )
+    // OpenCode Free (and other OpenAI-compatible routes) send the resolved
+    // effort as the standard `reasoning_effort` field, which the OpenCode Zen
+    // backend honors (verified live: effort=max yields much longer reasoning
+    // than low). Non-opencode routes pass undefined so behavior is unchanged.
+    const appliedEffort = isOpencodeRoute
+      ? resolveAppliedEffort(options.model, options.effortValue)
+      : undefined
+    const reasoningEffortParam =
+      typeof appliedEffort === 'string' ? appliedEffort : undefined
 
     // 9. Log tool filtering details
     if (useSearchExtraTools) {
@@ -351,7 +433,18 @@ export async function* queryModelOpenAI(
       options.maxOutputTokensOverride,
     )
 
-    const useChatGPTResponses = isChatGPTAuthEnabled()
+    const isOpencodeFree = isOpencodeRoute
+    const useChatGPTResponses = !isOpencodeFree && isChatGPTAuthEnabled()
+    // opencode/* ids gain the `opencode/` prefix the gateway expects; gateway
+    // ids (gemini/grok/openrouter/…) pass through raw; other opencode-free
+    // provider models keep the env default override.
+    const requestModel = isOpencodeModel(options.model)
+      ? `opencode/${openaiModel}`
+      : isApisixModel(options.model)
+        ? options.model.slice('apisix/'.length)
+        : isGatewayModel(options.model)
+          ? openaiModel
+          : (process.env.OPENCODE_FREE_MODEL ?? openaiModel)
     // OpenAI's official OAuth and API-key routes share the same prompt-cache
     // contract. Scope the key to the real conversation so resumed turns stay
     // sticky while unrelated sessions do not share a routing bucket. Generic
@@ -370,41 +463,75 @@ export async function* queryModelOpenAI(
     // 11. Call OpenAI API with streaming. ChatGPT subscription auth uses the
     // Codex Responses backend; API-key/OpenAI-compatible auth keeps the
     // existing Chat Completions adapter.
+    const rawStream:
+      | AsyncIterable<ChatCompletionChunk>
+      | AsyncIterable<Record<string, unknown>> = useChatGPTResponses
+      ? await createChatGPTResponsesStream({
+          request: buildResponsesRequest({
+            model: requestModel,
+            messages: openaiMessages,
+            tools: openaiTools,
+            toolChoice: openaiToolChoice,
+            reasoningEffort,
+            promptCacheKey: sessionPromptCacheKey,
+          }),
+          signal,
+          fetchOverride: options.fetchOverride as unknown as typeof fetch,
+        })
+      : await (isOpencodeFree
+          ? retryOpencodeFreeStream(() =>
+              getOpenAIClient({
+                maxRetries: 0,
+                baseURL: isApisixModel(options.model)
+                  ? `${APISIX_BASE_URL}/api/v1`
+                  : (process.env.OPENCODE_FREE_BASE_URL ??
+                    OPENCODE_FREE_BASE_URL),
+                apiKey: 'opencode-free-local',
+                fetchOverride: createOpencodeFreeFetch(
+                  options.fetchOverride as unknown as typeof fetch,
+                ),
+                source: options.querySource,
+              }).chat.completions.create(
+                buildOpenAIRequestBody({
+                  model: requestModel,
+                  messages: openaiMessages,
+                  tools: openaiTools,
+                  toolChoice: openaiToolChoice,
+                  enableThinking,
+                  maxTokens,
+                  reasoningEffort: reasoningEffortParam,
+                  temperatureOverride: options.temperatureOverride,
+                }),
+                { signal },
+              ),
+            )
+          : getOpenAIClient({
+              maxRetries: 0,
+              fetchOverride: options.fetchOverride as unknown as typeof fetch,
+              source: options.querySource,
+            }).chat.completions.create(
+              buildOpenAIRequestBody({
+                model: openaiModel,
+                messages: openaiMessages,
+                tools: openaiTools,
+                toolChoice: openaiToolChoice,
+                enableThinking,
+                maxTokens,
+                reasoningEffort: reasoningEffortParam,
+                temperatureOverride: options.temperatureOverride,
+                promptCacheKey,
+              }),
+              { signal },
+            ))
+
     const adaptedStream = useChatGPTResponses
       ? adaptResponsesStreamToAnthropic(
-          await createChatGPTResponsesStream({
-            request: buildResponsesRequest({
-              model: openaiModel,
-              messages: openaiMessages,
-              tools: openaiTools,
-              toolChoice: openaiToolChoice,
-              reasoningEffort,
-              promptCacheKey: sessionPromptCacheKey,
-            }),
-            signal,
-            fetchOverride: options.fetchOverride as unknown as typeof fetch,
-          }),
-          openaiModel,
+          rawStream as AsyncIterable<Record<string, unknown>>,
+          requestModel,
         )
       : adaptOpenAIStreamToAnthropic(
-          await getOpenAIClient({
-            maxRetries: 0,
-            fetchOverride: options.fetchOverride as unknown as typeof fetch,
-            source: options.querySource,
-          }).chat.completions.create(
-            buildOpenAIRequestBody({
-              model: openaiModel,
-              messages: openaiMessages,
-              tools: openaiTools,
-              toolChoice: openaiToolChoice,
-              enableThinking,
-              maxTokens,
-              temperatureOverride: options.temperatureOverride,
-              promptCacheKey,
-            }),
-            { signal },
-          ),
-          openaiModel,
+          rawStream as AsyncIterable<ChatCompletionChunk>,
+          requestModel,
           { includeCacheWriteTokens: useOfficialOpenAICache },
         )
 

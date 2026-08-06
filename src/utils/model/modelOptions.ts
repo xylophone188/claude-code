@@ -38,6 +38,12 @@ import {
   CHATGPT_CODEX_MODEL_OPTIONS,
   isChatGPTAuthMode,
 } from './chatgptModels.js'
+import {
+  getProviderModelGroups,
+  getProviderModelOptions,
+} from './opencodeFree.js'
+
+const OPENAI_PROVIDER_ID = 'openai'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -333,6 +339,17 @@ const MaxHaiku45Option: ModelOption = {
   description: 'Haiku 4.5 · Fastest for quick answers',
 }
 
+function getOpencodeFreeOption(): ModelOption {
+  const model = process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'
+  const value = `opencode/${model}`
+  return {
+    value,
+    label: `OpenCode Free · ${model}`,
+    description: 'OpenCode Free via local Headroom gateway',
+    descriptionForModel: `OpenCode Free model (${value})`,
+  }
+}
+
 function getOpusPlanOption(): ModelOption {
   return {
     value: 'opusplan',
@@ -341,7 +358,7 @@ function getOpusPlanOption(): ModelOption {
   }
 }
 
-function getChatGPTCodexModelOptions(): ModelOption[] {
+export function getChatGPTCodexModelOptions(): ModelOption[] {
   return [
     {
       value: null,
@@ -554,6 +571,7 @@ function getKnownModelOption(model: string): ModelOption | null {
 
 export function getModelOptions(fastMode = false): ModelOption[] {
   const options = getModelOptionsBase(fastMode)
+  options.splice(1, 0, getOpencodeFreeOption())
 
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var
   const envCustomModel = process.env.ANTHROPIC_CUSTOM_MODEL_OPTION
@@ -631,4 +649,33 @@ function filterModelOptionsByAllowlist(options: ModelOption[]): ModelOption[] {
     opt =>
       opt.value === null || (opt.value !== null && isModelAllowed(opt.value)),
   )
+}
+
+/**
+ * Level-1 menu options for the two-step /model picker (standalone command):
+ * one entry per provider group, derived live from the gateway model list.
+ * 'openai' is always present (curated ChatGPT/Codex set) even when the
+ * gateway exposes no openai-prefixed ids; it is inserted right after the
+ * default OpenCode group.
+ */
+export async function getProviderList(): Promise<ModelOption[]> {
+  const groups = await getProviderModelGroups()
+  const options: ModelOption[] = []
+  for (const g of groups) {
+    if (g.id === OPENAI_PROVIDER_ID) continue // appended below with curated count
+    options.push({
+      value: g.id,
+      label: g.label,
+      description: `${g.models.length} model${g.models.length === 1 ? '' : 's'}`,
+    })
+  }
+  const curated = await getProviderModelOptions(OPENAI_PROVIDER_ID)
+  const openai: ModelOption = {
+    value: OPENAI_PROVIDER_ID,
+    label: 'OpenAI',
+    description: `${curated.length} model${curated.length === 1 ? '' : 's'}`,
+  }
+  const ocIndex = options.findIndex(o => o.value === 'oc')
+  options.splice(ocIndex >= 0 ? ocIndex + 1 : 0, 0, openai)
+  return options
 }

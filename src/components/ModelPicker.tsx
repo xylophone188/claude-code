@@ -32,7 +32,8 @@ import {
   modelDisplayString,
   parseUserSpecifiedModel,
 } from '../utils/model/model.js';
-import { getModelOptions } from '../utils/model/modelOptions.js';
+import { getModelOptions, getProviderList, type ModelOption } from '../utils/model/modelOptions.js';
+import { getProviderModelOptions } from '../utils/model/opencodeFree.js';
 import { getSettingsForSource, updateSettingsForSource } from '../utils/settings/settings.js';
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
 import { Select } from './CustomSelect/index.js';
@@ -82,6 +83,44 @@ export function ModelPicker({
     () => new Set(has1mContext(initialValue) ? [initialValue.replace(/\[1m\]/i, '')] : []),
   );
 
+  // Two-phase /model picker: phase 1 selects a provider group, phase 2 selects
+  // the model inside it. Only active for the standalone /model command; the
+  // quick-switch keybinding path skips straight to the model list.
+  const [provider, setProvider] = useState<string | null>(null);
+  const [providerOptions, setProviderOptions] = useState<ModelOption[]>([]);
+  const [providerModels, setProviderModels] = useState<ModelOption[] | null>(null);
+
+  React.useEffect(() => {
+    if (!isStandaloneCommand) return;
+    let cancelled = false;
+    void getProviderList()
+      .then(opts => {
+        if (!cancelled) setProviderOptions(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setProviderOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStandaloneCommand]);
+
+  React.useEffect(() => {
+    if (!isStandaloneCommand || provider === null) return;
+    let cancelled = false;
+    setProviderModels(null);
+    void getProviderModelOptions(provider)
+      .then(opts => {
+        if (!cancelled) setProviderModels(opts);
+      })
+      .catch(() => {
+        if (!cancelled) setProviderModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStandaloneCommand, provider]);
+
   const handleToggle1M = useCallback(() => {
     if (!focusedValue || focusedValue === NO_PREFERENCE) return;
     // Key on the base value so lookups in handleSelect / is1MMarked match the
@@ -106,7 +145,15 @@ export function ModelPicker({
   );
 
   // Memoize all derived values to prevent re-renders
-  const modelOptions = useMemo(() => getModelOptions(isFastMode ?? false), [isFastMode]);
+  const modelOptions = useMemo(() => {
+    if (isStandaloneCommand && provider !== null && providerModels !== null) {
+      return providerModels;
+    }
+    return getModelOptions(isFastMode ?? false);
+  }, [isFastMode, isStandaloneCommand, provider, providerModels]);
+
+  // Phase 1 default provider is the first group (OpenCode / free).
+  const providerFocusValue = providerOptions[0]?.value;
 
   // Ensure the initial value is in the options list
   // This handles edge cases where the user's current model (e.g., 'haiku' for 3P users)
@@ -330,6 +377,62 @@ export function ModelPicker({
 
   if (!isStandaloneCommand) {
     return content;
+  }
+
+  // Phase 1 (standalone /model only): pick a provider group before models.
+  if (isStandaloneCommand && provider === null) {
+    return (
+      <Pane color="permission">
+        <Box flexDirection="column">
+          <Box marginBottom={1} flexDirection="column">
+            <Text color="remember" bold>
+              Select a provider
+            </Text>
+          </Box>
+          <Box flexDirection="column" marginBottom={1}>
+            {providerOptions.length === 0 ? (
+              <Text dimColor>Loading providers…</Text>
+            ) : (
+              <Select
+                defaultValue={providerFocusValue}
+                defaultFocusValue={providerFocusValue}
+                options={providerOptions}
+                onChange={value => setProvider(value)}
+                onCancel={onCancel ?? (() => {})}
+                visibleOptionCount={Math.min(maxVisible, providerOptions.length)}
+              />
+            )}
+          </Box>
+          <Text dimColor italic>
+            <Byline>
+              <KeyboardShortcutHint shortcut="Enter" action="confirm" />
+              <ConfigurableShortcutHint action="select:cancel" context="Select" fallback="Esc" description="exit" />
+            </Byline>
+          </Text>
+        </Box>
+      </Pane>
+    );
+  }
+
+  // Phase 2 loading/empty states (standalone only): models are fetched per
+  // provider from the gateway.
+  if (isStandaloneCommand && provider !== null && providerModels === null) {
+    return (
+      <Pane color="permission">
+        <Box flexDirection="column">
+          <Text dimColor>Loading models…</Text>
+        </Box>
+      </Pane>
+    );
+  }
+  if (isStandaloneCommand && provider !== null && providerModels !== null && providerModels.length === 0) {
+    return (
+      <Pane color="permission">
+        <Box flexDirection="column">
+          <Text dimColor>No models available for this provider.</Text>
+        </Box>
+      </Pane>
+    );
   }
 
   return <Pane color="permission">{content}</Pane>;

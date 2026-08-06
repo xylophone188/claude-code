@@ -39,6 +39,18 @@ export type ModelShortName = string
 export type ModelName = string
 export type ModelSetting = ModelName | ModelAlias | null
 
+const OPENCODE_MODEL_PREFIX = 'opencode/'
+
+export function isOpencodeModel(model: string | null | undefined): boolean {
+  if (!model?.toLowerCase().startsWith(OPENCODE_MODEL_PREFIX)) return false
+  return model.slice(OPENCODE_MODEL_PREFIX.length).trim().length > 0
+}
+
+export function getOpencodeModelName(model: string): string {
+  if (!isOpencodeModel(model)) return model
+  return model.slice(OPENCODE_MODEL_PREFIX.length).trim()
+}
+
 const OPENAI_DEFAULT_MODEL_ENV_BY_TIER: Record<ChatGPTCodexModelTier, string> =
   {
     opus: 'OPENAI_DEFAULT_OPUS_MODEL',

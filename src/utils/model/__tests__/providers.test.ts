@@ -1,4 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
+import {
+  type APIProvider,
+  isThirdPartyAPIProvider,
+} from '../providerClassification.js'
 
 /**
  * Inlined provider logic for hermetic testing.
@@ -10,15 +14,6 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
  * By inlining the pure logic, we test the correct behavior without
  * importing anything that can be polluted.
  */
-
-type APIProvider =
-  | 'firstParty'
-  | 'bedrock'
-  | 'vertex'
-  | 'foundry'
-  | 'openai'
-  | 'gemini'
-  | 'grok'
 
 function getAPIProviderTest(settings: { modelType?: string }): APIProvider {
   const modelType = settings.modelType
@@ -58,8 +53,44 @@ function getAPIProviderTest(settings: { modelType?: string }): APIProvider {
   )
     return 'grok'
 
-  return 'firstParty'
+  if (
+    process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.ANTHROPIC_AUTH_TOKEN
+  ) {
+    return 'firstParty'
+  }
+
+  return 'opencode-free'
 }
+
+describe('isThirdPartyAPIProvider', () => {
+  test('returns false only for the first-party Anthropic provider', () => {
+    expect(isThirdPartyAPIProvider('firstParty')).toBe(false)
+  })
+
+  for (const provider of [
+    'bedrock',
+    'vertex',
+    'foundry',
+    'openai',
+    'gemini',
+    'grok',
+    'opencode-free',
+  ] as const satisfies readonly APIProvider[]) {
+    test(`returns true for ${provider}`, () => {
+      expect(isThirdPartyAPIProvider(provider)).toBe(true)
+    })
+  }
+
+  for (const modelType of ['openai', 'gemini', 'grok'] as const) {
+    test(`classifies settings modelType=${modelType} as third-party`, () => {
+      expect(isThirdPartyAPIProvider(getAPIProviderTest({ modelType }))).toBe(
+        true,
+      )
+    })
+  }
+})
 
 function isFirstPartyAnthropicBaseUrlTest(): boolean {
   const baseUrl = process.env.ANTHROPIC_BASE_URL
@@ -78,6 +109,9 @@ function isFirstPartyAnthropicBaseUrlTest(): boolean {
 
 describe('getAPIProvider', () => {
   const envKeys = [
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
     'CLAUDE_CODE_USE_GEMINI',
     'CLAUDE_CODE_USE_BEDROCK',
     'CLAUDE_CODE_USE_VERTEX',
@@ -106,8 +140,8 @@ describe('getAPIProvider', () => {
     }
   })
 
-  test('returns "firstParty" by default', () => {
-    expect(getAPIProviderTest({})).toBe('firstParty')
+  test('returns "opencode-free" by default', () => {
+    expect(getAPIProviderTest({})).toBe('opencode-free')
   })
 
   test('returns "gemini" when modelType is gemini', () => {
@@ -175,12 +209,12 @@ describe('getAPIProvider', () => {
 
   test('"0" is not truthy', () => {
     process.env.CLAUDE_CODE_USE_BEDROCK = '0'
-    expect(getAPIProviderTest({})).toBe('firstParty')
+    expect(getAPIProviderTest({})).toBe('opencode-free')
   })
 
   test('empty string is not truthy', () => {
     process.env.CLAUDE_CODE_USE_BEDROCK = ''
-    expect(getAPIProviderTest({})).toBe('firstParty')
+    expect(getAPIProviderTest({})).toBe('opencode-free')
   })
 })
 

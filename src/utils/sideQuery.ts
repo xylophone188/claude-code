@@ -30,6 +30,7 @@ import {
 import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js'
 import { logForDebugging } from './debug.js'
 import { errorMessage } from './errors.js'
+import { getOpencodeModelName, isOpencodeModel } from './model/model.js'
 import { getAPIProvider } from './model/providers.js'
 import { normalizeModelStringForAPI } from './model/model.js'
 import { getOpenAIClient } from '../services/api/openai/client.js'
@@ -193,7 +194,12 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
   } = opts
 
   const provider = getAPIProvider()
-  if (provider === 'openai' || provider === 'grok') {
+  if (
+    isOpencodeModel(model) ||
+    provider === 'openai' ||
+    provider === 'grok' ||
+    provider === 'opencode-free'
+  ) {
     return sideQueryViaOpenAICompatible(opts)
   }
   if (provider === 'gemini') {
@@ -645,10 +651,12 @@ async function sideQueryViaOpenAICompatible(
 
   const provider = getAPIProvider()
   const normalizedModel = normalizeModelStringForAPI(model)
+  const isOpencodeRoute = isOpencodeModel(normalizedModel)
 
   // Resolve model name per provider
-  const openaiModel =
-    provider === 'grok'
+  const openaiModel = isOpencodeRoute
+    ? getOpencodeModelName(normalizedModel)
+    : provider === 'grok'
       ? resolveGrokModel(normalizedModel)
       : resolveOpenAIModel(normalizedModel)
 
@@ -675,7 +683,7 @@ async function sideQueryViaOpenAICompatible(
     : undefined
 
   // ChatGPT subscription auth: use Responses API + OAuth, never empty API key.
-  if (provider === 'openai' && isChatGPTAuthEnabled()) {
+  if (!isOpencodeRoute && provider === 'openai' && isChatGPTAuthEnabled()) {
     return sideQueryViaChatGPTResponses(
       opts,
       openaiModel,
@@ -687,15 +695,23 @@ async function sideQueryViaOpenAICompatible(
 
   // API-key / OpenAI-compatible / Grok: Chat Completions
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
-  const client: import('openai').default =
-    provider === 'grok'
+  const client: import('openai').default = isOpencodeRoute
+    ? getOpenAIClient({
+        maxRetries: opts.maxRetries ?? 2,
+        baseURL:
+          process.env.OPENCODE_FREE_BASE_URL ?? 'http://127.0.0.1:8787/v1',
+        apiKey: 'opencode-free-local',
+      })
+    : provider === 'grok'
       ? getGrokClient({ maxRetries: opts.maxRetries ?? 2 })
       : getOpenAIClient({ maxRetries: opts.maxRetries ?? 2 })
 
   const start = Date.now()
 
   const requestParams: Record<string, unknown> = {
-    model: openaiModel,
+    model: isOpencodeRoute
+      ? `opencode/${process.env.OPENCODE_FREE_MODEL ?? openaiModel}`
+      : openaiModel,
     messages: openaiMessages,
     max_tokens,
   }
@@ -713,11 +729,32 @@ async function sideQueryViaOpenAICompatible(
     if (openaiToolChoice) requestParams.tool_choice = openaiToolChoice
   }
 
-  const response = await client.chat.completions.create(
-    requestParams as unknown as import('openai/resources/chat/completions/completions.mjs').ChatCompletionCreateParamsNonStreaming,
-    { signal },
-  )
+  let response:
+    | import('openai/resources/chat/completions/completions.mjs').ChatCompletion
+    | undefined
+  for (let attempt = 1; attempt <= (isOpencodeRoute ? 2 : 1); attempt++) {
+    try {
+      response = (await client.chat.completions.create(
+        requestParams as unknown as import('openai/resources/chat/completions/completions.mjs').ChatCompletionCreateParamsNonStreaming,
+        { signal },
+      )) as import('openai/resources/chat/completions/completions.mjs').ChatCompletion
+      const message = response.choices[0]?.message
+      if (
+        isOpencodeRoute &&
+        !message?.content &&
+        !message?.tool_calls?.length &&
+        !(message as { reasoning_content?: string } | undefined)
+          ?.reasoning_content
+      ) {
+        throw new Error('opencode-free returned an empty response')
+      }
+      break
+    } catch (error) {
+      if (attempt === (isOpencodeRoute ? 2 : 1)) throw error
+    }
+  }
 
+  if (!response) throw new Error('OpenCode response was not received')
   const choice = response.choices[0]
   const message = choice?.message
 

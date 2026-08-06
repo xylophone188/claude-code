@@ -28,7 +28,15 @@ export async function openPath(path: string): Promise<boolean> {
       const { code } = await execFileNoThrow('explorer', [path])
       return code === 0
     }
-    const command = platform === 'darwin' ? 'open' : 'xdg-open'
+    const isTermux = Boolean(
+      process.env.TERMUX_VERSION ||
+        process.env.PREFIX?.includes('/com.termux/'),
+    )
+    const command = isTermux
+      ? 'termux-open'
+      : platform === 'darwin'
+        ? 'open'
+        : 'xdg-open'
     const { code } = await execFileNoThrow(command, [path])
     return code === 0
   } catch (_) {
@@ -57,8 +65,17 @@ export async function openBrowser(url: string): Promise<boolean> {
       )
       return code === 0
     } else {
+      const isTermux = Boolean(
+        process.env.TERMUX_VERSION ||
+          process.env.PREFIX?.includes('/com.termux/'),
+      )
       const command =
-        browserEnv || (platform === 'darwin' ? 'open' : 'xdg-open')
+        browserEnv ||
+        (isTermux
+          ? 'termux-open-url'
+          : platform === 'darwin'
+            ? 'open'
+            : 'xdg-open')
       const { code } = await execFileNoThrow(command, [url])
       return code === 0
     }

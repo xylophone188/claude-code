@@ -61,6 +61,15 @@ export function modelSupportsEffort(model: string): boolean {
     return false
   }
 
+  // OpenCode Free models route via the local Headroom gateway → 9router →
+  // OpenCode Zen, which honors the OpenAI-compatible reasoning_effort
+  // parameter (verified live: effort=max produced ~4x the reasoning content
+  // of effort=low). Matched by model name, not provider: ccb-real sets
+  // CLAUDE_CODE_USE_OPENAI=1 so the provider is 'openai' at runtime.
+  if (m.includes('opencode/')) {
+    return true
+  }
+
   // IMPORTANT: Do not change the default effort support without notifying
   // the model launch DRI and research. This is a sensitive setting that can
   // greatly affect model quality and bashing.
@@ -336,6 +345,12 @@ export function getDefaultEffortForModel(
     isChatGPTCodexReasoningModel(model)
   ) {
     return 'medium'
+  }
+
+  // OpenCode Free: default to maximum reasoning depth. modelSupportsEffort()
+  // is true for this provider, so 'max' reaches the API as reasoning_effort.
+  if (model.toLowerCase().includes('opencode/')) {
+    return 'max'
   }
 
   // Default effort on Opus 4.6 to medium for Pro.

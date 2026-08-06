@@ -74,6 +74,8 @@ export function buildOpenAIRequestBody(params: {
   toolChoice: any
   enableThinking: boolean
   maxTokens: number
+  /** Resolved effort level (low/medium/high/xhigh/max) sent as reasoning_effort. */
+  reasoningEffort?: string
   temperatureOverride?: number
   /** Session-scoped routing key for official OpenAI requests. */
   promptCacheKey?: string
@@ -83,6 +85,8 @@ export function buildOpenAIRequestBody(params: {
   chat_template_kwargs?: { thinking: boolean; enable_thinking: boolean }
   /** OpenAI prompt-cache routing key (not always in SDK types yet). */
   prompt_cache_key?: string
+  /** OpenAI-compatible reasoning effort; honored by OpenCode Zen / DeepSeek. */
+  reasoning_effort?: string
 } {
   const {
     model,
@@ -91,6 +95,7 @@ export function buildOpenAIRequestBody(params: {
     toolChoice,
     enableThinking,
     maxTokens,
+    reasoningEffort,
     temperatureOverride,
     promptCacheKey,
   } = params
@@ -105,6 +110,8 @@ export function buildOpenAIRequestBody(params: {
     }),
     stream: true,
     stream_options: { include_usage: true },
+    // OpenAI-compatible reasoning effort (honored by OpenCode Zen / DeepSeek).
+    ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
     // Enable chain-of-thought output for DeepSeek and MiMo models.
     // When active, temperature/top_p/presence_penalty/frequency_penalty are ignored.
     ...(enableThinking && {

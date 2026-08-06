@@ -189,6 +189,8 @@ export type CommandBase = {
    */
   getBridgeInvocationError?: (args: string) => string | undefined
   description: string
+  /** Chinese (zh) description override, shown when resolved language is zh. */
+  description_zh?: string
   hasUserSpecifiedDescription?: boolean
   /** Defaults to true. Only set when the command has conditional enablement (feature flags, env checks, etc). */
   isEnabled?: () => boolean

@@ -333,6 +333,17 @@ const MaxHaiku45Option: ModelOption = {
   description: 'Haiku 4.5 · Fastest for quick answers',
 }
 
+function getOpencodeFreeOption(): ModelOption {
+  const model = process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'
+  const value = `opencode/${model}`
+  return {
+    value,
+    label: `OpenCode Free · ${model}`,
+    description: 'OpenCode Free via local Headroom gateway',
+    descriptionForModel: `OpenCode Free model (${value})`,
+  }
+}
+
 function getOpusPlanOption(): ModelOption {
   return {
     value: 'opusplan',
@@ -554,6 +565,7 @@ function getKnownModelOption(model: string): ModelOption | null {
 
 export function getModelOptions(fastMode = false): ModelOption[] {
   const options = getModelOptionsBase(fastMode)
+  options.splice(1, 0, getOpencodeFreeOption())
 
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var
   const envCustomModel = process.env.ANTHROPIC_CUSTOM_MODEL_OPTION

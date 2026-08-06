@@ -4,6 +4,11 @@ import { getAPIProvider } from '../utils/model/providers.js'
 import { updateSettingsForSource } from '../utils/settings/settings.js'
 import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
 import { applyConfigEnvironmentVariables } from '../utils/managedEnv.js'
+import { loadProviders } from '../services/providerRegistry/loader.js'
+import {
+  buildShellExportBlock,
+  switchProvider,
+} from '../services/providerRegistry/switcher.js'
 
 function getEnvVarForProvider(provider: string): string {
   switch (provider) {
@@ -61,20 +66,47 @@ const call: LocalCommandCall = async (args, _context) => {
     }
   }
 
+  // list - show all available providers (built-in + user-defined)
+  if (arg === 'list') {
+    const providers = loadProviders()
+    const grouped = providers
+      .map(p => `${p.id}${p.apiKeyEnv ? ` [${p.apiKeyEnv}]` : ''}`)
+      .join('\n')
+    return {
+      type: 'text',
+      value: `Available providers (${providers.length}):\n${grouped}`,
+    }
+  }
+
   // Validate provider
   const validProviders = [
     'anthropic',
     'openai',
+    'opencode-free',
     'gemini',
     'grok',
     'bedrock',
     'vertex',
     'foundry',
   ]
+
+  // OpenAI-compat provider from provider registry (e.g. cerebras/groq/qwen/...)
   if (!validProviders.includes(arg)) {
-    return {
-      type: 'text',
-      value: `Invalid provider: ${arg}\nValid: ${validProviders.join(', ')}`,
+    try {
+      const result = switchProvider(arg)
+      return {
+        type: 'text',
+        value: `Switched to OpenAI-compatible provider ${arg} (${result.provider.baseUrl}).\nAdd these to your shell profile, then restart:\n\n${buildShellExportBlock(
+          result,
+        )}`,
+      }
+    } catch (err) {
+      const providers = loadProviders()
+      const ids = providers.map(p => p.id).join(', ')
+      return {
+        type: 'text',
+        value: `Invalid provider: ${arg}\nValid: ${[...validProviders, ...ids].join(', ')}`,
+      }
     }
   }
 
@@ -129,6 +161,7 @@ const call: LocalCommandCall = async (args, _context) => {
   if (
     arg === 'anthropic' ||
     arg === 'openai' ||
+    arg === 'opencode-free' ||
     arg === 'gemini' ||
     arg === 'grok'
   ) {
@@ -165,9 +198,10 @@ const provider = {
   type: 'local',
   name: 'provider',
   description:
-    'Switch API provider (anthropic/openai/gemini/grok/bedrock/vertex/foundry)',
+    'Switch API provider (anthropic/openai/opencode-free/gemini/grok/bedrock/vertex/foundry)',
   aliases: ['api'],
-  argumentHint: '[anthropic|openai|gemini|grok|bedrock|vertex|foundry|unset]',
+  argumentHint:
+    '[anthropic|openai|opencode-free|gemini|grok|bedrock|vertex|foundry|unset]',
   supportsNonInteractive: true,
   load: () => Promise.resolve({ call }),
 } satisfies Command

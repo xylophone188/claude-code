@@ -222,7 +222,7 @@ import {
   clearPluginSkillsCache,
 } from './utils/plugins/loadPluginCommands.js'
 import memoize from 'lodash-es/memoize.js'
-import { isUsing3PServices, isClaudeAISubscriber } from './utils/auth.js'
+import { isClaudeAISubscriber } from './utils/auth.js'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
@@ -262,6 +262,7 @@ const usageReport: Command = {
 import oauthRefresh from './commands/oauth-refresh/index.js'
 import debugToolCall from './commands/debug-tool-call/index.js'
 import { getSettingSourceName } from './utils/settings/constants.js'
+import { localizeDescription } from './utils/language.js'
 import {
   type Command,
   getCommandName,
@@ -392,7 +393,8 @@ const COMMANDS = memoize((): Command[] => [
   hooks,
   exportCommand,
   sandboxToggle,
-  ...(!isUsing3PServices() ? [logout, login()] : []),
+  logout,
+  login(),
   passes,
   ...(peersCmd ? [peersCmd] : []),
   ...(attachCmd ? [attachCmd] : []),
@@ -826,29 +828,30 @@ export function getCommand(commandName: string, commands: Command[]): Command {
  * For model-facing prompts (like SkillTool), use cmd.description directly.
  */
 export function formatDescriptionWithSource(cmd: Command): string {
+  const description = localizeDescription(cmd)
   if (cmd.type !== 'prompt') {
-    return cmd.description
+    return description
   }
 
   if (cmd.kind === 'workflow') {
-    return `${cmd.description} (workflow)`
+    return `${description} (workflow)`
   }
 
   if (cmd.source === 'plugin') {
     const pluginName = cmd.pluginInfo?.pluginManifest.name
     if (pluginName) {
-      return `(${pluginName}) ${cmd.description}`
+      return `(${pluginName}) ${description}`
     }
-    return `${cmd.description} (plugin)`
+    return `${description} (plugin)`
   }
 
   if (cmd.source === 'builtin' || cmd.source === 'mcp') {
-    return cmd.description
+    return description
   }
 
   if (cmd.source === 'bundled') {
-    return `${cmd.description} (bundled)`
+    return `${description} (bundled)`
   }
 
-  return `${cmd.description} (${getSettingSourceName(cmd.source)})`
+  return `${description} (${getSettingSourceName(cmd.source)})`
 }

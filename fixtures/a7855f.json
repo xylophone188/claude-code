@@ -1,0 +1,48 @@
+{
+  "input": [
+    "Observations (chronological, newest last):\n#1 | event=user_message | text=\"test message\"\n#2 | event=user_message | text=\"test message\"\n#3 | event=user_message | text=\"test message\"\n#4 | event=user_message | text=\"test message\"\n#5 | event=user_message | text=\"test message\"\n\nExtract up to 3 atomic instincts. JSON array only."
+  ],
+  "output": [
+    {
+      "uuid": "UUID-0",
+      "requestId": "REQUEST_ID",
+      "timestamp": "2026-08-05T14:00:58.456Z",
+      "message": {
+        "id": "f61b92db-dba1-48e4-ad5b-8571656f5784",
+        "container": null,
+        "model": "<synthetic>",
+        "role": "assistant",
+        "stop_reason": "stop_sequence",
+        "stop_sequence": "",
+        "type": "message",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": null,
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": null,
+          "iterations": null,
+          "speed": null
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "API Error: ChatGPT Responses API request failed (401): {\"detail\":\"Could not parse your authentication token. Please try signing in again.\"}",
+            "citations": []
+          }
+        ],
+        "context_management": null
+      },
+      "type": "assistant"
+    }
+  ]
+}

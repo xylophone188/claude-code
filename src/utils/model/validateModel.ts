@@ -1,6 +1,7 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { MODEL_ALIASES } from './aliases.js'
 import { isModelAllowed } from './modelAllowlist.js'
+import { getOpencodeModelName, isOpencodeModel } from './model.js'
 import { getAPIProvider } from './providers.js'
 import { sideQuery } from '../sideQuery.js'
 import {
@@ -39,6 +40,13 @@ export async function validateModel(
   const lowerModel = normalizedModel.toLowerCase()
   if ((MODEL_ALIASES as readonly string[]).includes(lowerModel)) {
     return { valid: true }
+  }
+
+  // OpenCode model names are routed through the local compatible endpoint.
+  if (isOpencodeModel(normalizedModel)) {
+    return getOpencodeModelName(normalizedModel)
+      ? { valid: true }
+      : { valid: false, error: 'OpenCode model name cannot be empty' }
   }
 
   // Check if it matches ANTHROPIC_CUSTOM_MODEL_OPTION (pre-validated by the user)

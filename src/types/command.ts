@@ -189,6 +189,12 @@ export type CommandBase = {
    */
   getBridgeInvocationError?: (args: string) => string | undefined
   description: string
+  /**
+   * Optional Chinese translation of `description`. When the resolved display
+   * language is zh (via /lang), the command palette shows this value, falling
+   * back to `description` when absent.
+   */
+  descriptionZh?: string
   hasUserSpecifiedDescription?: boolean
   /** Defaults to true. Only set when the command has conditional enablement (feature flags, env checks, etc). */
   isEnabled?: () => boolean

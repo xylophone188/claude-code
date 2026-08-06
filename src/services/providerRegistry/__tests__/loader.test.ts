@@ -32,37 +32,35 @@ afterEach(async () => {
 })
 
 describe('loadProviders', () => {
-  test('returns 4 default providers when providers.json does not exist', async () => {
-    const { loadProviders } = await import('../loader.js')
+  test('returns built-in providers (core + OmniRoute) when providers.json does not exist', async () => {
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    expect(providers).toHaveLength(4)
-    expect(providers.map(p => p.id)).toEqual([
-      'cerebras',
-      'groq',
-      'qwen',
-      'deepseek',
-    ])
+    const expectedIds = new Set(BUILTIN_PROVIDERS.map(p => p.id))
+    const receivedIds = new Set(providers.map(p => p.id))
+    // Same id set, deduplicated (core default beats OmniRoute on overlap)
+    expect(receivedIds).toEqual(expectedIds)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })
 
   test('returns defaults when providers.json is empty', async () => {
     writeFileSync(join(tmpDir, 'providers.json'), '')
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    expect(providers).toHaveLength(4)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })
 
   test('returns defaults when providers.json is empty array', async () => {
     writeFileSync(join(tmpDir, 'providers.json'), '[]')
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    expect(providers).toHaveLength(4)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })
 
   test('returns defaults when providers.json is corrupt JSON', async () => {
     writeFileSync(join(tmpDir, 'providers.json'), '{not valid json')
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    expect(providers).toHaveLength(4)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })
 
   test('returns defaults when providers.json fails schema validation', async () => {
@@ -70,9 +68,9 @@ describe('loadProviders', () => {
       join(tmpDir, 'providers.json'),
       JSON.stringify([{ id: 123, kind: 'bad-kind', baseUrl: 'not-a-url' }]),
     )
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    expect(providers).toHaveLength(4)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })
 
   test('merges valid user providers on top of defaults', async () => {
@@ -88,10 +86,10 @@ describe('loadProviders', () => {
       join(tmpDir, 'providers.json'),
       JSON.stringify([customProvider]),
     )
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    // 4 defaults + 1 custom = 5
-    expect(providers).toHaveLength(5)
+    // builtins + 1 custom
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length + 1)
     expect(providers.find(p => p.id === 'myendpoint')).toMatchObject({
       baseUrl: 'https://my.api.com/v1',
     })
@@ -110,10 +108,10 @@ describe('loadProviders', () => {
       join(tmpDir, 'providers.json'),
       JSON.stringify([overrideCerebras]),
     )
-    const { loadProviders } = await import('../loader.js')
+    const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
-    // Still 4 providers (cerebras replaced, not added)
-    expect(providers).toHaveLength(4)
+    // Same count (cerebras replaced, not added)
+    expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
     const cerebras = providers.find(p => p.id === 'cerebras')
     expect(cerebras?.baseUrl).toBe('https://custom-cerebras.example.com/v1')
   })

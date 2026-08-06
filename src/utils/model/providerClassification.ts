@@ -4,6 +4,7 @@ export type APIProvider =
   | 'vertex'
   | 'foundry'
   | 'openai'
+  | 'opencode-free'
   | 'gemini'
   | 'grok'
 

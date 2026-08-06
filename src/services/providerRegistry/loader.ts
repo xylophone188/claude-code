@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { logError } from '../../utils/log.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { ProvidersFileSchema, type ProviderConfig } from './types.js'
+import { OMNIROUTE_PROVIDERS } from './omnirouteProviders.generated.js'
 
 /**
  * The four built-in OpenAI-compat providers.
@@ -46,6 +47,20 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     defaultModel: 'deepseek-chat',
     compatRule: 'deepseek',
   },
+]
+
+/**
+ * All built-in providers: the four core defaults plus the OmniRoute
+ * collection of 9router openai-compat providers.
+ *
+ * Deduplicated by id with core defaults winning — OmniRoute's cerebras/groq/
+ * deepseek entries (OMNI_*_KEY env) only fill gaps, never override the core
+ * defaults' credential expectations.
+ */
+export const BUILTIN_PROVIDERS: ProviderConfig[] = [
+  ...new Map(
+    [...OMNIROUTE_PROVIDERS, ...DEFAULT_PROVIDERS].map(p => [p.id, p]),
+  ).values(),
 ]
 
 /**
@@ -109,7 +124,7 @@ function _loadProvidersInternal(): {
   const filePath = getProvidersFilePath()
 
   if (!existsSync(filePath)) {
-    return { providers: [...DEFAULT_PROVIDERS] }
+    return { providers: [...BUILTIN_PROVIDERS] }
   }
 
   let raw: string
@@ -118,12 +133,12 @@ function _loadProvidersInternal(): {
   } catch (err: unknown) {
     const msg = `loadProviders: failed to read ${filePath}: ${err instanceof Error ? err.message : String(err)}`
     logError(new Error(msg))
-    return { providers: [...DEFAULT_PROVIDERS], error: msg }
+    return { providers: [...BUILTIN_PROVIDERS], error: msg }
   }
 
   // Empty file → return defaults
   if (!raw.trim()) {
-    return { providers: [...DEFAULT_PROVIDERS] }
+    return { providers: [...BUILTIN_PROVIDERS] }
   }
 
   let parsed: unknown
@@ -132,23 +147,23 @@ function _loadProvidersInternal(): {
   } catch {
     const msg = `loadProviders: ${filePath} is not valid JSON. Using default providers.`
     logError(new Error(msg))
-    return { providers: [...DEFAULT_PROVIDERS], error: msg }
+    return { providers: [...BUILTIN_PROVIDERS], error: msg }
   }
 
   const result = ProvidersFileSchema.safeParse(parsed)
   if (!result.success) {
     const msg = `loadProviders: ${filePath} failed schema validation: ${result.error.message}. Using default providers.`
     logError(new Error(msg))
-    return { providers: [...DEFAULT_PROVIDERS], error: msg }
+    return { providers: [...BUILTIN_PROVIDERS], error: msg }
   }
 
   if (result.data.length === 0) {
-    return { providers: [...DEFAULT_PROVIDERS] }
+    return { providers: [...BUILTIN_PROVIDERS] }
   }
 
   // Merge: user entries override defaults with same id; new ids are appended.
   const merged = new Map<string, ProviderConfig>()
-  for (const p of DEFAULT_PROVIDERS) {
+  for (const p of BUILTIN_PROVIDERS) {
     merged.set(p.id, p)
   }
   for (const p of result.data) {
@@ -200,7 +215,7 @@ export function saveProviders(providers: ProviderConfig[]): ProviderConfig[] {
 
   // Build merged list (providers override defaults by id)
   const merged = new Map<string, ProviderConfig>()
-  for (const p of DEFAULT_PROVIDERS) {
+  for (const p of BUILTIN_PROVIDERS) {
     merged.set(p.id, p)
   }
   for (const p of providers) {

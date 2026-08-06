@@ -14,6 +14,7 @@ export function getAPIProvider(
 ): APIProvider {
   const modelType = settings.modelType
   if (modelType === 'openai') return 'openai'
+  if (modelType === 'opencode-free') return 'opencode-free'
   if (modelType === 'gemini') return 'gemini'
   if (modelType === 'grok') return 'grok'
 
@@ -25,7 +26,15 @@ export function getAPIProvider(
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_GEMINI)) return 'gemini'
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_GROK)) return 'grok'
 
-  return 'firstParty'
+  if (
+    process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.ANTHROPIC_AUTH_TOKEN
+  ) {
+    return 'firstParty'
+  }
+
+  return 'opencode-free'
 }
 
 export function getAPIProviderForStatsig(): AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS {

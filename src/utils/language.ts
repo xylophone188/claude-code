@@ -24,3 +24,17 @@ const DISPLAY_NAMES: Record<string, string> = {
 export function getLanguageDisplayName(lang: string): string {
   return DISPLAY_NAMES[lang] ?? lang
 }
+
+/**
+ * Pick a localized description for a command/skill.
+ * In zh mode, prefer `descriptionZh`, falling back to the original
+ * `description` when a Chinese translation is not yet provided.
+ */
+export function localizeDescription(c: {
+  description: string
+  descriptionZh?: string
+}): string {
+  return getResolvedLanguage() === 'zh' && c.descriptionZh
+    ? c.descriptionZh
+    : c.description
+}

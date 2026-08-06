@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **运营分工**：本仓库源码改动默认在 **PC** 完成；Termux（手机）侧只做分发与 Termux 特有任务。详见 [DIVISION_OF_LABOR.md](./DIVISION_OF_LABOR.md)。
+
 This file provides guidance to Claude Code (claude.ai/code) and other AI coding agents when working with code in this repository.
 
 ## Project Overview

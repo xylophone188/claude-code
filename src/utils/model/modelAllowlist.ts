@@ -98,6 +98,10 @@ function familyHasSpecificEntries(
  * 3. Full model IDs ("claude-opus-4-5-20251101") — exact match only
  */
 export function isModelAllowed(model: string): boolean {
+  if (model.trim().toLowerCase().startsWith('opencode/')) {
+    return model.trim().slice('opencode/'.length).trim().length > 0
+  }
+
   const settings = getSettings_DEPRECATED() || {}
   const { availableModels } = settings
   if (!availableModels) {

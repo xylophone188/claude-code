@@ -83,6 +83,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Bare `ccb` is the advisor entrypoint. Explicit CLI arguments retain their
+  // normal behavior; the advisor uses the local CCB Codex account pool.
+  if (args.length === 0) {
+    process.argv.push('--model', 'advisor');
+  }
+
   // For all other paths, load the startup profiler
   const { profileCheckpoint } = await import('../utils/startupProfiler.js');
   profileCheckpoint('cli_entry');

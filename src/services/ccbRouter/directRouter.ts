@@ -171,11 +171,9 @@ function withHeadroom(
   // requests go direct to upstream — no compression savings, but functional.
   if (process.env.CCB_SKIP_HEADROOM === '1')
     return { ...route, tier, headroomMode: undefined }
-  const headroomMode = tier === 'l1' ? 'token' : 'cache'
-  const baseURL =
-    headroomMode === 'token'
-      ? process.env.CCB_HEADROOM_TOKEN_BASE_URL
-      : process.env.CCB_HEADROOM_CACHE_BASE_URL
+  // Use cache mode for all tiers (L1-L6) as requested.
+  const headroomMode = 'cache'
+  const baseURL = process.env.CCB_HEADROOM_CACHE_BASE_URL
   if (!baseURL || !/^https?:\/\//i.test(baseURL))
     return { ...route, tier, headroomMode }
   return {
@@ -186,6 +184,8 @@ function withHeadroom(
     headers: {
       ...route.headers,
       'x-headroom-base-url': route.baseURL,
+      // Headroom keeps the base URL path and forwards this value verbatim.
+      // `/v1/chat/completions` here would become `/v1/v1/chat/completions`.
       'x-headroom-original-path': '/chat/completions',
     },
   }

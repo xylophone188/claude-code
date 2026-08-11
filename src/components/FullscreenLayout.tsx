@@ -71,6 +71,9 @@ type Props = {
   newMessageCount?: number;
   /** Called when the user clicks the "N new" pill. */
   onPillClick?: () => void;
+  /** Optional fixed-width panel rendered to the right of the transcript.
+   *  Fullscreen only; ignored in inline mode. Panel controls its own width. */
+  sidePanel?: ReactNode;
 };
 
 /**
@@ -295,8 +298,12 @@ export function FullscreenLayout({
   hideSticky = false,
   newMessageCount = 0,
   onPillClick,
+  sidePanel,
 }: Props): React.ReactNode {
   const { rows: terminalRows, columns } = useTerminalSize();
+  const hasSidePanel = sidePanel != null && columns > 100;
+  const sideWidth = columns >= 200 ? 60 : columns >= 160 ? 50 : 42;
+  const contentCols = hasSidePanel ? columns - sideWidth : columns;
   // Scroll-derived chrome state lives HERE, not in REPL. StickyTracker
   // writes via ScrollChromeContext; pillVisible subscribes directly to
   // ScrollBox. Both change rarely (pill flips once per threshold crossing,
@@ -368,7 +375,7 @@ export function FullscreenLayout({
     return (
       <PromptOverlayProvider>
         <Box flexDirection="row" flexGrow={1} overflow="hidden" width="100%">
-          <Box flexDirection="column" flexGrow={1} width={columns} overflow="hidden">
+          <Box flexDirection="column" flexGrow={1} width={contentCols} overflow="hidden">
             <Box flexGrow={1} flexDirection="column" overflow="hidden">
               {headerPrompt && <StickyPromptHeader text={headerPrompt.text} onClick={headerPrompt.scrollTo} />}
               <ScrollBox
@@ -398,6 +405,11 @@ export function FullscreenLayout({
               </Box>
             </Box>
           </Box>
+          {hasSidePanel && (
+            <Box flexDirection="column" width={sideWidth} flexShrink={0} overflow="hidden">
+              {sidePanel}
+            </Box>
+          )}
         </Box>
         {modal != null && (
           <ModalContext

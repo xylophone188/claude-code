@@ -31,6 +31,9 @@ export const PROVIDER_OC = 'oc'
 export const PROVIDER_OPENAI = 'openai'
 export const PROVIDER_CCB = 'ccb'
 export const PROVIDER_ADD = 'add-provider'
+export const PROVIDER_DELETE = 'delete-provider'
+export const PROVIDER_DEFAULT = 'default'
+export const PROVIDER_SWITCH = 'switch'
 export const PROVIDER_AUTO = 'auto'
 export const PROVIDER_ADVISOR = 'advisor'
 export const PROVIDER_MANAGED = 'managed'
@@ -38,7 +41,14 @@ export const PROVIDER_MANAGE = 'manage'
 
 /** Level-2 content behind a level-1 provider entry. */
 export interface ProviderContent {
-  kind: 'models' | 'combos' | 'subproviders' | 'info' | 'managed' | 'manage'
+  kind:
+    | 'models'
+    | 'combos'
+    | 'subproviders'
+    | 'info'
+    | 'managed'
+    | 'manage'
+    | 'delete'
   options: ModelOption[]
   /** Read-only lines rendered by the 'info' kind. */
   lines?: string[]
@@ -361,6 +371,55 @@ export async function getProviderContent(
       ],
     }
   }
+  if (providerId === PROVIDER_DEFAULT) {
+    const codexLoggedIn = isCodexLoggedIn()
+    if (codexLoggedIn) {
+      const { getChatGPTCodexModelOptions } = await import('./modelOptions.js')
+      return { kind: 'models', options: getChatGPTCodexModelOptions() }
+    }
+    return {
+      kind: 'subproviders',
+      options: listDirectProviderModels().map(({ providerId: id }) => ({
+        value: id,
+        label: PREFIX_NAMES[id] ?? id,
+        description: 'CCB 直连供应商',
+      })),
+    }
+  }
+  if (providerId === PROVIDER_SWITCH) {
+    const providers = getRegisteredProviders()
+    return {
+      kind: 'subproviders',
+      options: [
+        ...listDirectProviderModels().map(({ providerId: id }) => ({
+          value: id,
+          label: PREFIX_NAMES[id] ?? id,
+          description: 'CCB 直连供应商',
+        })),
+        ...providers
+          .filter(p => p.providerId !== PROVIDER_CCB)
+          .map(p => ({
+            value: p.providerId,
+            label: p.name,
+            description: '已添加',
+          })),
+      ],
+    }
+  }
+  if (providerId === PROVIDER_DELETE) {
+    const providers = getRegisteredProviders().filter(
+      p => p.providerId !== PROVIDER_CCB,
+    )
+    return {
+      kind: 'delete',
+      options: providers.map(p => ({
+        value: p.id,
+        label: p.name,
+        description: '删除该供应商',
+      })),
+      lines: ['选择供应商后回车删除，Esc 返回。'],
+    }
+  }
   if (providerId === PROVIDER_AUTO) {
     return {
       kind: 'info',
@@ -544,53 +603,35 @@ export async function getProviderModelOptions(
  * (Codex login only), CCB providers, registered custom providers, and
  * finally "添加供应商". */
 export async function getProviderList(): Promise<ModelOption[]> {
-  const options: ModelOption[] = [
+  const codexLoggedIn = isCodexLoggedIn()
+  const embedded = embeddedProviderIds().length
+  const registered = getRegisteredProviders().filter(
+    p => p.providerId !== PROVIDER_CCB,
+  )
+  const totalManaged = embedded + registered.length
+
+  return [
     {
-      value: PROVIDER_AUTO,
-      label: '自动路由',
-      description: '智能评分自动选择模型',
+      value: PROVIDER_DEFAULT,
+      label: '默认模式',
+      description: codexLoggedIn
+        ? 'OpenAI + 已添加供应商'
+        : `CCB 直连 ${embedded} 个供应商`,
     },
     {
-      value: PROVIDER_ADVISOR,
-      label: '顾问路由',
-      description: '方案、复核、验收；自动路由执行',
+      value: PROVIDER_SWITCH,
+      label: '切换供应商',
+      description: `已接入 ${totalManaged} 个供应商`,
     },
     {
-      value: PROVIDER_OC,
-      label: 'OpenCode',
-      description: 'OpenCode Free 免费模型',
+      value: PROVIDER_ADD,
+      label: '添加供应商',
+      description: '注册新的模型供应商',
+    },
+    {
+      value: PROVIDER_DELETE,
+      label: '删除供应商',
+      description: '移除已添加的供应商',
     },
   ]
-
-  if (isCodexLoggedIn()) {
-    const { getChatGPTCodexModelOptions } = await import('./modelOptions.js')
-    const curated = getChatGPTCodexModelOptions()
-    options.push({
-      value: PROVIDER_OPENAI,
-      label: 'OpenAI',
-      description: `${curated.length} model${curated.length === 1 ? '' : 's'}`,
-    })
-  }
-
-  options.push({
-    value: PROVIDER_CCB,
-    label: getLocalGatewayName(),
-    description: `${embeddedProviderIds().length} 个供应商`,
-  })
-
-  for (const provider of getRegisteredProviders()) {
-    if (provider.providerId === PROVIDER_CCB) continue
-    options.push({
-      value: provider.providerId,
-      label: provider.name,
-      description: '已添加的供应商',
-    })
-  }
-
-  options.push({
-    value: PROVIDER_ADD,
-    label: '添加供应商',
-    description: '注册新的模型供应商',
-  })
-  return options
 }

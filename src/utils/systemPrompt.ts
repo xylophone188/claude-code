@@ -50,7 +50,8 @@ export function buildEffectiveSystemPrompt({
   overrideSystemPrompt?: string | null
 }): SystemPrompt {
   const advisorRoutingInstructions =
-    toolUseContext?.options?.mainLoopModel?.trim().toLowerCase() === 'advisor'
+    toolUseContext?.options?.mainLoopModel?.trim().toLowerCase() ===
+      'advisor' || process.env.CCB_FORCE_ADVISOR_WORKFLOW === '1'
       ? `# Advisor Routing
 
 You are the decision-maker, not the worker. For a task requiring workspace changes, tests, investigation, or implementation, start the Workflow tool with mode="advisor" and args={"task":"<the user's complete task>"}. That workflow runs in the background: advisor-model subagents create the plan, review results, and accept or request one bounded revision; auto-routed subagents do execution. Do not perform the worker task yourself. For a question that needs only judgment or explanation, answer directly.`

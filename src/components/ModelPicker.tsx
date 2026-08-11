@@ -42,8 +42,16 @@ import {
   PROVIDER_ADVISOR,
   PROVIDER_AUTO,
   PROVIDER_CCB,
+  PROVIDER_DEFAULT,
+  PROVIDER_DELETE,
+  PROVIDER_SWITCH,
 } from '../utils/model/opencodeFree.js';
-import { addRegisteredProvider, getLocalGatewayName, setLocalGatewayName } from '../utils/model/providerRegistry.js';
+import {
+  addRegisteredProvider,
+  getLocalGatewayName,
+  removeRegisteredProvider,
+  setLocalGatewayName,
+} from '../utils/model/providerRegistry.js';
 import { getSettingsForSource, updateSettingsForSource } from '../utils/settings/settings.js';
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
 import { Select } from './CustomSelect/index.js';
@@ -79,7 +87,7 @@ const NO_PREFERENCE = '__NO_PREFERENCE__';
  * 'subprovider'  → CCB sub-provider list
  * 'content'      → final model/combo list (phase 2, effort + 1M controls)
  */
-type Phase = 'provider' | 'content' | 'subprovider' | 'catalog' | 'naming';
+type Phase = 'provider' | 'content' | 'subprovider' | 'catalog' | 'naming' | 'delete';
 
 type NamingTarget =
   | { kind: 'ccb' } // rename CCB
@@ -171,6 +179,9 @@ export function ModelPicker({
       } else if (content.kind === 'subproviders') {
         setSubproviderOptions(content.options);
         setPhase('subprovider');
+      } else if (content.kind === 'delete') {
+        setSubproviderOptions(content.options);
+        setPhase('delete');
       } else {
         // 'models' and 'combos' both render in the content phase; combos are
         // directly selectable and the data layer

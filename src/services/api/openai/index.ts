@@ -49,6 +49,7 @@ import {
   waitForProviderRequestSlot,
 } from '../../ccbRouter/accountPool.js'
 import { recordRaceMetric } from '../../ccbRouter/raceMetrics.js'
+import { fuseAnswers, type PanelAnswer } from '../../routing/fusion.js'
 import {
   invalidateOpenCodeModelsCache,
   refreshAutoHealth,
@@ -245,6 +246,14 @@ const AUTO_L1_RACE_TIMEOUT_MS =
  * latency-sensitive (closest to first-wins); higher = more candidates to judge.
  */
 const RACE_QUORUM = Number(process.env.CCB_RACE_QUORUM) || 3
+const RACE_ALL_OF: 'best' | 'vote' | 'concat' | false = (() => {
+  const raw = process.env.CCB_RACE_ALL_OF
+  if (!raw) return false
+  if (raw === '1' || raw === 'best') return 'best'
+  if (raw === 'vote') return 'vote'
+  if (raw === 'concat') return 'concat'
+  return false
+})()
 
 function isMeaningfulOpenAIEvent(event: ChatCompletionChunk): boolean {
   const choice = event.choices[0]
@@ -302,6 +311,21 @@ function throwIfUpstreamBlocked(
 
 /** Provider junk must fail before it reaches the transcript. Deliberately do
  * not treat a human language as junk: users may request Japanese or Korean. */
+function hasMeaningfulContent(text: string): boolean {
+  const compact = text.trim()
+  if (compact.length < 30) return false
+  if (isInvalidProviderText(compact)) return false
+  if (
+    /(^|[.`-]\s|\n)#{1,6}\s|^\s*(?:[-*+]\s|\d+[.)]\s)|https?:\/\/|\/[A-Za-z_]/.test(
+      compact,
+    )
+  )
+    return true
+  if (/[^\n]\?|[^\n]!|[^\n]\.|[^\n]，|[^\n]。|[^\n]？/.test(compact))
+    return true
+  return compact.length > 200
+}
+
 function isInvalidProviderText(text: string): boolean {
   if (
     text.includes('\ufffd') ||
@@ -897,6 +921,102 @@ async function createRouteStream(
   }
 }
 
+async function* allOfRaceStream(
+  routes: DirectRoute[],
+  createStream: (
+    route: DirectRoute,
+    signal: AbortSignal,
+  ) => Promise<AsyncIterable<ChatCompletionChunk>>,
+  signal: AbortSignal,
+  onSelected?: () => void,
+): AsyncGenerator<ChatCompletionChunk, void> {
+  if (!RACE_ALL_OF || routes.length < 2) {
+    yield* raceDirectProviderStream(routes, createStream, signal)
+    return
+  }
+  const quorum = Math.min(RACE_QUORUM, routes.length)
+  const controllers = new Map(
+    routes.map(route => [route, new AbortController()] as const),
+  )
+  const abort = () => controllers.forEach(c => c.abort())
+  signal.addEventListener('abort', abort, { once: true })
+  type Completed = {
+    route: DirectRoute
+    fullText: string
+    toolCalls: number
+  }
+  const attempts = routes.map(async (route): Promise<Completed> => {
+    const requestSignal = controllers.get(route)!.signal
+    const stream = await createStream(route, requestSignal)
+    const iterator = stream[Symbol.asyncIterator]()
+    let fullText = ''
+    let toolCalls = 0
+    for (;;) {
+      const next = await iterator.next()
+      if (next.done) break
+      fullText += eventText(next.value)
+      toolCalls += eventToolCalls(next.value)
+      if (signal.aborted) {
+        throw new APIUserAbortError()
+      }
+    }
+    return { route, fullText, toolCalls }
+  })
+  try {
+    const results = await Promise.allSettled(attempts)
+    const completed = results
+      .filter(
+        (r): r is PromiseFulfilledResult<Completed> => r.status === 'fulfilled',
+      )
+      .map(r => r.value)
+      .filter(
+        c => c.fullText.trim().length > 0 && !isInvalidProviderText(c.fullText),
+      )
+    if (completed.length < 2) {
+      if (completed.length === 1) {
+        const stream = await createStream(completed[0].route, signal)
+        yield* stream
+        return
+      }
+      throw new ProviderOutputError('allOf: no quorum completed')
+    }
+    const answers: PanelAnswer[] = completed.map(c => ({
+      model: c.route.model,
+      text: c.fullText,
+    }))
+    const fused = fuseAnswers(answers, RACE_ALL_OF)
+    if (!fused || !hasMeaningfulContent(fused))
+      throw new ProviderOutputError('allOf: fusion returned low-quality output')
+    onSelected?.()
+    routeLog(
+      'race',
+      `allOf fused ${completed.length} responses -> ${RACE_ALL_OF}`,
+      {
+        models: completed.map(c => c.route.model).join(', '),
+      },
+    )
+    recordRaceMetric({
+      at: new Date().toISOString(),
+      provider: answers[0].model.split('/')[0] || 'fused',
+      model: answers[0].model,
+      account: 'allOf',
+      outcome: 'selected',
+      elapsedMs: Date.now(),
+    })
+    const baseChunk = {
+      id: `allOf-${Date.now()}`,
+      model: 'fused-allOf',
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      choices: [{ index: 0, delta: { content: fused }, finish_reason: 'stop' }],
+    } as ChatCompletionChunk
+    yield baseChunk
+  } finally {
+    signal.removeEventListener('abort', abort)
+    abort()
+  }
+}
+
 async function* raceThenFallbackStream(
   tierGroups: DirectRoute[][],
   createStream: (
@@ -922,7 +1042,7 @@ async function* raceThenFallbackStream(
   )
   try {
     if (raceRoutes.length)
-      yield* raceDirectProviderStream(
+      yield* allOfRaceStream(
         raceRoutes,
         createStream,
         l1Controller.signal,

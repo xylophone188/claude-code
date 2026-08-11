@@ -158,6 +158,21 @@ const buddy = feature('BUDDY')
       require('./commands/buddy/index.js') as typeof import('./commands/buddy/index.js')
     ).default
   : null
+const caveman = feature('CAVEMAN')
+  ? (
+      require('./commands/caveman/index.js') as typeof import('./commands/caveman/index.js')
+    ).default
+  : null
+const ponytail = feature('PONYTAIL')
+  ? (
+      require('./commands/ponytail/index.js') as typeof import('./commands/ponytail/index.js')
+    ).default
+  : null
+const rtkCmd = feature('RTK')
+  ? (
+      require('./commands/rtk/index.js') as typeof import('./commands/rtk/index.js')
+    ).default
+  : null
 const poor = feature('POOR')
   ? (
       require('./commands/poor/index.js') as typeof import('./commands/poor/index.js')
@@ -377,6 +392,9 @@ const COMMANDS = memoize((): Command[] => [
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(buddy ? [buddy] : []),
+  ...(caveman ? [caveman] : []),
+  ...(ponytail ? [ponytail] : []),
+  ...(rtkCmd ? [rtkCmd] : []),
   ...(poor ? [poor] : []),
   ...(goalCmd ? [goalCmd] : []),
   ...(proactive ? [proactive] : []),

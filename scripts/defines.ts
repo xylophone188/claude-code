@@ -89,6 +89,9 @@ export const DEFAULT_BUILD_FEATURES = [
   // 'SKILL_LEARNING',
   // P3: poor mode
   'POOR', // 穷鬼模式，跳过 extract_memories/prompt_suggestion 减少消耗
+  'CAVEMAN', // caveman 输出压缩模式
+  'PONYTAIL', // ponytail 懒开发模式
+  'RTK', // rtk bash 输出过滤
   // Team Memory
   // 'TEAMMEM',                  // 已禁用：依赖 COORDINATOR_MODE，邮箱文件无限增长
   // SSH Remote

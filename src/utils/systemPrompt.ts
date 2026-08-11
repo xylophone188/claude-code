@@ -8,36 +8,32 @@ import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/Agen
 import { isBuiltInAgent } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
 import { isEnvTruthy } from './envUtils.js'
 import { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
+import { getCavemanInstructions } from '../commands/caveman/cavemanMode.js'
+import { getPonytailInstructions } from '../commands/ponytail/ponytailMode.js'
+import { getRtkInstructions } from '../commands/rtk/rtkMode.js'
 
 export { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
 
-// Dead code elimination: conditional import for proactive mode.
-// Same pattern as prompts.ts — lazy require to avoid pulling the module
-// into non-proactive builds.
-/* eslint-disable @typescript-eslint/no-require-imports */
 const proactiveModule =
   feature('PROACTIVE') || feature('KAIROS')
     ? (require('../proactive/index.js') as typeof import('../proactive/index.js'))
     : null
+
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 function isProactiveActive_SAFE_TO_CALL_ANYWHERE(): boolean {
   return proactiveModule?.isProactiveActive() ?? false
 }
 
-/**
- * Builds the effective system prompt array based on priority:
- * 0. Override system prompt (if set, e.g., via loop mode - REPLACES all other prompts)
- * 1. Coordinator system prompt (if coordinator mode is active)
- * 2. Agent system prompt (if mainThreadAgentDefinition is set)
- *    - In proactive mode: agent prompt is APPENDED to default (agent adds domain
- *      instructions on top of the autonomous agent prompt, like teammates do)
- *    - Otherwise: agent prompt REPLACES default
- * 3. Custom system prompt (if specified via --system-prompt)
- * 4. Default system prompt (the standard Claude Code prompt)
- *
- * Plus appendSystemPrompt is always added at the end if specified (except when override is set).
- */
+function getModeInstructions(): string | undefined {
+  const parts = [
+    getCavemanInstructions(),
+    getPonytailInstructions(),
+    getRtkInstructions(),
+  ].filter((p): p is string => Boolean(p))
+  return parts.length ? parts.join('\n\n') : undefined
+}
+
 export function buildEffectiveSystemPrompt({
   mainThreadAgentDefinition,
   toolUseContext,
@@ -59,21 +55,22 @@ export function buildEffectiveSystemPrompt({
 
 You are the decision-maker, not the worker. For a task requiring workspace changes, tests, investigation, or implementation, start the Workflow tool with mode="advisor" and args={"task":"<the user's complete task>"}. That workflow runs in the background: advisor-model subagents create the plan, review results, and accept or request one bounded revision; auto-routed subagents do execution. Do not perform the worker task yourself. For a question that needs only judgment or explanation, answer directly.`
       : undefined
+
+  const modeInstructions = getModeInstructions()
+
   if (overrideSystemPrompt) {
     return asSystemPrompt([
       overrideSystemPrompt,
       ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
+      ...(modeInstructions ? [modeInstructions] : []),
     ])
   }
-  // Coordinator mode: use coordinator prompt instead of default
-  // Use inline env check instead of coordinatorModule to avoid circular
-  // dependency issues during test module loading.
+
   if (
     feature('COORDINATOR_MODE') &&
     isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) &&
     !mainThreadAgentDefinition
   ) {
-    // Lazy require to avoid circular dependency at module load time
     const { getCoordinatorSystemPrompt } =
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js')
@@ -81,6 +78,7 @@ You are the decision-maker, not the worker. For a task requiring workspace chang
       getCoordinatorSystemPrompt(),
       ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
       ...(appendSystemPrompt ? [appendSystemPrompt] : []),
+      ...(modeInstructions ? [modeInstructions] : []),
     ])
   }
 
@@ -92,7 +90,6 @@ You are the decision-maker, not the worker. For a task requiring workspace chang
       : mainThreadAgentDefinition.getSystemPrompt()
     : undefined
 
-  // Log agent memory loaded event for main loop agents
   if (mainThreadAgentDefinition?.memory) {
     logEvent('tengu_agent_memory_loaded', {
       ...(process.env.USER_TYPE === 'ant' && {
@@ -106,10 +103,6 @@ You are the decision-maker, not the worker. For a task requiring workspace chang
     })
   }
 
-  // In proactive mode, agent instructions are appended to the default prompt
-  // rather than replacing it. The proactive default prompt is already lean
-  // (autonomous agent identity + memory + env + proactive section), and agents
-  // add domain-specific behavior on top — same pattern as teammates.
   if (
     agentSystemPrompt &&
     (feature('PROACTIVE') || feature('KAIROS')) &&
@@ -120,6 +113,7 @@ You are the decision-maker, not the worker. For a task requiring workspace chang
       `\n# Custom Agent Instructions\n${agentSystemPrompt}`,
       ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
       ...(appendSystemPrompt ? [appendSystemPrompt] : []),
+      ...(modeInstructions ? [modeInstructions] : []),
     ])
   }
 
@@ -131,5 +125,6 @@ You are the decision-maker, not the worker. For a task requiring workspace chang
         : defaultSystemPrompt),
     ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
     ...(appendSystemPrompt ? [appendSystemPrompt] : []),
+    ...(modeInstructions ? [modeInstructions] : []),
   ])
 }

@@ -1,5 +1,15 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import { buildEffectiveSystemPrompt } from '../systemPrompt'
+
+mock.module('../../commands/caveman/cavemanMode.js', () => ({
+  getCavemanInstructions: () => undefined,
+}))
+mock.module('../../commands/ponytail/ponytailMode.js', () => ({
+  getPonytailInstructions: () => undefined,
+}))
+mock.module('../../commands/rtk/rtkMode.js', () => ({
+  getRtkInstructions: () => undefined,
+}))
 
 const defaultPrompt = ['You are a helpful assistant.', 'Follow instructions.']
 

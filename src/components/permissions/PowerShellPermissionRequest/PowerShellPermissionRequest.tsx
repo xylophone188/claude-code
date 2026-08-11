@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, useTheme } from '@anthropic/ink';
 import { useKeybinding } from '../../../keybindings/useKeybinding.js';
@@ -228,7 +229,7 @@ export function PowerShellPermissionRequest(props: PermissionRequestProps): Reac
           <PermissionDecisionDebugInfo permissionResult={toolUseConfirm.permissionResult} toolName="PowerShell" />
           {toolUseContext.options.debug && (
             <Box justifyContent="flex-end" marginTop={1}>
-              <Text dimColor>Ctrl-D to hide debug info</Text>
+              <Text dimColor>{zh('Ctrl-D to hide debug info', 'Ctrl-D 隐藏调试信息')}</Text>
             </Box>
           )}
         </>
@@ -241,7 +242,7 @@ export function PowerShellPermissionRequest(props: PermissionRequestProps): Reac
                 <Text color="warning">{destructiveWarning}</Text>
               </Box>
             )}
-            <Text>Do you want to proceed?</Text>
+            <Text>{zh('Do you want to proceed?', '是否继续？')}</Text>
             <Select
               options={options}
               inlineDescriptions
@@ -258,7 +259,9 @@ export function PowerShellPermissionRequest(props: PermissionRequestProps): Reac
                 ' · Tab to amend'}
               {explainerState.enabled && ` · ctrl+e to ${explainerState.visible ? 'hide' : 'explain'}`}
             </Text>
-            {toolUseContext.options.debug && <Text dimColor>Ctrl+d to show debug info</Text>}
+            {toolUseContext.options.debug && (
+              <Text dimColor>{zh('Ctrl+d to show debug info', 'Ctrl+d 显示调试信息')}</Text>
+            )}
           </Box>
         </>
       )}

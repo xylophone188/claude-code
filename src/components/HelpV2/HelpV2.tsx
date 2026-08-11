@@ -13,6 +13,7 @@ import { Box, Link, Text, Tab, Tabs, Pane } from '@anthropic/ink';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';
 import { Commands } from './Commands.js';
 import { General } from './General.js';
+import { zh } from '../../utils/i18n.js';
 
 type Props = {
   onClose: (result?: string, options?: { display?: CommandResultDisplay }) => void;
@@ -46,31 +47,31 @@ export function HelpV2({ onClose, commands }: Props): React.ReactNode {
   const customCommands = commands.filter(cmd => !builtinNames.has(cmd.name) && !cmd.isHidden);
 
   const tabs = [
-    <Tab key="general" title="general">
+    <Tab key="general" title={zh('general', '常规')}>
       <General />
     </Tab>,
   ];
 
   tabs.push(
-    <Tab key="commands" title="commands">
+    <Tab key="commands" title={zh('commands', '命令')}>
       <Commands
         commands={builtinCommands}
         maxHeight={maxHeight}
         columns={columns}
-        title="Browse default commands:"
+        title={zh('Browse default commands:', '浏览默认命令：')}
         onCancel={close}
       />
     </Tab>,
   );
 
   tabs.push(
-    <Tab key="custom" title="custom-commands">
+    <Tab key="custom" title={zh('custom-commands', '自定义命令')}>
       <Commands
         commands={customCommands}
         maxHeight={maxHeight}
         columns={columns}
-        title="Browse custom commands:"
-        emptyMessage="No custom commands found"
+        title={zh('Browse custom commands:', '浏览自定义命令：')}
+        emptyMessage={zh('No custom commands found', '未找到自定义命令')}
         onCancel={close}
       />
     </Tab>,
@@ -83,7 +84,7 @@ export function HelpV2({ onClose, commands }: Props): React.ReactNode {
           commands={antOnlyCommands}
           maxHeight={maxHeight}
           columns={columns}
-          title="Browse ant-only commands:"
+          title={zh('Browse ant-only commands:', '浏览 ant-only 命令：')}
           onCancel={close}
         />
       </Tab>,
@@ -102,15 +103,23 @@ export function HelpV2({ onClose, commands }: Props): React.ReactNode {
         </Tabs>
         <Box marginTop={1}>
           <Text>
-            For more help: <Link url="https://code.claude.com/docs/en/overview" />
+            {zh('For more help: ', '更多帮助：')}
+            <Link url="https://code.claude.com/docs/en/overview" />
           </Text>
         </Box>
         <Box marginTop={1}>
           <Text dimColor>
             {exitState.pending ? (
-              <>Press {exitState.keyName} again to exit</>
+              <>
+                {zh('Press ', '再次按 ')}
+                {exitState.keyName}
+                {zh(' again to exit', ' 退出')}
+              </>
             ) : (
-              <Text italic>{dismissShortcut} to cancel</Text>
+              <Text italic>
+                {dismissShortcut}
+                {zh(' to cancel', ' 取消')}
+              </Text>
             )}
           </Text>
         </Box>

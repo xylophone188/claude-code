@@ -45,6 +45,78 @@ function describeResolved(spec: string): string {
 const call: LocalCommandCall = async (args, _context) => {
   const arg = args.trim()
 
+  const importCodex = arg.match(/^import-codex(?:\s+(.*))?$/)
+  if (importCodex) {
+    const paths = importCodex[1]?.trim().split(/\s+/).filter(Boolean) ?? []
+    if (paths.length === 0) {
+      return { type: 'text', value: '用法：/ccb import-codex <auth.json...>' }
+    }
+    try {
+      const { importChatGPTAuthFiles } = await import(
+        '../services/api/openai/chatgptAuth.js'
+      )
+      const imported = await importChatGPTAuthFiles(paths)
+      return { type: 'text', value: `已导入 ${imported} 个 Codex 账号。` }
+    } catch (e) {
+      return {
+        type: 'text',
+        value: `导入 Codex 账号失败：${(e as Error).message}`,
+      }
+    }
+  }
+
+  const importOmniRoute = arg.match(/^import-omniroute\s+(.+)$/)
+  if (importOmniRoute) {
+    const databasePath = importOmniRoute[1]!.trim()
+    try {
+      const { importChatGPTAuthFromOmniRoute } = await import(
+        '../services/api/openai/chatgptAuth.js'
+      )
+      const imported = await importChatGPTAuthFromOmniRoute(databasePath)
+      return {
+        type: 'text',
+        value: `已从 OmniRoute 导入 ${imported} 个 Codex 账号。`,
+      }
+    } catch (e) {
+      return {
+        type: 'text',
+        value: `导入 OmniRoute Codex 账号失败：${(e as Error).message}`,
+      }
+    }
+  }
+  if (arg === 'import-omniroute') {
+    return {
+      type: 'text',
+      value: '用法：/ccb import-omniroute <storage.sqlite>',
+    }
+  }
+
+  const import9Router = arg.match(/^import-9router\s+(.+)$/)
+  if (import9Router) {
+    const databasePath = import9Router[1]!.trim()
+    try {
+      const { importCodeBuddyCnFrom9Router } = await import(
+        '../services/api/openai/codebuddyCnAuth.js'
+      )
+      const imported = await importCodeBuddyCnFrom9Router(databasePath)
+      return {
+        type: 'text',
+        value: `已从 9router 导入 ${imported} 个 CodeBuddy CN 账号（ADD-only，不改动上游）。`,
+      }
+    } catch (e) {
+      return {
+        type: 'text',
+        value: `导入 9router CodeBuddy CN 账号失败：${(e as Error).message}`,
+      }
+    }
+  }
+  if (arg === 'import-9router') {
+    return {
+      type: 'text',
+      value: '用法：/ccb import-9router <storage.sqlite>',
+    }
+  }
+
   if (arg === '-p' || arg.startsWith('-p ')) {
     const task = arg.slice(2).trim()
     if (!task) {
@@ -106,9 +178,10 @@ const router = {
   type: 'local',
   name: 'router',
   description:
-    'Inspect CCB routes, or run /ccb -p <task> through advisor plan/review + auto execution',
+    'Inspect CCB routes, import Codex/OmniRoute/9router auth, or run /ccb -p <task> through advisor plan/review + auto execution',
   aliases: ['ccb'],
-  argumentHint: '[-p <task>|--list|<provider/model|combo|alias>]',
+  argumentHint:
+    '[import-codex <auth.json...>|import-omniroute <storage.sqlite>|import-9router <storage.sqlite>|-p <task>|--list|<provider/model|combo|alias>]',
   supportsNonInteractive: true,
   load: () => Promise.resolve({ call }),
 } satisfies Command

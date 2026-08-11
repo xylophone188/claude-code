@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import React from 'react';
 import { Box, Text } from '@anthropic/ink';
@@ -64,7 +65,7 @@ export function SubmitQuestionsView({
           )}
 
           <PermissionRuleExplanation permissionResult={permissionResult} toolType="tool" />
-          <Text color="inactive">Ready to submit your answers?</Text>
+          <Text color="inactive">{zh('Ready to submit your answers?', '准备好提交答案了吗？')}</Text>
           <Box marginTop={1}>
             <Select
               options={[

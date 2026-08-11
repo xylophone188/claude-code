@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import React, { useEffect, useState } from 'react';
 import type { CommandResultDisplay } from 'src/commands.js';
 import { logEvent } from 'src/services/analytics/index.js';
@@ -66,7 +67,7 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
               logForDebugging(`Failed to clean up worktree: ${error}`, {
                 level: 'error',
               });
-              setResultMessage('Worktree cleanup failed, exiting anyway');
+              setResultMessage(zh('Worktree cleanup failed, exiting anyway', '清理 worktree 失败，仍将退出'));
             })
             .then(() => {
               setStatus('done');
@@ -159,23 +160,34 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
         logForDebugging(`Failed to clean up worktree: ${error}`, {
           level: 'error',
         });
-        setResultMessage('Worktree cleanup failed, exiting anyway');
+        setResultMessage(zh('Worktree cleanup failed, exiting anyway', '清理 worktree 失败，仍将退出'));
         setStatus('done');
         return;
       }
-      const tmuxNote = hasTmux ? ' Tmux session terminated.' : '';
+      const tmuxNote = hasTmux ? zh(' Tmux session terminated.', ' Tmux 会话已终止。') : '';
       if (commitCount > 0 && changes.length > 0) {
         setResultMessage(
-          `Worktree removed. ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} and uncommitted changes were discarded.${tmuxNote}`,
+          zh(
+            `Worktree removed. ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} and uncommitted changes were discarded.${tmuxNote}`,
+            `已移除 worktree。${commitCount} 个${commitCount === 1 ? '提交' : '提交'}及未提交更改已丢弃。${tmuxNote}`,
+          ),
         );
       } else if (commitCount > 0) {
         setResultMessage(
-          `Worktree removed. ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${worktreeSession.worktreeBranch} ${commitCount === 1 ? 'was' : 'were'} discarded.${tmuxNote}`,
+          zh(
+            `Worktree removed. ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${worktreeSession.worktreeBranch} ${commitCount === 1 ? 'was' : 'were'} discarded.${tmuxNote}`,
+            `已移除 worktree。${worktreeSession.worktreeBranch} 上的 ${commitCount} 个提交已丢弃。${tmuxNote}`,
+          ),
         );
       } else if (changes.length > 0) {
-        setResultMessage(`Worktree removed. Uncommitted changes were discarded.${tmuxNote}`);
+        setResultMessage(
+          zh(
+            `Worktree removed. Uncommitted changes were discarded.${tmuxNote}`,
+            `已移除 worktree。未提交更改已丢弃。${tmuxNote}`,
+          ),
+        );
       } else {
-        setResultMessage(`Worktree removed.${tmuxNote}`);
+        setResultMessage(zh(`Worktree removed.${tmuxNote}`, `已移除 worktree。${tmuxNote}`));
       }
       setStatus('done');
     }
@@ -185,7 +197,7 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
     return (
       <Box flexDirection="row" marginY={1}>
         <Spinner />
-        <Text>Keeping worktree…</Text>
+        <Text>{zh('Keeping worktree…', '正在保留 worktree…')}</Text>
       </Box>
     );
   }
@@ -194,7 +206,7 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
     return (
       <Box flexDirection="row" marginY={1}>
         <Spinner />
-        <Text>Removing worktree…</Text>
+        <Text>{zh('Removing worktree…', '正在移除 worktree…')}</Text>
       </Box>
     );
   }
@@ -205,13 +217,25 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
 
   let subtitle = '';
   if (hasUncommitted && hasCommits) {
-    subtitle = `You have ${changes.length} uncommitted ${changes.length === 1 ? 'file' : 'files'} and ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${branchName}. All will be lost if you remove.`;
+    subtitle = zh(
+      `You have ${changes.length} uncommitted ${changes.length === 1 ? 'file' : 'files'} and ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${branchName}. All will be lost if you remove.`,
+      `${branchName} 上有 ${changes.length} 个未提交${changes.length === 1 ? '文件' : '文件'}和 ${commitCount} 个提交。移除将全部丢失。`,
+    );
   } else if (hasUncommitted) {
-    subtitle = `You have ${changes.length} uncommitted ${changes.length === 1 ? 'file' : 'files'}. These will be lost if you remove the worktree.`;
+    subtitle = zh(
+      `You have ${changes.length} uncommitted ${changes.length === 1 ? 'file' : 'files'}. These will be lost if you remove the worktree.`,
+      `有 ${changes.length} 个未提交${changes.length === 1 ? '文件' : '文件'}。移除 worktree 将丢失这些更改。`,
+    );
   } else if (hasCommits) {
-    subtitle = `You have ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${branchName}. The branch will be deleted if you remove the worktree.`;
+    subtitle = zh(
+      `You have ${commitCount} ${commitCount === 1 ? 'commit' : 'commits'} on ${branchName}. The branch will be deleted if you remove the worktree.`,
+      `${branchName} 上有 ${commitCount} 个提交。移除 worktree 将删除该分支。`,
+    );
   } else {
-    subtitle = 'You are working in a worktree. Keep it to continue working there, or remove it to clean up.';
+    subtitle = zh(
+      'You are working in a worktree. Keep it to continue working there, or remove it to clean up.',
+      '你正在 worktree 中工作。保留可继续在此工作，或移除进行清理。',
+    );
   }
 
   function handleCancel() {
@@ -225,36 +249,44 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
   }
 
   const removeDescription =
-    hasUncommitted || hasCommits ? 'All changes and commits will be lost.' : 'Clean up the worktree directory.';
+    hasUncommitted || hasCommits
+      ? zh('All changes and commits will be lost.', '所有更改和提交都将丢失。')
+      : zh('Clean up the worktree directory.', '清理 worktree 目录。');
 
   const hasTmuxSession = Boolean(worktreeSession.tmuxSessionName);
 
   const options = hasTmuxSession
     ? [
         {
-          label: 'Keep worktree and tmux session',
+          label: zh('Keep worktree and tmux session', '保留 worktree 和 tmux 会话'),
           value: 'keep-with-tmux',
-          description: `Stays at ${worktreeSession.worktreePath}. Reattach with: tmux attach -t ${worktreeSession.tmuxSessionName}`,
+          description: zh(
+            `Stays at ${worktreeSession.worktreePath}. Reattach with: tmux attach -t ${worktreeSession.tmuxSessionName}`,
+            `停留在 ${worktreeSession.worktreePath}。重新连接：tmux attach -t ${worktreeSession.tmuxSessionName}`,
+          ),
         },
         {
-          label: 'Keep worktree, kill tmux session',
+          label: zh('Keep worktree, kill tmux session', '保留 worktree，终止 tmux 会话'),
           value: 'keep-kill-tmux',
-          description: `Keeps worktree at ${worktreeSession.worktreePath}, terminates tmux session.`,
+          description: zh(
+            `Keeps worktree at ${worktreeSession.worktreePath}, terminates tmux session.`,
+            `保留 ${worktreeSession.worktreePath} 的 worktree，终止 tmux 会话。`,
+          ),
         },
         {
-          label: 'Remove worktree and tmux session',
+          label: zh('Remove worktree and tmux session', '移除 worktree 和 tmux 会话'),
           value: 'remove-with-tmux',
           description: removeDescription,
         },
       ]
     : [
         {
-          label: 'Keep worktree',
+          label: zh('Keep worktree', '保留 worktree'),
           value: 'keep',
-          description: `Stays at ${worktreeSession.worktreePath}`,
+          description: zh(`Stays at ${worktreeSession.worktreePath}`, `停留在 ${worktreeSession.worktreePath}`),
         },
         {
-          label: 'Remove worktree',
+          label: zh('Remove worktree', '移除 worktree'),
           value: 'remove',
           description: removeDescription,
         },
@@ -263,7 +295,7 @@ export function WorktreeExitDialog({ onDone, onCancel }: Props): React.ReactNode
   const defaultValue = hasTmuxSession ? 'keep-with-tmux' : 'keep';
 
   return (
-    <Dialog title="Exiting worktree session" subtitle={subtitle} onCancel={handleCancel}>
+    <Dialog title={zh('Exiting worktree session', '退出 worktree 会话')} subtitle={subtitle} onCancel={handleCancel}>
       <Select defaultFocusValue={defaultValue} options={options} onChange={handleSelect} />
     </Dialog>
   );

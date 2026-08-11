@@ -12,6 +12,9 @@
  * CLAUDE_CODE_USE_OPENAI env. Mock only client + ChatGPT token surface.
  */
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { logMock } from '../../../tests/mocks/log'
 import { debugMock } from '../../../tests/mocks/debug'
 
@@ -29,17 +32,45 @@ mock.module('src/services/analytics/index.js', () => ({
 let getOpenAIClientCallCount = 0
 let chatCompletionsCreateCount = 0
 let lastChatCompletionsArgs: Record<string, unknown> | null = null
+let lastOpenAIClientOptions: Record<string, unknown> | null = null
 let chatCompletionsUsage: Record<string, unknown> = {}
-
+let chatCompletionsCreate:
+  | ((
+      args: Record<string, unknown>,
+    ) => Promise<
+      Record<string, unknown> | AsyncIterable<Record<string, unknown>>
+    >)
+  | undefined
 mock.module('src/services/api/openai/client.js', () => ({
-  getOpenAIClient: () => {
+  getOpenAIClient: (options?: Record<string, unknown>) => {
     getOpenAIClientCallCount++
+    lastOpenAIClientOptions = options ?? null
     return {
       chat: {
         completions: {
           create: async (args: Record<string, unknown>) => {
             chatCompletionsCreateCount++
             lastChatCompletionsArgs = args
+            if (chatCompletionsCreate) return chatCompletionsCreate(args)
+            if (args.stream) {
+              return {
+                async *[Symbol.asyncIterator]() {
+                  yield {
+                    id: 'chatcmpl_stream_test',
+                    choices: [
+                      {
+                        delta: { content: 'auto fallback' },
+                        finish_reason: 'stop',
+                        index: 0,
+                      },
+                    ],
+                    created: 0,
+                    model: String(args.model ?? 'test'),
+                    object: 'chat.completion.chunk',
+                  }
+                },
+              }
+            }
             return {
               id: 'chatcmpl_test',
               choices: [
@@ -70,23 +101,6 @@ mock.module('src/services/api/openai/client.js', () => ({
   clearOpenAIClientCache: () => {},
 }))
 
-// Keep isChatGPTAuthEnabled env-driven (same as production) so other suite
-// files are not forced into ChatGPT mode.
-mock.module('src/services/api/openai/chatgptAuth.js', () => ({
-  isChatGPTAuthEnabled: () => process.env.OPENAI_AUTH_MODE === 'chatgpt',
-  getValidChatGPTAuth: async () => ({
-    accessToken: 'test-access-token-not-real',
-    accountId: 'acct_test',
-  }),
-  removeChatGPTAuth: async () => {},
-  requestChatGPTDeviceCode: async () => {
-    throw new Error('not used')
-  },
-  completeChatGPTDeviceLogin: async () => {
-    throw new Error('not used')
-  },
-}))
-
 type CapturedFetch = {
   url: string
   headers: Record<string, string>
@@ -105,9 +119,23 @@ const ENV_KEYS = [
   'OPENAI_AUTH_MODE',
   'OPENAI_API_KEY',
   'OPENAI_BASE_URL',
+  'CCB_EMBED_ROUTE_FILE',
+  'CLAUDE_CONFIG_DIR',
+  'CCB_HEADROOM_TOKEN_BASE_URL',
+  'CCB_EMBED_PROVIDERS_FILE',
 ] as const
 
 const savedEnv: Record<string, string | undefined> = {}
+let directConfigDir: string | undefined
+
+function chatGPTTestToken(): string {
+  return `x.${Buffer.from(
+    JSON.stringify({
+      exp: Math.floor(Date.now() / 1000) + 3_600,
+      'https://api.openai.com/auth': { chatgpt_account_id: 'acct_test' },
+    }),
+  ).toString('base64url')}.x`
+}
 
 function buildFunctionCallSse(toolName: string, argsJson: string): string {
   return [
@@ -160,9 +188,35 @@ beforeEach(() => {
   getOpenAIClientCallCount = 0
   chatCompletionsCreateCount = 0
   lastChatCompletionsArgs = null
+  lastOpenAIClientOptions = null
   chatCompletionsUsage = { prompt_tokens: 3, completion_tokens: 2 }
+  chatCompletionsCreate = undefined
   capturedFetch = null
   enableOpenAIProvider()
+  process.env.CCB_EMBED_ROUTE_FILE = '/tmp/ccb-embed-route-disabled.json'
+  directConfigDir = mkdtempSync(join(tmpdir(), 'side-query-chatgpt-'))
+  process.env.CLAUDE_CONFIG_DIR = directConfigDir
+  // Prevent reading production ccb-embed providers.json (which injects real
+  // codebuddy-cn oauth accounts) and the headroom token proxy (which rewrites
+  // baseURL to 127.0.0.1:8787). Tests write to this temp file per-case.
+  process.env.CCB_EMBED_PROVIDERS_FILE = join(directConfigDir, 'providers.json')
+  delete process.env.CCB_HEADROOM_TOKEN_BASE_URL
+  const token = chatGPTTestToken()
+  writeFileSync(
+    join(directConfigDir, 'openai-chatgpt-auth.json'),
+    JSON.stringify({
+      auth_mode: 'chatgpt',
+      accounts: [
+        {
+          tokens: {
+            id_token: token,
+            access_token: token,
+            refresh_token: 'refresh-test',
+          },
+        },
+      ],
+    }),
+  )
   originalFetch = globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -197,13 +251,21 @@ beforeEach(() => {
   }) as unknown as typeof fetch
 })
 
-afterEach(() => {
+afterEach(async () => {
   globalThis.fetch = originalFetch
+  if (directConfigDir) {
+    rmSync(directConfigDir, { recursive: true, force: true })
+    directConfigDir = undefined
+  }
   for (const key of ENV_KEYS) {
     const value = savedEnv[key]
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
+  const { _invalidateProviderCache } = await import(
+    '../../services/providerRegistry/loader.js'
+  )
+  _invalidateProviderCache()
 })
 
 const classifierTool = {
@@ -269,6 +331,66 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
     expect(result.usage.output_tokens).toBe(7)
   })
 
+  test('routes virtual advisor through Codex Responses, not its placeholder route', async () => {
+    process.env.OPENAI_AUTH_MODE = 'chatgpt'
+    process.env.CCB_AUTO_CANDIDATES = 'opencode/deepseek-v4-flash-free'
+    const { sideQuery } = await import('../sideQuery.js')
+
+    const result = await sideQuery({
+      querySource: 'auto_mode',
+      model: 'advisor',
+      messages: [{ role: 'user', content: 'classify' }],
+    })
+
+    expect(getOpenAIClientCallCount).toBe(0)
+    expect(capturedFetch?.url).toContain(
+      'chatgpt.com/backend-api/codex/responses',
+    )
+    expect(capturedFetch?.body.model).toBe('gpt-5.6-sol')
+    expect(result.content).toMatchObject([
+      { type: 'tool_use', name: 'classify_result' },
+    ])
+  })
+
+  test('falls back from an unavailable Codex advisor pool to auto routes', async () => {
+    process.env.OPENAI_AUTH_MODE = 'chatgpt'
+    process.env.CCB_AUTO_CANDIDATES = 'test-fallback/glm-5.2'
+    unlinkSync(join(directConfigDir!, 'openai-chatgpt-auth.json'))
+    writeFileSync(
+      join(directConfigDir!, 'providers.json'),
+      JSON.stringify([
+        {
+          id: 'test-fallback',
+          kind: 'openai-compat',
+          baseUrl: 'https://fallback.test/v1',
+          defaultModel: 'glm-5.2',
+          compatRule: 'permissive',
+          accounts: [{ id: 'auto', apiKey: 'auto-key', quotaRemaining: 100 }],
+        },
+      ]),
+    )
+    const { _invalidateProviderCache } = await import(
+      '../../services/providerRegistry/loader.js'
+    )
+    _invalidateProviderCache()
+    const { sideQuery } = await import('../sideQuery.js')
+
+    const result = await sideQuery({
+      querySource: 'auto_mode',
+      model: 'advisor',
+      messages: [{ role: 'user', content: 'classify' }],
+    })
+
+    expect(lastOpenAIClientOptions).toMatchObject({
+      baseURL: 'https://fallback.test/v1',
+      providerId: 'test-fallback',
+    })
+    expect(lastChatCompletionsArgs?.model).toBe('glm-5.2')
+    expect(result.content).toMatchObject([
+      { type: 'tool_use', name: 'classify_result' },
+    ])
+  })
+
   test('official API key mode uses a session cache key and normalized usage', async () => {
     delete process.env.OPENAI_AUTH_MODE
     delete process.env.OPENAI_BASE_URL
@@ -332,6 +454,95 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
     expect(result.usage.input_tokens).toBe(400)
     expect(result.usage.cache_read_input_tokens).toBe(600)
     expect(result.usage.cache_creation_input_tokens).toBe(0)
+  })
+
+  test('direct CCB route bypasses ChatGPT OAuth and cache fields', async () => {
+    process.env.OPENAI_AUTH_MODE = 'chatgpt'
+    process.env.CCB_CODEBUDDY_CN_KEY = 'test-key'
+    const { _invalidateProviderCache } = await import(
+      '../../services/providerRegistry/loader.js'
+    )
+    _invalidateProviderCache()
+    const { sideQuery } = await import('../sideQuery.js')
+
+    const result = await sideQuery({
+      querySource: 'auto_mode',
+      model: 'ccb/codebuddy-cn/glm-5.2',
+      messages: [{ role: 'user', content: 'hi' }],
+    })
+
+    expect(capturedFetch).toBeNull()
+    expect(lastOpenAIClientOptions).toMatchObject({
+      baseURL: 'https://copilot.tencent.com/v2',
+      apiKey: 'test-key',
+      providerId: 'codebuddy-cn',
+    })
+    expect(lastChatCompletionsArgs?.model).toBe('glm-5.2')
+    expect('prompt_cache_key' in (lastChatCompletionsArgs ?? {})).toBe(false)
+    expect(result.model).toBe('ccb/codebuddy-cn/glm-5.2')
+  })
+
+  test('direct CCB side query falls back after a 200 gateway error', async () => {
+    writeFileSync(
+      join(directConfigDir!, 'providers.json'),
+      JSON.stringify([
+        {
+          id: 'test-fallback',
+          kind: 'openai-compat',
+          baseUrl: 'https://fallback.test/v1',
+          defaultModel: 'glm-5.2',
+          compatRule: 'permissive',
+          accounts: [
+            { id: 'first', apiKey: 'first-key', quotaRemaining: 100 },
+            { id: 'second', apiKey: 'second-key', quotaRemaining: 50 },
+          ],
+        },
+      ]),
+    )
+    const { _invalidateProviderCache } = await import(
+      '../../services/providerRegistry/loader.js'
+    )
+    _invalidateProviderCache()
+    const { resolveDirectRoutes } = await import(
+      '../../services/ccbRouter/directRouter.js'
+    )
+    expect(resolveDirectRoutes('ccb/test-fallback/glm-5.2')).toHaveLength(2)
+    let attempts = 0
+    chatCompletionsCreate = async args => {
+      attempts++
+      expect(args.model).toBe('glm-5.2')
+      if (attempts === 1) {
+        return {
+          id: 'blocked',
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: {
+                content:
+                  '抱歉，系统检测到您当前输入的信息存在敏感内容，我无法响应您的请求，请检查后重新输入。',
+              },
+            },
+          ],
+          usage: chatCompletionsUsage,
+        }
+      }
+      return {
+        id: 'fallback',
+        choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
+        usage: chatCompletionsUsage,
+      }
+    }
+    const { sideQuery } = await import('../sideQuery.js')
+
+    const result = await sideQuery({
+      querySource: 'auto_mode',
+      model: 'ccb/test-fallback/glm-5.2',
+      messages: [{ role: 'user', content: 'hi' }],
+    })
+
+    expect(attempts).toBe(2)
+    expect(result.id).toBe('fallback')
+    expect(result.content).toMatchObject([{ type: 'text', text: 'ok' }])
   })
 
   test('ChatGPT OAuth request failure propagates for fail-closed classifiers', async () => {

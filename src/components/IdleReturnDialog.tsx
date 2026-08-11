@@ -3,6 +3,7 @@ import { Box, Text } from '@anthropic/ink';
 import { formatTokens } from '../utils/format.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from '@anthropic/ink';
+import { zh } from '../utils/i18n.js';
 
 type IdleReturnAction = 'continue' | 'clear' | 'dismiss' | 'never';
 
@@ -18,25 +19,33 @@ export function IdleReturnDialog({ idleMinutes, totalInputTokens, onDone }: Prop
 
   return (
     <Dialog
-      title={`You've been away ${formattedIdle} and this conversation is ${formattedTokens} tokens.`}
+      title={zh(
+        `You've been away ${formattedIdle} and this conversation is ${formattedTokens} tokens.`,
+        `你已离开 ${formattedIdle}，当前对话占用 ${formattedTokens} tokens。`,
+      )}
       onCancel={() => onDone('dismiss')}
     >
       <Box flexDirection="column">
-        <Text>If this is a new task, clearing context will save usage and be faster.</Text>
+        <Text>
+          {zh(
+            'If this is a new task, clearing context will save usage and be faster.',
+            '如果是新任务，清空上下文可节省用量并更快。',
+          )}
+        </Text>
       </Box>
       <Select
         options={[
           {
             value: 'continue' as const,
-            label: 'Continue this conversation',
+            label: zh('Continue this conversation', '继续此对话'),
           },
           {
             value: 'clear' as const,
-            label: 'Send message as a new conversation',
+            label: zh('Send message as a new conversation', '作为新对话发送消息'),
           },
           {
             value: 'never' as const,
-            label: "Don't ask me again",
+            label: zh("Don't ask me again", '不再次询问'),
           },
         ]}
         onChange={(value: IdleReturnAction) => onDone(value)}

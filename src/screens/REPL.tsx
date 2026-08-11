@@ -285,6 +285,12 @@ import type { ScopedMcpServerConfig } from '../services/mcp/types.js';
 import { randomUUID, type UUID } from 'crypto';
 import { processSessionStartHooks } from '../utils/sessionStart.js';
 import { executeSessionEndHooks, getSessionEndHookTimeoutMs } from '../utils/hooks.js';
+import { calculateIdleCompactScore } from '../services/compact/idleCompact.js';
+import { decideCompression, hasToolResult, parseCompressionDecision } from '../services/context/decision.js';
+import { getEffectiveContextWindowSize } from '../services/compact/autoCompact.js';
+import { sideQuery } from '../utils/sideQuery.js';
+import { tokenCountWithEstimation } from '../utils/tokens.js';
+import { getLastCacheSafeParams } from '../utils/cacheSafeParamsSlot.js';
 import { type IDESelection, useIdeSelection } from '../hooks/useIdeSelection.js';
 import { getTools, assembleToolPool } from '../tools.js';
 import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js';
@@ -367,7 +373,10 @@ const useSlaveNotifications = feature('UDS_INBOX')
 const usePipeIpc = feature('UDS_INBOX') ? require('../hooks/usePipeIpc.js').usePipeIpc : () => undefined;
 const usePipeRelay = feature('UDS_INBOX')
   ? require('../hooks/usePipeRelay.js').usePipeRelay
-  : () => ({ relayPipeMessage: () => false, pipeReturnHadErrorRef: { current: false } });
+  : () => ({
+      relayPipeMessage: () => false,
+      pipeReturnHadErrorRef: { current: false },
+    });
 const usePipePermissionForward = feature('UDS_INBOX')
   ? require('../hooks/usePipePermissionForward.js').usePipePermissionForward
   : () => undefined;
@@ -1821,6 +1830,153 @@ export function REPL({
   const skipIdleCheckRef = useRef(false);
   const lastQueryCompletionTimeRef = useRef(lastQueryCompletionTime);
   lastQueryCompletionTimeRef.current = lastQueryCompletionTime;
+
+  // Idle-compact: background compaction during user idle time to avoid
+  // the "context at 99% when user hits send" delay. Fires once per idle
+  // period when score >= threshold; aborted/cleared on every new turn.
+  const idleCompactAbortRef = useRef(new AbortController());
+  const idleCompactTimerCleanupRef = useRef<(() => void) | null>(null);
+  // Circuit breaker for idle compact: after MAX_FAILURES consecutive failures
+  // (e.g. compaction fork keeps 413'ing because the conversation is too big to
+  // summarize at all), stop retrying every turn — otherwise the user burns
+  // 5-10s per turn on doomed compaction attempts. Resets when the conversation
+  // shrinks (manual /compact, /clear, or rewind).
+  const IDLE_COMPACT_MAX_FAILURES = 3;
+  const idleCompactFailuresRef = useRef(0);
+  const idleCompactLastMsgCountRef = useRef(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lastQueryCompletionTime drives the idle window; all mutable refs hold live values
+  useEffect(() => {
+    if (process.env.CCB_IDLE_COMPACT_ENABLED === '0') return;
+    if (lastQueryCompletionTime === 0) return;
+    // Start/reset timer only when turn just finished (new turn);
+    // if a timer is already running we skip — let it fire once.
+    if (idleCompactTimerCleanupRef.current) return;
+
+    const clearTimer = () => {
+      if (idleCompactTimerCleanupRef.current) {
+        idleCompactTimerCleanupRef.current();
+        idleCompactTimerCleanupRef.current = null;
+      }
+    };
+    const abort = () => {
+      clearTimer();
+      idleCompactAbortRef.current.abort();
+      idleCompactAbortRef.current = new AbortController();
+    };
+    if (typeof window !== 'undefined') window.addEventListener('beforeunload', abort);
+    const tick = () => {
+      if (lastQueryCompletionTimeRef.current === 0) return;
+      const msgs = messagesRef.current;
+      if (msgs.length < 4) return; // too short to justify compaction
+      // Reset the circuit breaker if the conversation shrank (manual /compact,
+      // /clear, rewind) — the failure was specific to the old oversized context.
+      if (msgs.length < idleCompactLastMsgCountRef.current) {
+        idleCompactFailuresRef.current = 0;
+      }
+      idleCompactLastMsgCountRef.current = msgs.length;
+      // Tripped circuit breaker: previous idle compacts failed irrecoverably,
+      // don't keep burning time on doomed attempts this session.
+      if (idleCompactFailuresRef.current >= IDLE_COMPACT_MAX_FAILURES) return;
+      const params = getLastCacheSafeParams();
+      if (!params) return; // no turn completed yet (first message only)
+      const score = calculateIdleCompactScore(msgs, mainLoopModel);
+      const thresholdPct = Number(process.env.CCB_IDLE_COMPACT_THRESHOLD_PCT) || 70;
+      if (score < thresholdPct / 100) return;
+      clearTimer();
+      const signal = idleCompactAbortRef.current.signal;
+      const onCompact = async (compactMessages: MessageType[]) => {
+        if (signal.aborted) return;
+        try {
+          const turnCount = compactMessages.filter(
+            message => message.type === 'user' && !message.isMeta && typeof message.message?.content === 'string',
+          ).length;
+          const decision = decideCompression({
+            messages: compactMessages,
+            tokenUsage: tokenCountWithEstimation(compactMessages),
+            contextWindow: getEffectiveContextWindowSize(mainLoopModel),
+            turns: turnCount,
+            hasToolResult: hasToolResult(compactMessages),
+          });
+          let approved = decision.shouldCompress;
+          if (!approved && decision.shouldAskLlm) {
+            const response = await sideQuery({
+              querySource: 'idle_compact_decision',
+              model: mainLoopModel,
+              system:
+                'Decide whether idle background compaction is useful now. Reply exact JSON only: {"shouldCompress":true} or {"shouldCompress":false}. Decline unless conversation has enough completed tool work and compaction improves future context.',
+              skipSystemPromptPrefix: true,
+              max_tokens: 16,
+              maxRetries: 0,
+              thinking: false,
+              signal,
+              optional: true,
+              messages: [
+                {
+                  role: 'user',
+                  content: `turns=${turnCount}; messages=${compactMessages.length}; tokenRatio=${(tokenCountWithEstimation(compactMessages) / getEffectiveContextWindowSize(mainLoopModel)).toFixed(2)}; toolResults=${hasToolResult(compactMessages)}.`,
+                },
+              ],
+            });
+            const text = response.content.find(block => block.type === 'text');
+            approved = text?.type === 'text' && parseCompressionDecision(text.text) === true;
+          }
+          if (!approved || signal.aborted) return;
+          const toolUseCtx = getToolUseContext(compactMessages, [], new AbortController(), mainLoopModel);
+          const deps = {
+            autocompact: require('../services/compact/autoCompact.js').autoCompactIfNeeded,
+            microcompact: () => ({ messages: compactMessages }),
+          };
+          // Thread the persisted failure count so autoCompactIfNeeded's own
+          // circuit breaker can short-circuit, and we can update ours.
+          const tracking = {
+            compacted: false,
+            turnCounter: 0,
+            turnId: '',
+            consecutiveFailures: idleCompactFailuresRef.current,
+          };
+          const { wasCompacted, compactionResult, consecutiveFailures } = await deps.autocompact(
+            compactMessages,
+            toolUseCtx,
+            params,
+            'idle_compact',
+            tracking,
+            0,
+            true,
+          );
+          if (!wasCompacted || !compactionResult) {
+            if (consecutiveFailures !== undefined) {
+              idleCompactFailuresRef.current = consecutiveFailures;
+            }
+            return;
+          }
+          idleCompactFailuresRef.current = 0; // reset on success
+          const { buildPostCompactMessages } =
+            require('../services/compact/compact.js') as typeof import('../services/compact/compact.js');
+          const postMessages = buildPostCompactMessages(compactionResult);
+          setMessages(postMessages);
+          setConversationId(randomUUID());
+          logForDebugging('idleCompact: compacted', { level: 'info' });
+        } catch (err) {
+          if (!signal.aborted) logError(err);
+        }
+      };
+      const controller = idleCompactAbortRef.current;
+      const delayMs = Number(process.env.CCB_IDLE_COMPACT_MIN_IDLE_SECONDS) || 45;
+      const timer = setTimeout(async () => {
+        if (controller.signal.aborted) return;
+        await onCompact(msgs);
+      }, delayMs * 1000);
+      idleCompactTimerCleanupRef.current = () => clearTimeout(timer);
+    };
+    // Delay first evaluation slightly so stop-hooks settle
+    const t = setTimeout(tick, 1000);
+    return () => {
+      clearTimeout(t);
+      if (typeof window !== 'undefined') window.removeEventListener('beforeunload', abort);
+      clearTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastQueryCompletionTime]);
 
   // Aggregate tool result budget: per-conversation decision tracking.
   // When the GrowthBook flag is on, query.ts enforces the budget; when
@@ -3531,7 +3687,10 @@ export function REPL({
           setAppState(prev =>
             prev.companionReaction === (reaction as typeof prev.companionReaction)
               ? prev
-              : { ...prev, companionReaction: reaction as typeof prev.companionReaction },
+              : {
+                  ...prev,
+                  companionReaction: reaction as typeof prev.companionReaction,
+                },
           ),
         );
       }
@@ -3625,6 +3784,16 @@ export function REPL({
       input?: string,
       effort?: EffortValue,
     ): Promise<boolean> => {
+      // Cancel any pending idle-compaction — a new turn is starting, so
+      // either the compact already ran (and was replaced by user input)
+      // or we want it suppressed so we don't race the live query.
+      if (idleCompactTimerCleanupRef.current) {
+        idleCompactTimerCleanupRef.current();
+        idleCompactTimerCleanupRef.current = null;
+      }
+      idleCompactAbortRef.current.abort();
+      idleCompactAbortRef.current = new AbortController();
+
       // If this is a teammate, mark them as active when starting a turn
       if (isAgentSwarmsEnabled()) {
         const teamName = getTeamName();
@@ -5060,7 +5229,11 @@ export function REPL({
   const { relayPipeMessage, pipeReturnHadErrorRef } = usePipeRelay();
 
   // Voice input integration (VOICE_MODE builds only)
-  const voiceIntegrationResult = useVoiceIntegration({ setInputValueRaw, inputValueRef, insertTextRef });
+  const voiceIntegrationResult = useVoiceIntegration({
+    setInputValueRaw,
+    inputValueRef,
+    insertTextRef,
+  });
   const voice = feature('VOICE_MODE')
     ? voiceIntegrationResult
     : {
@@ -5082,12 +5255,23 @@ export function REPL({
   useSlaveNotifications();
   const _pipeIpcState = useAppState(s => getPipeIpc(s));
 
-  usePipePermissionForward({ store, tools, setMessages, setToolUseConfirmQueue, getToolUseContext, mainLoopModel });
+  usePipePermissionForward({
+    store,
+    tools,
+    setMessages,
+    setToolUseConfirmQueue,
+    getToolUseContext,
+    mainLoopModel,
+  });
   usePipeMuteSync({ setToolUseConfirmQueue });
 
   // Pipe IPC lifecycle — extracted to usePipeIpc hook
   usePipeIpc({ store, handleIncomingPrompt });
-  const { routeToSelectedPipes } = usePipeRouter({ store, setAppState, addNotification });
+  const { routeToSelectedPipes } = usePipeRouter({
+    store,
+    setAppState,
+    addNotification,
+  });
 
   // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {
@@ -5520,7 +5704,10 @@ export function REPL({
     onTogglePipeSelector: () => {
       setAppState((prev: any) => {
         const pIpc = prev.pipeIpc ?? {};
-        return { ...prev, pipeIpc: { ...pIpc, selectorOpen: !pIpc.selectorOpen } };
+        return {
+          ...prev,
+          pipeIpc: { ...pIpc, selectorOpen: !pIpc.selectorOpen },
+        };
       });
     },
   });

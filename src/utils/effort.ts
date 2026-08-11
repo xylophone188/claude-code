@@ -13,6 +13,7 @@ import {
   isChatGPTAuthMode,
   isChatGPTCodexReasoningModel,
 } from './model/chatgptModels.js'
+import { isAutoCandidate } from 'src/services/routing/autoScoring.js'
 
 export type { EffortLevel }
 
@@ -33,6 +34,17 @@ export type EffortValue = EffortLevel | number
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports the effort parameter.
 export function modelSupportsEffort(model: string): boolean {
   const m = model.toLowerCase()
+  // ccb/* ids are combos / provider groups routed via CCB
+  // gateway; a combo's concrete reasoning support is decided by gateway
+  // capabilities, so effort adjustment defaults to unsupported here.
+  if (m.startsWith('ccb/')) return false
+  // Auto-routing candidates flow effort to the concrete model as
+  // reasoning_effort on their OpenAI-compatible transports (nvidia,
+  // codebuddy-cn). Candidates are plain provider/model specs, never
+  // ccb/-namespaced, so they cannot reach this branch via ccb/* ids.
+  if (isAutoCandidate(model)) {
+    return true
+  }
   if (isEnvTruthy(process.env.CLAUDE_CODE_ALWAYS_ENABLE_EFFORT)) {
     return true
   }
@@ -61,8 +73,7 @@ export function modelSupportsEffort(model: string): boolean {
     return false
   }
 
-  // OpenCode Free models route via the local Headroom gateway → 9router →
-  // OpenCode Zen, which honors the OpenAI-compatible reasoning_effort
+  // OpenCode Free models route directly to OpenCode Zen, which honors the
   // parameter (verified live: effort=max produced ~4x the reasoning content
   // of effort=low). Provider-wide, so future free models work automatically.
   // Matched by model name, not provider: ccb-real sets CLAUDE_CODE_USE_OPENAI=1
@@ -345,7 +356,7 @@ export function getDefaultEffortForModel(
     isChatGPTAuthMode() &&
     isChatGPTCodexReasoningModel(model)
   ) {
-    return 'medium'
+    return 'max'
   }
 
   // OpenCode Free: default to maximum reasoning depth. modelSupportsEffort()

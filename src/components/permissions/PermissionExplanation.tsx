@@ -11,8 +11,9 @@ import {
 } from '../../utils/permissions/permissionExplainer.js';
 import { ShimmerChar } from '../Spinner/ShimmerChar.js';
 import { useShimmerAnimation } from '../Spinner/useShimmerAnimation.js';
+import { zh } from '../../utils/i18n.js';
 
-const LOADING_MESSAGE = 'Loading explanation…';
+const LOADING_MESSAGE = zh('Loading explanation…', '正在加载解释…');
 
 function ShimmerLoadingText(): React.ReactNode {
   const [ref, glimmerIndex] = useShimmerAnimation('responding', LOADING_MESSAGE, false);
@@ -49,11 +50,11 @@ function getRiskColor(riskLevel: RiskLevel): 'success' | 'warning' | 'error' {
 function getRiskLabel(riskLevel: RiskLevel): string {
   switch (riskLevel) {
     case 'LOW':
-      return 'Low risk';
+      return zh('Low risk', '低风险');
     case 'MEDIUM':
-      return 'Med risk';
+      return zh('Med risk', '中风险');
     case 'HIGH':
-      return 'High risk';
+      return zh('High risk', '高风险');
   }
 }
 

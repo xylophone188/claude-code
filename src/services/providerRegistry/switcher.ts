@@ -49,9 +49,17 @@ export function switchProvider(
     )
   }
 
+  // CCBRouting providers (ids namespaced `ccb/…`) point at ccb upstream
+  // base URLs that may omit the OpenAI `/v1` path segment. Append it when
+  // missing so the OpenAI SDK hits `<baseUrl>/v1/chat/completions`.
+  const normalizedBaseUrl =
+    id.startsWith('ccb/') && !/\/v1\/?$/.test(found.baseUrl)
+      ? `${found.baseUrl.replace(/\/+$/, '')}/v1`
+      : found.baseUrl
+
   const env: Record<string, string> = {
     CLAUDE_CODE_USE_OPENAI: '1',
-    OPENAI_BASE_URL: found.baseUrl,
+    OPENAI_BASE_URL: normalizedBaseUrl,
     OPENAI_MODEL: found.defaultModel,
     // The value is the env var name that holds the key, not the key itself.
     // Shell snippet: export OPENAI_API_KEY=$CEREBRAS_API_KEY
@@ -78,7 +86,7 @@ export function switchProvider(
     )
   }
 
-  if (!process.env[found.apiKeyEnv]) {
+  if (found.apiKeyEnv && !process.env[found.apiKeyEnv]) {
     warnings.push(
       `${found.apiKeyEnv} is not set in the current environment. ` +
         `Set it before starting Claude Code: export ${found.apiKeyEnv}=<your-api-key>`,

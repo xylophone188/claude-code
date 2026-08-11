@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import chalk from 'chalk';
 import figures from 'figures';
 import * as React from 'react';
@@ -14,8 +15,8 @@ import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
 import { Select } from './CustomSelect/select.js';
 import { Byline, Dialog, KeyboardShortcutHint, LoadingState } from '@anthropic/ink';
 
-const DIALOG_TITLE = 'Select Remote Environment';
-const SETUP_HINT = `Configure environments at: https://claude.ai/code`;
+const DIALOG_TITLE = zh('Select Remote Environment', '选择远程环境');
+const SETUP_HINT = zh('Configure environments at: https://claude.ai/code', '环境配置：https://claude.ai/code');
 
 type Props = {
   onDone: (message?: string) => void;
@@ -82,7 +83,7 @@ export function RemoteEnvironmentDialog({ onDone }: Props): React.ReactNode {
   if (loadingState === 'loading') {
     return (
       <Dialog title={DIALOG_TITLE} onCancel={onDone} hideInputGuide>
-        <LoadingState message="Loading environments…" />
+        <LoadingState message={zh('Loading environments…', '正在加载环境…')} />
       </Dialog>
     );
   }
@@ -91,7 +92,9 @@ export function RemoteEnvironmentDialog({ onDone }: Props): React.ReactNode {
   if (error) {
     return (
       <Dialog title={DIALOG_TITLE} onCancel={onDone}>
-        <Text color="error">Error: {error}</Text>
+        <Text color="error">
+          {zh('Error:', '错误：')} {error}
+        </Text>
       </Dialog>
     );
   }
@@ -100,7 +103,7 @@ export function RemoteEnvironmentDialog({ onDone }: Props): React.ReactNode {
   if (!selectedEnvironment) {
     return (
       <Dialog title={DIALOG_TITLE} subtitle={SETUP_HINT} onCancel={onDone}>
-        <Text>No remote environments available.</Text>
+        <Text>{zh('No remote environments available.', '没有可用的远程环境。')}</Text>
       </Dialog>
     );
   }
@@ -126,7 +129,8 @@ export function RemoteEnvironmentDialog({ onDone }: Props): React.ReactNode {
 function EnvironmentLabel({ environment }: { environment: EnvironmentResource }): React.ReactNode {
   return (
     <Text>
-      {figures.tick} Using <Text bold>{environment.name}</Text> <Text dimColor>({environment.environment_id})</Text>
+      {figures.tick} {zh('Using', '正在使用')} <Text bold>{environment.name}</Text>{' '}
+      <Text dimColor>({environment.environment_id})</Text>
     </Text>
   );
 }
@@ -170,7 +174,7 @@ function MultipleEnvironmentsContent({
 
   const subtitle = (
     <Text>
-      Currently using: <Text bold>{selectedEnvironment.name}</Text>
+      {zh('Currently using:', '当前使用：')} <Text bold>{selectedEnvironment.name}</Text>
       {sourceSuffix}
     </Text>
   );
@@ -179,7 +183,7 @@ function MultipleEnvironmentsContent({
     <Dialog title={DIALOG_TITLE} subtitle={subtitle} onCancel={onCancel} hideInputGuide>
       <Text dimColor>{SETUP_HINT}</Text>
       {loadingState === 'updating' ? (
-        <LoadingState message="Updating…" />
+        <LoadingState message={zh('Updating…', '正在更新…')} />
       ) : (
         <Select
           options={environments.map(env => ({

@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import React, { useMemo } from 'react';
 import { Box, Text, useTheme } from '@anthropic/ink';
 import { WebFetchTool } from '@claude-code-best/builtin-tools/tools/WebFetchTool/WebFetchTool.js';
@@ -124,7 +125,7 @@ export function WebFetchPermissionRequest({
 
       <Box flexDirection="column">
         <PermissionRuleExplanation permissionResult={toolUseConfirm.permissionResult} toolType="tool" />
-        <Text>Do you want to allow Claude to fetch this content?</Text>
+        <Text>{zh('Do you want to allow Claude to fetch this content?', '是否允许 Claude 获取此内容？')}</Text>
         <Select options={options} onChange={onChange} onCancel={() => onChange('no')} />
       </Box>
     </PermissionDialog>

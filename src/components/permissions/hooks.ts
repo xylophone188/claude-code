@@ -1,3 +1,4 @@
+import { zh } from '../../utils/i18n.js'
 import { feature } from 'bun:bundle'
 import { useEffect, useRef } from 'react'
 import {
@@ -62,7 +63,7 @@ function decisionReasonToString(
   decisionReason: PermissionDecisionReason | undefined,
 ): string {
   if (!decisionReason) {
-    return 'No decision reason'
+    return zh('No decision reason', '无决策原因')
   }
   if (
     (feature('BASH_CLASSIFIER') || feature('TRANSCRIPT_CLASSIFIER')) &&

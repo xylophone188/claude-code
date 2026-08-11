@@ -29,7 +29,11 @@
       ],
       "@claude-code-best/workflow-engine": [
         "./packages/workflow-engine/src/index.ts"
-      ]
+      ],
+      "@claude-code-best/qqbot/*": ["./packages/qqbot/src/*"],
+      "@claude-code-best/qqbot": ["./packages/qqbot/src/index.ts"],
+      "@claude-code-best/telegram/*": ["./packages/telegram/src/*"],
+      "@claude-code-best/telegram": ["./packages/telegram/src/index.ts"]
     }
   },
   "include": [

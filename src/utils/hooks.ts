@@ -9,6 +9,7 @@ import { pathExists } from './file.js'
 import { wrapSpawn } from './ShellCommand.js'
 import { TaskOutput } from './task/TaskOutput.js'
 import { getCwd } from './cwd.js'
+import { formatLocalTimestamp, repairUtf8 } from './encoding.js'
 import { randomUUID } from 'crypto'
 import { formatShellPrefixCommand } from './bash/shellPrefix.js'
 import {
@@ -4286,8 +4287,11 @@ export async function executeSessionEndHooks(
   // During shutdown, Ink is unmounted so we can write directly to stderr
   for (const result of results) {
     if (!result.succeeded && result.output) {
+      // Prefix with a local-timezone timestamp for log alignment, and repair
+      // any double-encoded UTF-8 the external hook subprocess may have emitted
+      // so the log file stays valid UTF-8 (see src/utils/encoding.ts).
       process.stderr.write(
-        `SessionEnd hook [${result.command}] failed: ${result.output}\n`,
+        `${formatLocalTimestamp()} SessionEnd hook [${result.command}] failed: ${repairUtf8(result.output)}\n`,
       )
     }
   }

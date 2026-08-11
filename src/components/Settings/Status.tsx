@@ -8,6 +8,7 @@ import { Box, Text, useTheme } from '@anthropic/ink';
 import { type AppState, useAppState } from '../../state/AppState.js';
 import { getCwd } from '../../utils/cwd.js';
 import { getCurrentSessionTitle } from '../../utils/sessionStorage.js';
+import { zh } from '../../utils/i18n.js';
 import {
   buildAccountProperties,
   buildAPIProviderProperties,
@@ -33,12 +34,12 @@ type Props = {
 function buildPrimarySection(): Property[] {
   const sessionId = getSessionId();
   const customTitle = getCurrentSessionTitle(sessionId);
-  const nameValue = customTitle ?? <Text dimColor>/rename to add a name</Text>;
+  const nameValue = customTitle ?? <Text dimColor>{zh('/rename to add a name', '/rename 添加名称')}</Text>;
 
   return [
-    { label: 'Version', value: MACRO.VERSION },
-    { label: 'Session name', value: nameValue },
-    { label: 'Session ID', value: sessionId },
+    { label: zh('Version', '版本'), value: MACRO.VERSION },
+    { label: zh('Session name', '会话名称'), value: nameValue },
+    { label: zh('Session ID', '会话 ID'), value: sessionId },
     { label: 'cwd', value: getCwd() },
     ...buildAccountProperties(),
     ...buildAPIProviderProperties(),
@@ -59,7 +60,7 @@ function buildSecondarySection({
   const modelLabel = getModelDisplayLabel(mainLoopModel);
 
   return [
-    { label: 'Model', value: modelLabel },
+    { label: zh('Model', '模型'), value: modelLabel },
     ...buildIDEProperties(mcp.clients, context.options.ideInstallationStatus, theme),
     ...buildMcpProperties(mcp.clients, theme),
     ...buildSandboxProperties(),
@@ -153,7 +154,7 @@ function Diagnostics({ promise }: { promise: Promise<Diagnostic[]> }): React.Rea
   if (diagnostics.length === 0) return null;
   return (
     <Box flexDirection="column" paddingBottom={1}>
-      <Text bold>System Diagnostics</Text>
+      <Text bold>{zh('System Diagnostics', '系统诊断')}</Text>
       {diagnostics.map((diagnostic, i) => (
         <Box key={i} flexDirection="row" gap={1} paddingX={1}>
           <Text color="error">{figures.warning}</Text>

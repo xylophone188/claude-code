@@ -12,6 +12,7 @@ import { sendNotification } from '../services/notifier.js';
 import {
   completeChatGPTDeviceLogin,
   removeChatGPTAuth,
+  requestChatGPTAccountLogin,
   requestChatGPTDeviceCode,
   type ChatGPTDeviceCode,
 } from '../services/api/openai/chatgptAuth.js';
@@ -59,6 +60,12 @@ type OAuthStatus =
       phase: 'requesting' | 'waiting';
       deviceCode?: ChatGPTDeviceCode;
     } // ChatGPT account subscription via Codex OAuth device flow
+  | { state: 'chatgpt_method_select' } // ChatGPT login: pick device-code vs account-login
+  | {
+      state: 'chatgpt_account_login';
+      phase: 'requesting' | 'waiting';
+      authUrl?: string;
+    } // ChatGPT account subscription via Codex OAuth PKCE browser callback
   | {
       state: 'gemini_api';
       baseUrl: string;
@@ -558,8 +565,7 @@ function OAuthStatusMessage({
                 } else if (value === 'chatgpt_subscription') {
                   logEvent('tengu_chatgpt_subscription_selected', {});
                   setOAuthStatus({
-                    state: 'chatgpt_subscription',
-                    phase: 'requesting',
+                    state: 'chatgpt_method_select',
                   });
                 } else if (value === 'gemini_api') {
                   logEvent('tengu_gemini_api_selected', {});
@@ -1009,6 +1015,125 @@ function OAuthStatusMessage({
             {renderOpenAIRow('opus_model', 'Opus     ')}
           </Box>
           <Text dimColor>↑↓/Tab to switch · Enter on last field to save · Esc to go back</Text>
+        </Box>
+      );
+    }
+
+    case 'chatgpt_method_select': {
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text bold>ChatGPT Account Setup</Text>
+          <Text dimColor>Choose how to sign in with your ChatGPT subscription:</Text>
+          <Select
+            options={[
+              {
+                value: 'device_code',
+                label: 'Device code (recommended for remote / headless)',
+              },
+              {
+                value: 'account_login',
+                label: 'Account login (browser on this machine)',
+              },
+            ]}
+            onChange={value => {
+              if (value === 'device_code') {
+                setOAuthStatus({
+                  state: 'chatgpt_subscription',
+                  phase: 'requesting',
+                });
+              } else if (value === 'account_login') {
+                setOAuthStatus({
+                  state: 'chatgpt_account_login',
+                  phase: 'requesting',
+                });
+              }
+            }}
+          />
+          <Text dimColor>Esc to go back.</Text>
+        </Box>
+      );
+    }
+
+    case 'chatgpt_account_login': {
+      const status = oauthStatus as {
+        state: 'chatgpt_account_login';
+        phase: 'requesting' | 'waiting';
+        authUrl?: string;
+      };
+      const startedRef = useRef(false);
+
+      useEffect(() => {
+        if (startedRef.current) return;
+        startedRef.current = true;
+        let cancelled = false;
+        const controller = new AbortController();
+        async function runLogin() {
+          try {
+            const handle = requestChatGPTAccountLogin();
+            if (cancelled) return;
+            setOAuthStatus({
+              state: 'chatgpt_account_login',
+              phase: 'waiting',
+              authUrl: handle.authUrl,
+            });
+            void openBrowser(handle.authUrl);
+            await handle.waitForCompletion(controller.signal);
+            if (cancelled) return;
+            const env: Record<string, string> = {
+              OPENAI_AUTH_MODE: 'chatgpt',
+            };
+            const settingsUpdate: Parameters<typeof updateSettingsForSource>[1] = {
+              modelType: 'openai',
+              env,
+            };
+            const { error } = updateSettingsForSource('userSettings', settingsUpdate);
+            if (error) {
+              throw new Error('Failed to save settings. Please try again.');
+            }
+            for (const [k, v] of Object.entries(env)) process.env[k] = v;
+            clearOpenAIClientCache();
+            setOAuthStatus({ state: 'success' });
+            void onDone();
+          } catch (err) {
+            if (cancelled) return;
+            setOAuthStatus({
+              state: 'error',
+              message: (err as Error).message,
+              toRetry: {
+                state: 'chatgpt_method_select',
+              },
+            });
+          }
+        }
+        void runLogin();
+        return () => {
+          cancelled = true;
+          controller.abort();
+        };
+      }, [setOAuthStatus, onDone]);
+
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text bold>ChatGPT Account Login</Text>
+          {status.phase === 'requesting' && (
+            <Box>
+              <Spinner />
+              <Text>Starting browser sign-in…</Text>
+            </Box>
+          )}
+          {status.phase === 'waiting' && status.authUrl && (
+            <Box flexDirection="column" gap={1}>
+              <Text>Opening your browser to sign in with ChatGPT…</Text>
+              <Link url={status.authUrl}>
+                <Text dimColor>{status.authUrl}</Text>
+              </Link>
+              <Box>
+                <Spinner />
+                <Text>Waiting for browser authorization…</Text>
+              </Box>
+            </Box>
+          )}
+          <Text dimColor>Esc to go back. If the browser didn't open, click the link above.</Text>
         </Box>
       );
     }

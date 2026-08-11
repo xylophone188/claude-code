@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import React, { useCallback, useMemo } from 'react';
 import { Box, Text, useTheme } from '@anthropic/ink';
 import { getTheme } from '../../../utils/theme.js';
@@ -45,7 +46,10 @@ export function MonitorPermissionRequest({
       opts.push({
         label: (
           <Text>
-            Yes, and don{'\u2019'}t ask again for <Text bold>{toolUseConfirm.tool.name}</Text> commands
+            {zh('Yes, and don', '可以，不再')}
+            {'\u2019'}t{zh(' ask again for ', '询问 ')}
+            <Text bold>{toolUseConfirm.tool.name}</Text>
+            {zh(' commands', ' 命令')}
           </Text>
         ),
         value: 'yes-dont-ask-again',

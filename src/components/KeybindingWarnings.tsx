@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from '@anthropic/ink';
+import { zh } from '../utils/i18n.js';
 import {
   getCachedKeybindingWarnings,
   getKeybindingsPath,
@@ -31,10 +32,10 @@ export function KeybindingWarnings(): React.ReactNode {
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
       <Text bold color={errors.length > 0 ? 'error' : 'warning'}>
-        Keybinding Configuration Issues
+        {zh('Keybinding Configuration Issues', '按键绑定配置问题')}
       </Text>
       <Box>
-        <Text dimColor>Location: </Text>
+        <Text dimColor>{zh('Location: ', '位置：')}</Text>
         <Text dimColor>{getKeybindingsPath()}</Text>
       </Box>
       <Box marginLeft={1} flexDirection="column" marginTop={1}>
@@ -42,7 +43,7 @@ export function KeybindingWarnings(): React.ReactNode {
           <Box key={`error-${i}`} flexDirection="column">
             <Box>
               <Text dimColor>└ </Text>
-              <Text color="error">[Error]</Text>
+              <Text color="error">{zh('[Error]', '[错误]')}</Text>
               <Text dimColor> {error.message}</Text>
             </Box>
             {error.suggestion && (
@@ -56,7 +57,7 @@ export function KeybindingWarnings(): React.ReactNode {
           <Box key={`warning-${i}`} flexDirection="column">
             <Box>
               <Text dimColor>└ </Text>
-              <Text color="warning">[Warning]</Text>
+              <Text color="warning">{zh('[Warning]', '[警告]')}</Text>
               <Text dimColor> {warning.message}</Text>
             </Box>
             {warning.suggestion && (

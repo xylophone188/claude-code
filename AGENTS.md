@@ -357,3 +357,44 @@ Impeccable 设计上下文保存在 `.impeccable.md` 中。设计 Web UI（RCS �
 ### 视觉参考
 
 Anthropic 公司的设计风格 — 干净、考究、温暖的底色。大量留白，以排版为核心。避免 AI 产品常见的设计套路（渐变文字、玻璃态、霓虹色）。
+
+
+<claude-mem-context>
+# Memory Context
+
+# [claude-code] recent context, 2026-08-11 1:15am GMT+8
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 20 obs (4,174t read) | 3,204,812t work | 100% savings
+
+### Aug 9, 2026
+S2591 CCB fork（`/home/melody/cloud/source-code/github/ai/claude-code`）双需求：(1) 当前账号周配额耗尽时自动切换到第二个已授权账号并尽量续跑当前请求，HTTP 429 本身不得触发切换；(2) 修复状态栏 quota 徽章错误显示（`oai 0/6` 应为 `5/5 100%`），另有 `4 MCP servers failed · /mcp` 待查。 (Aug 9, 9:16 AM)
+S2583 用户请求"充分了解该项目"——reverse-engineered Claude Code CLI (TypeScript/Bun + React/Ink),研究已在进行中 (Aug 9, 9:16 AM)
+### Aug 10, 2026
+S2609 确认接码与二次验证码能力，并调查 CodeBuddy CN/ccbRouter 自动路由账号池接入链路。 (Aug 10, 9:29 AM)
+6131 10:03a 🔵 QQ/TG 迁移 Workflow 在执行前失败
+6132 " 🔐 迁移 Phase 0 脱敏备份已完成
+6133 " 🔵 Weixin MCP 实现提供 QQ/TG 通道模板
+6134 " 🔵 OpenClaw 已具备成熟 QQ/TG 插件边界
+6137 10:21a 🔵 QQ/TG migration workflow stopped before implementation
+6138 " 🔐 Migration backup completed with redaction and integrity checks
+6139 " 🔵 CCB has only partial QQ/TG package scaffolding
+6140 " 🔵 Weixin channel defines reusable CCB integration pattern
+6141 " 🔵 OpenClaw supplies mature QQ and Telegram extension references
+6161 10:38a 🔵 接码与二次验证码技能已可用
+6162 10:41a 🔵 CCB direct router supports account-aware auto failover
+6163 " 🟣 `/ccb` command exposes routing and auth imports
+6164 10:42a 🔵 CCB account pool filters cooldown, quota, and credentials
+6169 10:46a 🟣 CodeBuddy CN account pool integrates with provider registry
+6170 " 🔵 Auto-health probes use account-aware provider targets
+6171 10:51a 🔵 Single-account selection ignores runtime quota
+6172 8:08p ⚖️ CCB CLI 全场景可靠性目标
+6173 8:10p ⚖️ Final CCB strategy fixes order of work
+6174 " ⚖️ Provider research must not prematurely exclude integrations
+6175 " 🔵 Port 20128 ownership records conflict
+
+Access 3205k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>

@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { homedir } from 'os';
 import { basename, join, sep } from 'path';
 import { type ReactNode } from 'react';
@@ -138,14 +139,15 @@ export function getFilePermissionOptions({
       if (operationType === 'read') {
         sessionLabel = (
           <Text>
-            Yes, allow reading from <Text bold>{dirName}/</Text> during this session
+            {zh('Allow reading from', '允许从')} <Text bold>{dirName}/</Text>{' '}
+            {zh('during this session', '读取，本次会话内有效')}
           </Text>
         );
       } else {
         sessionLabel = (
           <Text>
-            Yes, allow all edits in <Text bold>{dirName}/</Text> during this session{' '}
-            <Text bold>({modeCycleShortcut})</Text>
+            {zh('Allow all edits in', '允许编辑')} <Text bold>{dirName}/</Text>{' '}
+            {zh('during this session', '，本次会话内有效')} <Text bold>({modeCycleShortcut})</Text>
           </Text>
         );
       }

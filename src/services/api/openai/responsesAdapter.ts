@@ -1,16 +1,141 @@
 import { randomUUID } from 'crypto'
 import type { BetaRawMessageStreamEvent } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions/completions.mjs'
 import { normalizeOpenAIUsage, type AnthropicUsage } from '@ant/model-provider'
-import { getValidChatGPTAuth } from './chatgptAuth.js'
+import {
+  clearChatGPTAccountFailure,
+  getValidChatGPTAuth,
+  markChatGPTAccountAuthRejected,
+  markChatGPTAccountFailure,
+  markChatGPTAccountQuotaExhausted,
+} from './chatgptAuth.js'
+import { routeError, routeLog } from '../../routing/stageLog.js'
 
 type ResponsesInputItem = Record<string, unknown>
 type ResponsesTool = Record<string, unknown>
+const CHATGPT_ACCOUNT_FAILURE_LOG_LIMIT = 12
 export type ResponsesReasoningEffort =
   | 'low'
   | 'medium'
   | 'high'
   | 'xhigh'
   | 'max'
+
+/** Repair an upstream UTF-8 error decoded as Latin-1, without touching normal
+ * non-ASCII provider messages. */
+export function repairUTF8Mojibake(text: string): string {
+  if (!/[\u00c0-\u00ff]/.test(text)) return text
+  const repaired = new TextDecoder().decode(
+    Uint8Array.from(text, char => char.charCodeAt(0)),
+  )
+  return repaired.includes('\ufffd') ||
+    !/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(repaired)
+    ? text
+    : repaired
+}
+
+/** A 429 alone is transient; only an explicit subscription-cap response may
+ * advance to another locally imported ChatGPT account. */
+export function isChatGPTAccountQuotaExhausted(
+  status: number,
+  body: string,
+): boolean {
+  if (status !== 429) return false
+  return isChatGPTSubscriptionQuota(body)
+}
+
+function isChatGPTSubscriptionQuota(body: string): boolean {
+  return /usage_limit_reached|weekly (?:usage )?limit|(?:weekly|subscription) quota (?:is )?exhausted|(?:weekly|subscription) limit (?:has been )?reached|(?:you have |you've )?(?:exceeded|reached|hit) (?:your )?(?:weekly )?(?:usage )?limit/i.test(
+    body,
+  )
+}
+
+function quotaFailureText(event: Record<string, unknown>): string | undefined {
+  if (event.type !== 'response.error' && event.type !== 'response.failed')
+    return undefined
+  const response = event.response as Record<string, unknown> | undefined
+  const error = (event.error ?? response?.error) as unknown
+  const text = JSON.stringify(error ?? event)
+  return isChatGPTSubscriptionQuota(text) ? text : undefined
+}
+
+function upstreamUnavailableText(
+  event: Record<string, unknown>,
+): string | undefined {
+  if (event.type !== 'response.error' && event.type !== 'response.failed')
+    return undefined
+  const response = event.response as Record<string, unknown> | undefined
+  const text = JSON.stringify(event.error ?? response?.error ?? event)
+  return /\b5\d\d\b|overloaded|temporarily unavailable|service unavailable|internal server error|server error|upstream.*(?:error|unavailable)/i.test(
+    text,
+  )
+    ? text
+    : undefined
+}
+
+/** Convert a direct Chat Completions fallback into the Responses event shape
+ * consumed by the existing Anthropic stream adapter. */
+export async function* chatCompletionsToResponses(
+  stream: AsyncIterable<ChatCompletionChunk>,
+): AsyncGenerator<Record<string, unknown>, void> {
+  const tools = new Map<number, { id: string; name: string }>()
+  let completed = false
+  for await (const chunk of stream) {
+    const choice = chunk.choices[0]
+    if (!choice) continue
+    const delta = choice.delta as typeof choice.delta & {
+      reasoning_content?: string
+    }
+    if (delta.reasoning_content) {
+      yield {
+        type: 'response.reasoning_text.delta',
+        delta: delta.reasoning_content,
+      }
+    }
+    if (delta.content) {
+      yield { type: 'response.output_text.delta', delta: delta.content }
+    }
+    for (const tool of delta.tool_calls ?? []) {
+      const outputIndex = tool.index ?? 0
+      let known = tools.get(outputIndex)
+      if (!known) {
+        known = {
+          id: tool.id ?? `call_${outputIndex}`,
+          name: tool.function?.name ?? '',
+        }
+        tools.set(outputIndex, known)
+        yield {
+          type: 'response.output_item.added',
+          output_index: outputIndex,
+          item: { type: 'function_call', call_id: known.id, name: known.name },
+        }
+      }
+      if (tool.function?.arguments) {
+        yield {
+          type: 'response.function_call_arguments.delta',
+          output_index: outputIndex,
+          delta: tool.function.arguments,
+        }
+      }
+    }
+    if (choice.finish_reason) {
+      for (const outputIndex of tools.keys()) {
+        yield { type: 'response.output_item.done', output_index: outputIndex }
+      }
+      yield {
+        type: 'response.completed',
+        response: {
+          status:
+            choice.finish_reason === 'length' ? 'incomplete' : 'completed',
+        },
+      }
+      completed = true
+      return
+    }
+  }
+  if (!completed)
+    yield { type: 'response.completed', response: { status: 'completed' } }
+}
 
 type ResponsesRequest = {
   model: string
@@ -198,14 +323,17 @@ export function buildResponsesRequest(params: {
 
 async function* parseSSE(
   response: Response,
+  signal?: AbortSignal,
+  onChunk?: () => void,
 ): AsyncGenerator<Record<string, unknown>, void> {
   if (!response.body) throw new Error('ChatGPT response did not include a body')
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   while (true) {
-    const { done, value } = await reader.read()
+    const { done, value } = await readSSEChunk(reader, signal)
     if (done) break
+    onChunk?.()
     buffer += decoder.decode(value, { stream: true })
     let splitAt = buffer.indexOf('\n\n')
     while (splitAt >= 0) {
@@ -225,6 +353,36 @@ async function* parseSSE(
       splitAt = buffer.indexOf('\n\n')
     }
   }
+}
+
+async function readSSEChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): ReturnType<ReadableStreamDefaultReader<Uint8Array>['read']> {
+  if (!signal) return await reader.read()
+  if (signal.aborted) throw new Error('ChatGPT Responses stream aborted')
+  return await new Promise((resolve, reject) => {
+    const onAbort = () => {
+      void reader.cancel().catch(() => undefined)
+      reject(new Error('ChatGPT Responses stream aborted'))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    void reader.read().then(
+      value => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+    )
+  })
+}
+
+function getChatGPTResponsesTimeoutMs(): number {
+  const configured = Number(process.env.CHATGPT_RESPONSES_TIMEOUT_MS)
+  return Number.isFinite(configured) && configured > 0 ? configured : 30_000
 }
 
 /**
@@ -433,13 +591,21 @@ export async function* adaptResponsesStreamToAnthropic(
 
     if (type === 'response.error') {
       const error = event.error as Record<string, unknown> | undefined
-      throw new Error(String(error?.message ?? 'ChatGPT Responses API error'))
+      throw new Error(
+        repairUTF8Mojibake(
+          String(error?.message ?? 'ChatGPT Responses API error'),
+        ),
+      )
     }
 
     if (type === 'response.failed') {
       const response = event.response as Record<string, unknown> | undefined
       const error = response?.error as Record<string, unknown> | undefined
-      throw new Error(String(error?.message ?? 'ChatGPT Responses API failed'))
+      throw new Error(
+        repairUTF8Mojibake(
+          String(error?.message ?? 'ChatGPT Responses API failed'),
+        ),
+      )
     }
 
     if (type === 'response.completed' || type === 'response.incomplete') {
@@ -468,39 +634,276 @@ export async function* adaptResponsesStreamToAnthropic(
   }
 }
 
-export async function createChatGPTResponsesStream(params: {
+export async function* createChatGPTResponsesStream(params: {
   request: ResponsesRequest
   signal: AbortSignal
   fetchOverride?: typeof fetch
-}): Promise<AsyncIterable<Record<string, unknown>>> {
-  const auth = await getValidChatGPTAuth()
+  onAccountExhausted?: () => AsyncIterable<Record<string, unknown>>
+  onAccountUnavailable?: () => AsyncIterable<Record<string, unknown>>
+}): AsyncGenerator<Record<string, unknown>, void> {
   const fetchFn = params.fetchOverride ?? (globalThis.fetch as typeof fetch)
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${auth.accessToken}`,
-    'Content-Type': 'application/json',
-    Accept: 'text/event-stream',
-    'OpenAI-Beta': 'responses=experimental',
-    Origin: 'https://chatgpt.com',
-    Referer: 'https://chatgpt.com/',
-    originator: 'claude-code-best',
+  const attempted = new Set<string>()
+  const rejected = new Set<string>()
+  let lastError: Error | undefined
+  let failureLogsSuppressed = false
+
+  const logAccountFailure = (
+    message: string,
+    details: Record<string, unknown>,
+  ) => {
+    if (attempted.size <= CHATGPT_ACCOUNT_FAILURE_LOG_LIMIT) {
+      routeError(message, details)
+      return
+    }
+    if (!failureLogsSuppressed) {
+      failureLogsSuppressed = true
+      routeError('codex account failures suppressed', {
+        attempted: attempted.size,
+      })
+    }
   }
-  if (auth.accountId) {
-    headers['ChatGPT-Account-Id'] = auth.accountId
-  }
-  const response = await fetchFn(
-    'https://chatgpt.com/backend-api/codex/responses',
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(params.request),
-      signal: params.signal,
-    },
-  )
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(
+
+  // Retry only account-specific auth failures. In particular, a generic 429
+  // must not rotate the pool: it does not prove another account can serve it.
+  while (true) {
+    let auth
+    try {
+      while (true) {
+        auth = await getValidChatGPTAuth()
+        if (!auth.accountId || !rejected.has(auth.accountId)) break
+        markChatGPTAccountFailure(auth)
+      }
+    } catch (error) {
+      if (params.onAccountExhausted) {
+        routeLog('request', 'codex unavailable; auto fallback', {
+          attempts: attempted.size,
+        })
+        yield* params.onAccountExhausted()
+        return
+      }
+      routeError('codex account unavailable', {
+        attempts: attempted.size,
+        errorType: error instanceof Error ? error.name : typeof error,
+      })
+      throw lastError ?? error
+    }
+    if (!auth.accountId || attempted.has(auth.accountId)) {
+      if (params.onAccountExhausted) {
+        routeLog('request', 'codex pool exhausted; auto fallback', {
+          attempts: attempted.size,
+        })
+        yield* params.onAccountExhausted()
+        return
+      }
+      routeError('codex account pool exhausted', { attempts: attempted.size })
+      throw lastError ?? new Error('No ChatGPT account could start a response.')
+    }
+    attempted.add(auth.accountId)
+    rejected.add(auth.accountId)
+    routeLog('request', 'codex request', {
+      account: auth.accountId,
+      model: params.request.model,
+      attempt: attempted.size,
+    })
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${auth.accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      'OpenAI-Beta': 'responses=experimental',
+      Origin: 'https://chatgpt.com',
+      Referer: 'https://chatgpt.com/',
+      originator: 'claude-code-best',
+      'ChatGPT-Account-Id': auth.accountId,
+    }
+    const controller = new AbortController()
+    let timedOut = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const resetTimeout = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timedOut = true
+        controller.abort()
+      }, getChatGPTResponsesTimeoutMs())
+    }
+    const clearRequestTimeout = () => {
+      if (timer) clearTimeout(timer)
+      timer = undefined
+    }
+    resetTimeout()
+    const abort = () => controller.abort()
+    params.signal.addEventListener('abort', abort, { once: true })
+    let response: Response
+    try {
+      response = await fetchFn(
+        'https://chatgpt.com/backend-api/codex/responses',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(params.request),
+          signal: controller.signal,
+        },
+      )
+    } catch (error) {
+      clearRequestTimeout()
+      params.signal.removeEventListener('abort', abort)
+      if (params.signal.aborted) {
+        routeLog('request', 'codex request cancelled', {
+          account: auth.accountId,
+          phase: 'request',
+        })
+        throw error
+      }
+      logAccountFailure(
+        timedOut ? 'codex request timed out' : 'codex request failed',
+        {
+          account: auth.accountId,
+          phase: 'request',
+          contentStarted: false,
+          timeoutMs: timedOut ? getChatGPTResponsesTimeoutMs() : undefined,
+          errorType: error instanceof Error ? error.name : typeof error,
+        },
+      )
+      if (timedOut && params.onAccountUnavailable) {
+        routeLog('request', 'codex -> auto fallback (timeout)')
+        yield* params.onAccountUnavailable()
+        return
+      }
+      markChatGPTAccountFailure(auth)
+      continue
+    }
+    if (response.ok) {
+      routeLog('request', 'codex response', {
+        account: auth.accountId,
+        status: response.status,
+      })
+      let contentStarted = false
+      let rotate = false
+      let quotaExhausted = false
+      try {
+        for await (const event of parseSSE(
+          response,
+          controller.signal,
+          resetTimeout,
+        )) {
+          const unavailable = upstreamUnavailableText(event)
+          if (unavailable && !contentStarted && params.onAccountUnavailable) {
+            lastError = new Error(
+              `ChatGPT upstream unavailable: ${unavailable}`,
+            )
+            routeLog(
+              'request',
+              'codex -> auto fallback (SSE upstream unavailable)',
+            )
+            yield* params.onAccountUnavailable()
+            return
+          }
+          const quotaError = quotaFailureText(event)
+          if (quotaError) {
+            quotaExhausted = true
+            lastError = new Error(
+              `ChatGPT subscription quota exhausted: ${quotaError}`,
+            )
+            await markChatGPTAccountQuotaExhausted(auth, fetchFn)
+            logAccountFailure('codex subscription quota exhausted', {
+              account: auth.accountId,
+            })
+            if (contentStarted) throw lastError
+            rotate = true
+            break
+          }
+          contentStarted ||=
+            event.type === 'response.output_text.delta' ||
+            event.type === 'response.reasoning_text.delta' ||
+            event.type === 'response.output_item.added'
+          yield event
+        }
+      } catch (error) {
+        if (params.signal.aborted) {
+          routeLog('request', 'codex response stream cancelled', {
+            account: auth.accountId,
+            phase: 'stream',
+            contentStarted,
+          })
+          throw error
+        }
+        if (quotaExhausted) throw error
+        lastError =
+          error instanceof Error
+            ? error
+            : new Error('ChatGPT Responses stream failed')
+        logAccountFailure(
+          timedOut
+            ? 'codex response stream timed out'
+            : 'codex response stream failed',
+          {
+            account: auth.accountId,
+            phase: 'stream',
+            contentStarted,
+            timeoutMs: timedOut ? getChatGPTResponsesTimeoutMs() : undefined,
+            errorType: error instanceof Error ? error.name : typeof error,
+          },
+        )
+        if (timedOut && !contentStarted && params.onAccountUnavailable) {
+          routeLog('request', 'codex -> auto fallback (stream timeout)')
+          yield* params.onAccountUnavailable()
+          return
+        }
+        if (contentStarted) throw lastError
+        markChatGPTAccountFailure(auth)
+        continue
+      } finally {
+        clearRequestTimeout()
+        params.signal.removeEventListener('abort', abort)
+      }
+      if (rotate) continue
+      if (!contentStarted) {
+        lastError = new Error('ChatGPT Responses API returned an empty stream')
+        markChatGPTAccountFailure(auth)
+        logAccountFailure('codex returned empty stream', {
+          account: auth.accountId,
+        })
+        continue
+      }
+      clearChatGPTAccountFailure(auth)
+      rejected.delete(auth.accountId)
+      routeLog('request', 'codex response complete', {
+        account: auth.accountId,
+      })
+      return
+    }
+
+    clearRequestTimeout()
+    params.signal.removeEventListener('abort', abort)
+    const text = repairUTF8Mojibake(await response.text().catch(() => ''))
+    lastError = new Error(
       `ChatGPT Responses API request failed (${response.status})${text ? `: ${text.slice(0, 500)}` : ''}`,
     )
+    if (response.status >= 500 && params.onAccountUnavailable) {
+      routeLog('request', 'codex -> auto fallback (upstream unavailable)', {
+        status: response.status,
+      })
+      yield* params.onAccountUnavailable()
+      return
+    }
+    if (
+      response.status !== 401 &&
+      response.status !== 403 &&
+      !isChatGPTAccountQuotaExhausted(response.status, text)
+    ) {
+      routeError('codex request rejected', {
+        account: auth.accountId,
+        status: response.status,
+      })
+      throw lastError
+    }
+    if (isChatGPTAccountQuotaExhausted(response.status, text)) {
+      await markChatGPTAccountQuotaExhausted(auth, fetchFn)
+    } else {
+      await markChatGPTAccountAuthRejected(auth)
+    }
+    logAccountFailure('codex account rejected', {
+      account: auth.accountId,
+      status: response.status,
+    })
   }
-  return parseSSE(response)
 }

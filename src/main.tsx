@@ -2162,6 +2162,14 @@ async function run(): Promise<CommanderCommand> {
         channelEntries = parseChannelEntries(rawChannels, '--channels');
         setAllowedChannels(channelEntries);
       }
+      // Inbound polling is a *global* resource: a channel server long-polls one
+      // upstream inbox with one shared cursor. gateChannelServer() only stops
+      // this session from *handling* notifications — the spawned server still
+      // polls and consumes the message, so a session without --channels
+      // silently eats messages meant for the session that opted in. Publish
+      // the opt-in list so spawned channel servers (which inherit env) can
+      // decide whether to poll at all.
+      process.env.CLAUDE_ACTIVE_CHANNELS = channelEntries.map(e => e.name).join(',');
       if (!isNonInteractiveSession) {
         if (rawDev && rawDev.length > 0) {
           devChannels = parseChannelEntries(rawDev, '--dangerously-load-development-channels');

@@ -1,3 +1,4 @@
+import { zh } from '../../utils/i18n.js';
 import { feature } from 'bun:bundle';
 import chalk from 'chalk';
 import figures from 'figures';
@@ -33,7 +34,7 @@ function decisionReasonDisplayString(
     case 'mode':
       return `${permissionModeTitle(decisionReason.mode)} mode`;
     case 'sandboxOverride':
-      return 'Requires permission to bypass sandbox';
+      return zh('Requires permission to bypass sandbox', '需要权限以绕过沙箱');
     case 'workingDir':
       return decisionReason.reason;
     case 'safetyCheck':

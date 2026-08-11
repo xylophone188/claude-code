@@ -133,7 +133,7 @@ export function useGoalContinuation(opts: UseGoalContinuationOpts): void {
       enqueue({
         value: prompt,
         mode: 'prompt',
-        priority: 'now',
+        priority: 'next',
         isMeta: true,
         origin: 'goal-budget-limit',
         skipSlashCommands: true,
@@ -173,7 +173,7 @@ export function useGoalContinuation(opts: UseGoalContinuationOpts): void {
     enqueue({
       value: prompt,
       mode: 'prompt',
-      priority: 'now',
+      priority: 'next',
       isMeta: true,
       origin: 'goal-continuation',
       skipSlashCommands: true,

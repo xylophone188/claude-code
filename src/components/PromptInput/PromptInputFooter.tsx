@@ -17,6 +17,7 @@ import type { Message } from '../../types/message.js';
 import type { PromptInputMode, VimMode } from '../../types/textInputTypes.js';
 import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
+import { zh } from '../../utils/i18n.js';
 import { getPipeDisplayRole, isPipeControlled } from '../../utils/pipeTransport.js';
 import { isUndercover } from '../../utils/undercover.js';
 import { CoordinatorTaskPanel, useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';
@@ -237,7 +238,7 @@ function BridgeStatusIndicator({ bridgeSelected }: BridgeStatusProps): React.Rea
   return (
     <Text color={bridgeSelected ? 'background' : status.color} inverse={bridgeSelected} wrap="truncate">
       {status.label}
-      {bridgeSelected && <Text dimColor> · Enter to view</Text>}
+      {bridgeSelected && <Text dimColor>{zh(' · Enter to view', ' · Enter 查看')}</Text>}
     </Text>
   );
 }
@@ -265,8 +266,12 @@ function PipeStatusInline(): React.ReactNode {
 
   const slaves = pipeIpc?.slaves ?? {};
   const slaveNames = Object.keys(slaves);
-  const discovered: Array<{ pipeName: string; role: string; ip: string; hostname: string }> =
-    pipeIpc?.discoveredPipes ?? [];
+  const discovered: Array<{
+    pipeName: string;
+    role: string;
+    ip: string;
+    hostname: string;
+  }> = pipeIpc?.discoveredPipes ?? [];
   const allPipes = [...new Set([...slaveNames, ...discovered.map(d => d.pipeName)])].filter(
     n => n !== pipeIpc?.serverName,
   );
@@ -341,7 +346,10 @@ function PipeStatusInline(): React.ReactNode {
         {pipeIpc.localIp && <Text dimColor>{pipeIpc.localIp}</Text>}
         {allPipes.length > 0 && (
           <Text color={selectedRouteActive ? 'success' : undefined} dimColor={selectedPipes.length === 0}>
-            {selectedPipes.length}/{allPipes.length} selected
+            {zh(
+              `${selectedPipes.length}/${allPipes.length} selected`,
+              `${selectedPipes.length}/${allPipes.length} 已选`,
+            )}
           </Text>
         )}
         {pipeIpc && isPipeControlled(pipeIpc) && pipeIpc.attachedBy && (
@@ -353,8 +361,11 @@ function PipeStatusInline(): React.ReactNode {
         {allPipes.length > 0 && (
           <Text color={selectedRouteActive ? 'success' : undefined} dimColor={!selectedRouteActive}>
             {selectedPipes.length > 0
-              ? `${routeMode === 'local' ? 'local main' : 'selected pipes only'} · ←/→ switch · Shift+↓ edit`
-              : 'local main · Shift+↓ select'}
+              ? zh(
+                  `${routeMode === 'local' ? 'local main' : 'selected pipes only'} · ←/→ switch · Shift+↓ edit`,
+                  `${routeMode === 'local' ? '本地 main' : '仅已选 pipes'} · ←/→ 切换 · Shift+↓ 编辑`,
+                )
+              : zh('local main · Shift+↓ select', '本地 main · Shift+↓ 选择')}
           </Text>
         )}
       </Box>
@@ -369,7 +380,12 @@ function PipeStatusInline(): React.ReactNode {
         <Text bold>{pipeIpc.serverName}</Text>
         <Text dimColor>({displayRole})</Text>
         {pipeIpc.localIp && <Text dimColor>{pipeIpc.localIp}</Text>}
-        <Text color="warning">↑↓ move Space select ←/→ or m route Enter/Esc close Shift+↓ toggle</Text>
+        <Text color="warning">
+          {zh(
+            '↑↓ move Space select ←/→ or m route Enter/Esc close Shift+↓ toggle',
+            '↑↓ 移动 Space 选择 ←/→ 或 m 路由 Enter/Esc 关闭 Shift+↓ 切换',
+          )}
+        </Text>
       </Box>
       <Box height={1} paddingLeft={2}>
         <Text dimColor>
@@ -393,7 +409,7 @@ function PipeStatusInline(): React.ReactNode {
               dimColor={!isConnected && !isCursor}
             >
               {isSelected ? '☑' : '☐'} {name}
-              {isConnected ? '' : ' [offline]'}
+              {isConnected ? '' : zh(' [offline]', ' [离线]')}
               {label ? ` (${label})` : ''}
             </Text>
           </Box>
@@ -401,7 +417,9 @@ function PipeStatusInline(): React.ReactNode {
       })}
       {allPipes.length === 0 && (
         <Box height={1} paddingLeft={2}>
-          <Text dimColor>No other pipes found. Start another instance.</Text>
+          <Text dimColor>
+            {zh('No other pipes found. Start another instance.', '未发现其他 pipe，请再启动一个实例。')}
+          </Text>
         </Box>
       )}
     </Box>

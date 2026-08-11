@@ -348,3 +348,16 @@ describe('modelSupportsXhighEffort', () => {
     expect(modelSupportsXhighEffort('some-random-model')).toBe(true)
   })
 })
+
+describe('modelSupportsEffort', () => {
+  test('ccb/combo ids are never effort-adjustable (CCB decides)', async () => {
+    const { modelSupportsEffort } = await import('src/utils/effort.js')
+    expect(modelSupportsEffort('ccb/routeha')).toBe(false)
+    expect(modelSupportsEffort('ccb/auto/best-coding')).toBe(false)
+  })
+
+  test('normal claude models still support effort', async () => {
+    const { modelSupportsEffort } = await import('src/utils/effort.js')
+    expect(modelSupportsEffort('claude-opus-4-7')).toBe(true)
+  })
+})

@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import * as React from 'react';
 import { Text } from '@anthropic/ink';
 import { BashTool } from '@claude-code-best/builtin-tools/tools/BashTool/BashTool.js';
@@ -25,7 +26,7 @@ export function PermissionRuleDescription({ ruleValue }: RuleSubtitleProps): Rea
           );
         }
       } else {
-        return <Text dimColor>Any Bash command</Text>;
+        return <Text dimColor>{zh('Any Bash command', '任意 Bash 命令')}</Text>;
       }
     }
     default: {

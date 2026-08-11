@@ -1,3 +1,4 @@
+import { zh } from '../../utils/i18n.js';
 import { feature } from 'bun:bundle';
 import chalk from 'chalk';
 import React from 'react';
@@ -46,14 +47,17 @@ function stringsForDecisionReason(
         reasonString: `Permission rule ${chalk.bold(
           permissionRuleValueToString(reason.rule.ruleValue),
         )} requires confirmation for this ${toolType}.`,
-        configString: reason.rule.source === 'policySettings' ? undefined : '/permissions to update rules',
+        configString:
+          reason.rule.source === 'policySettings'
+            ? undefined
+            : zh('/permissions to update rules', '运行 /permissions 更新规则'),
       };
     case 'hook': {
       const hookReasonString = reason.reason ? `:\n${reason.reason}` : '.';
       const sourceLabel = reason.hookSource ? ` ${chalk.dim(`[${reason.hookSource}]`)}` : '';
       return {
         reasonString: `Hook ${chalk.bold(reason.hookName)} requires confirmation for this ${toolType}${hookReasonString}${sourceLabel}`,
-        configString: '/hooks to update',
+        configString: zh('/hooks to update', '运行 /hooks 更新'),
       };
     }
     case 'safetyCheck':
@@ -65,7 +69,7 @@ function stringsForDecisionReason(
     case 'workingDir':
       return {
         reasonString: reason.reason,
-        configString: '/permissions to update rules',
+        configString: zh('/permissions to update rules', '运行 /permissions 更新规则'),
       };
     default:
       return null;

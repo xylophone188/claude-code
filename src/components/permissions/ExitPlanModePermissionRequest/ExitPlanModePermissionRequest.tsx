@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { feature } from 'bun:bundle';
 import type { UUID } from 'crypto';
 import figures from 'figures';
@@ -615,7 +616,7 @@ export function ExitPlanModePermissionRequest({
         borderBottom={false}
         paddingX={1}
       >
-        <Text dimColor>Would you like to proceed?</Text>
+        <Text dimColor>{zh('Would you like to proceed?', '是否继续？')}</Text>
         <Box marginTop={1}>
           <Select
             options={options}
@@ -628,7 +629,7 @@ export function ExitPlanModePermissionRequest({
         </Box>
         {editorName && (
           <Box flexDirection="row" gap={1} marginTop={1}>
-            <Text dimColor>ctrl-g to edit in </Text>
+            <Text dimColor>{zh('ctrl-g to edit in ', '按 ctrl-g 在 ')}</Text>
             <Text bold dimColor>
               {editorName}
             </Text>
@@ -692,7 +693,7 @@ export function ExitPlanModePermissionRequest({
     return (
       <PermissionDialog color="planMode" title="Exit plan mode?" workerBadge={workerBadge}>
         <Box flexDirection="column" paddingX={1} marginTop={1}>
-          <Text>Claude wants to exit plan mode</Text>
+          <Text>{zh('Claude wants to exit plan mode', 'Claude 想退出计划模式')}</Text>
           <Box marginTop={1}>
             <Select
               options={[
@@ -723,7 +724,7 @@ export function ExitPlanModePermissionRequest({
       <PermissionDialog color="planMode" title="Ready to code?" innerPaddingX={0} workerBadge={workerBadge}>
         <Box flexDirection="column" marginTop={1}>
           <Box paddingX={1} flexDirection="column">
-            <Text>Here is Claude&apos;s plan:</Text>
+            <Text>{zh("Here is Claude's plan:", '这是 Claude 的计划：')}</Text>
           </Box>
           <Box
             borderColor="subtle"
@@ -742,7 +743,7 @@ export function ExitPlanModePermissionRequest({
             <PermissionRuleExplanation permissionResult={toolUseConfirm.permissionResult} toolType="tool" />
             {isClassifierPermissionsEnabled() && allowedPrompts && allowedPrompts.length > 0 && (
               <Box flexDirection="column" marginBottom={1}>
-                <Text bold>Requested permissions:</Text>
+                <Text bold>{zh('Requested permissions:', '请求的权限：')}</Text>
                 {allowedPrompts.map((p, i) => (
                   <Text key={i} dimColor>
                     {'  '}· {p.tool}({PROMPT_PREFIX} {p.prompt})
@@ -752,7 +753,12 @@ export function ExitPlanModePermissionRequest({
             )}
             {!useStickyFooter && (
               <>
-                <Text dimColor>Claude has written up a plan and is ready to execute. Would you like to proceed?</Text>
+                <Text dimColor>
+                  {zh(
+                    'Claude has written up a plan and is ready to execute. Would you like to proceed?',
+                    'Claude 已制定计划并准备执行。是否继续？',
+                  )}
+                </Text>
                 <Box marginTop={1}>
                   <Select
                     options={options}
@@ -771,7 +777,7 @@ export function ExitPlanModePermissionRequest({
       {!useStickyFooter && editorName && (
         <Box flexDirection="row" gap={1} paddingX={1} marginTop={1}>
           <Box>
-            <Text dimColor>ctrl-g to edit in </Text>
+            <Text dimColor>{zh('ctrl-g to edit in ', '按 ctrl-g 在 ')}</Text>
             <Text bold dimColor>
               {editorName}
             </Text>

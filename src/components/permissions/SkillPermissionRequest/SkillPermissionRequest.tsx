@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import React, { useCallback, useMemo } from 'react';
 import { logError } from 'src/utils/log.js';
 import { getOriginalCwd } from '../../../bootstrap/state.js';
@@ -214,7 +215,12 @@ export function SkillPermissionRequest(props: PermissionRequestProps): React.Rea
 
   return (
     <PermissionDialog title={`Use skill "${skill}"?`} workerBadge={workerBadge}>
-      <Text>Claude may use instructions, code, or files from this Skill.</Text>
+      <Text>
+        {zh(
+          'Claude may use instructions, code, or files from this Skill.',
+          'Claude 可以使用此 Skill 中的指令、代码或文件。',
+        )}
+      </Text>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Text dimColor>{commandObj?.description}</Text>
       </Box>

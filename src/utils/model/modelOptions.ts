@@ -38,12 +38,7 @@ import {
   CHATGPT_CODEX_MODEL_OPTIONS,
   isChatGPTAuthMode,
 } from './chatgptModels.js'
-import {
-  getProviderModelGroups,
-  getProviderModelOptions,
-} from './opencodeFree.js'
-
-const OPENAI_PROVIDER_ID = 'openai'
+import { getProviderList as getOpenCodeFreeProviderList } from './opencodeFree.js'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -345,7 +340,7 @@ function getOpencodeFreeOption(): ModelOption {
   return {
     value,
     label: `OpenCode Free · ${model}`,
-    description: 'OpenCode Free via local Headroom gateway',
+    description: 'OpenCode Free via direct CCB transport',
     descriptionForModel: `OpenCode Free model (${value})`,
   }
 }
@@ -652,30 +647,11 @@ function filterModelOptionsByAllowlist(options: ModelOption[]): ModelOption[] {
 }
 
 /**
- * Level-1 menu options for the two-step /model picker (standalone command):
- * one entry per provider group, derived live from the gateway model list.
- * 'openai' is always present (curated ChatGPT/Codex set) even when the
- * gateway exposes no openai-prefixed ids; it is inserted right after the
- * default OpenCode group.
+ * Level-1 menu options for the two-step /model picker (standalone command).
+ * Implementation lives in opencodeFree.ts (free OpenCode first, OpenAI on
+ * Codex login, CCB providers, registry providers, "添加供应商" last); this
+ * module only re-exports it so existing importers keep working.
  */
 export async function getProviderList(): Promise<ModelOption[]> {
-  const groups = await getProviderModelGroups()
-  const options: ModelOption[] = []
-  for (const g of groups) {
-    if (g.id === OPENAI_PROVIDER_ID) continue // appended below with curated count
-    options.push({
-      value: g.id,
-      label: g.label,
-      description: `${g.models.length} model${g.models.length === 1 ? '' : 's'}`,
-    })
-  }
-  const curated = await getProviderModelOptions(OPENAI_PROVIDER_ID)
-  const openai: ModelOption = {
-    value: OPENAI_PROVIDER_ID,
-    label: 'OpenAI',
-    description: `${curated.length} model${curated.length === 1 ? '' : 's'}`,
-  }
-  const ocIndex = options.findIndex(o => o.value === 'oc')
-  options.splice(ocIndex >= 0 ? ocIndex + 1 : 0, 0, openai)
-  return options
+  return getOpenCodeFreeProviderList()
 }

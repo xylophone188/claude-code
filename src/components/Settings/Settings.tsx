@@ -10,6 +10,7 @@ import { Status, buildDiagnostics } from './Status.js';
 import { Config } from './Config.js';
 import { Usage } from './Usage.js';
 import type { LocalJSXCommandContext, CommandResultDisplay } from '../../commands.js';
+import { zh } from '../../utils/i18n.js';
 
 type Props = {
   onClose: (result?: string, options?: { display?: CommandResultDisplay }) => void;
@@ -62,10 +63,10 @@ export function Settings({ onClose, context, defaultTab }: Props): React.ReactNo
   });
 
   const tabs = [
-    <Tab key="status" title="Status">
+    <Tab key="status" title={zh('Status', '状态')}>
       <Status context={context} diagnosticsPromise={diagnosticsPromise} />
     </Tab>,
-    <Tab key="config" title="Config">
+    <Tab key="config" title={zh('Config', '设置')}>
       <Suspense fallback={null}>
         <Config
           context={context}
@@ -76,7 +77,7 @@ export function Settings({ onClose, context, defaultTab }: Props): React.ReactNo
         />
       </Suspense>
     </Tab>,
-    <Tab key="usage" title="Usage">
+    <Tab key="usage" title={zh('Usage', '用量')}>
       <Usage />
     </Tab>,
   ];

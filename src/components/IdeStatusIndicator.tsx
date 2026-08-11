@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import { basename } from 'path';
 import * as React from 'react';
 import { useIdeConnectionStatus } from '../hooks/useIdeConnectionStatus.js';
@@ -24,7 +25,8 @@ export function IdeStatusIndicator({ ideSelection, mcpClients }: IdeStatusIndica
   if (ideSelection.text && ideSelection.lineCount > 0) {
     return (
       <Text color="ide" key="selection-indicator" wrap="truncate">
-        ⧉ {ideSelection.lineCount} {ideSelection.lineCount === 1 ? 'line' : 'lines'} selected
+        ⧉ {ideSelection.lineCount} {ideSelection.lineCount === 1 ? zh('line', '行') : zh('lines', '行')}{' '}
+        {zh('selected', '已选择')}
       </Text>
     );
   }
@@ -32,7 +34,7 @@ export function IdeStatusIndicator({ ideSelection, mcpClients }: IdeStatusIndica
   if (ideSelection.filePath) {
     return (
       <Text color="ide" key="selection-indicator" wrap="truncate">
-        ⧉ In {basename(ideSelection.filePath)}
+        ⧉ {zh('In', '位于')} {basename(ideSelection.filePath)}
       </Text>
     );
   }

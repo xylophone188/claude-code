@@ -1,7 +1,10 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test'
 import {
   isOpenAIThinkingEnabled,
+  neutralizeSystemPrompt,
   buildOpenAIRequestBody,
+  sanitizeCodeBuddyRequestBody,
+  sanitizeNvidiaRequestBody,
 } from '../requestBody.js'
 
 // Re-register envUtils.js with correct isEnvDefinedFalsy and isEnvTruthy to
@@ -206,7 +209,10 @@ describe('buildOpenAIRequestBody — thinking params', () => {
   } as any
 
   test('includes official DeepSeek API thinking format when enabled', () => {
-    const body = buildOpenAIRequestBody({ ...baseParams, enableThinking: true })
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      enableThinking: true,
+    })
     expect(body.thinking).toEqual({ type: 'enabled' })
   })
 
@@ -230,7 +236,10 @@ describe('buildOpenAIRequestBody — thinking params', () => {
   })
 
   test('includes vLLM/self-hosted thinking format when enabled', () => {
-    const body = buildOpenAIRequestBody({ ...baseParams, enableThinking: true })
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      enableThinking: true,
+    })
     expect(body.enable_thinking).toBe(true)
     expect(body.chat_template_kwargs).toEqual({
       thinking: true,
@@ -239,7 +248,10 @@ describe('buildOpenAIRequestBody — thinking params', () => {
   })
 
   test('includes both formats simultaneously when enabled', () => {
-    const body = buildOpenAIRequestBody({ ...baseParams, enableThinking: true })
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      enableThinking: true,
+    })
     expect(body.thinking).toEqual({ type: 'enabled' })
     expect(body.enable_thinking).toBe(true)
     expect(body.chat_template_kwargs!.thinking).toBe(true)
@@ -308,5 +320,125 @@ describe('buildOpenAIRequestBody — thinking params', () => {
     })
     expect(body.tools).toBeUndefined()
     expect(body.tool_choice).toBeUndefined()
+  })
+})
+
+describe('neutralizeSystemPrompt', () => {
+  const NEUTRAL =
+    'You are a helpful AI assistant that helps with software engineering tasks.'
+
+  test('replaces prompts over 2000 chars', () => {
+    const long = ['x'.repeat(2001)]
+    expect(neutralizeSystemPrompt(long as any) as unknown as string[]).toEqual([
+      NEUTRAL,
+    ])
+  })
+
+  test('replaces prompts whose pattern advertises an agent identity', () => {
+    expect(
+      neutralizeSystemPrompt([
+        'You are Claude Code, an official CLI',
+      ] as any) as unknown as string[],
+    ).toEqual([NEUTRAL])
+    expect(
+      neutralizeSystemPrompt([
+        'cc_entrypoint=cli',
+      ] as any) as unknown as string[],
+    ).toEqual([NEUTRAL])
+  })
+
+  test('keeps clean prompts unchanged', () => {
+    const clean = ['You are a helpful assistant that answers questions.']
+    expect(neutralizeSystemPrompt(clean as any) as unknown as string[]).toEqual(
+      clean,
+    )
+  })
+})
+
+describe('sanitizeCodeBuddyRequestBody', () => {
+  test('sanitizes every CodeBuddy-only message form without mutating input', () => {
+    const body = {
+      reasoning_effort: 'high',
+      messages: [
+        {
+          role: 'system',
+          content: "You are Claude Code, Anthropic's official CLI",
+        },
+        { role: 'tool', content: [{ type: 'tool_result', content: 'done' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', name: 'Bash', input: { command: 'pwd' } },
+          ],
+        },
+      ],
+    }
+
+    const sanitized = sanitizeCodeBuddyRequestBody(body)
+    expect(body.messages[0].content).toContain('Claude Code')
+    expect(sanitized.messages).toEqual([
+      {
+        role: 'system',
+        content:
+          'You are a helpful AI assistant that helps with software engineering tasks.',
+      },
+      { role: 'user', content: 'done' },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              type: 'tool_use',
+              name: 'Bash',
+              input: { command: 'pwd' },
+            }),
+          },
+        ],
+      },
+    ])
+    expect(sanitized.reasoning_summary).toBe('auto')
+  })
+})
+
+describe('buildOpenAIRequestBody — reasoning summary', () => {
+  const baseParams = {
+    model: 'hy3-preview',
+    messages: [{ role: 'user' as const, content: 'hi' }],
+    tools: [] as any[],
+    toolChoice: undefined as any,
+    enableThinking: false,
+    maxTokens: 1024,
+  }
+
+  test('sends reasoning_summary when supplied alongside reasoning_effort', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      reasoningEffort: 'high',
+      reasoningSummary: 'auto',
+    })
+    expect(body.reasoning_effort).toBe('high')
+    expect(body.reasoning_summary).toBe('auto')
+  })
+
+  test('omits reasoning_summary when no summary is supplied', () => {
+    const body = buildOpenAIRequestBody({
+      ...baseParams,
+      reasoningEffort: 'high',
+    })
+    expect(body.reasoning_effort).toBe('high')
+    expect('reasoning_summary' in body).toBe(false)
+  })
+})
+
+describe('sanitizeNvidiaRequestBody', () => {
+  test('clamps unsupported max effort without mutating caller body', () => {
+    const body = { model: 'glm-5.2', reasoning_effort: 'max' }
+
+    expect(sanitizeNvidiaRequestBody(body)).toEqual({
+      model: 'glm-5.2',
+      reasoning_effort: 'high',
+    })
+    expect(body.reasoning_effort).toBe('max')
   })
 })

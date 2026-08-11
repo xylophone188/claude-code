@@ -10,6 +10,7 @@ import type { WorkflowPorts } from '../ports.js'
 import type { WorkflowRunResult } from '../types.js'
 import { workflowInputSchema, type WorkflowInput } from './schema.js'
 import { persistInlineScript } from './persistInline.js'
+import { createAdvisorWorkflowScript } from './advisorWorkflow.js'
 
 /** Self-contained tool descriptor (core wiring wraps it with buildTool). Zero core-layer dependencies. */
 export type WorkflowToolDescriptor = {
@@ -39,7 +40,7 @@ export type WorkflowToolDescriptor = {
 
 const WORKFLOW_TOOL_PROMPT = `Use the Workflow tool to execute a workflow script that orchestrates multiple subagents deterministically. The script runs in the background; you receive a run_id immediately and are notified on completion.
 
-Provide the script inline via "script", or reference a named workflow via "name" (resolved from .claude/workflows/), or an existing file via "scriptPath". Pass "args" as a real JSON value (object/array/string), not a stringified string.
+Provide the script inline via "script", or reference a named workflow via "name" (resolved from .claude/workflows/), an existing file via "scriptPath", or use mode="advisor". Advisor mode runs a top model for planning/review/acceptance and auto routing for implementation. Pass "args" as a real JSON value (object/array/string), not a stringified string.
 
 Use "resumeFromRunId" to resume a prior run — completed agent() calls replay from the journal instantly.
 
@@ -77,7 +78,10 @@ export function createWorkflowTool(
       if (input.resumeFromRunId)
         return `Workflow resume: ${input.resumeFromRunId}`
       const id =
-        input.name ?? input.scriptPath ?? (input.script ? 'inline' : 'unknown')
+        input.name ??
+        input.scriptPath ??
+        input.mode ??
+        (input.script ? 'inline' : 'unknown')
       return `Workflow: ${id}`
     },
 
@@ -87,10 +91,12 @@ export function createWorkflowTool(
       // Resolve the script source
       let script: string
       let workflowFile: string | undefined
+      let resolvedWorkflowName: string | undefined
       try {
         const resolved = await resolveScriptSource(input, host.cwd)
         script = resolved.script
         workflowFile = resolved.workflowFile
+        resolvedWorkflowName = resolved.workflowName
       } catch (e) {
         return { data: { output: `Error: ${(e as Error).message}` } }
       }
@@ -106,7 +112,8 @@ export function createWorkflowTool(
         }
       }
 
-      const workflowName = input.name ?? input.title ?? 'workflow'
+      const workflowName =
+        resolvedWorkflowName ?? input.name ?? input.title ?? 'workflow'
       const { runId, signal } = ports.taskRegistrar.register(
         {
           workflowName,
@@ -121,13 +128,9 @@ export function createWorkflowTool(
       // Inline entry: persist the script to the run directory and return a reusable path (the
       // inline -> persist -> edit -> resubmit-as-scriptPath iteration loop promised by the ultracode skill).
       // On write failure degrade to a placeholder + warn, do not abort the run (script is already in memory).
-      if (!workflowFile && input.script) {
+      if (!workflowFile && (input.script || input.mode)) {
         try {
-          workflowFile = await persistInlineScript(
-            input.script,
-            runId,
-            host.cwd,
-          )
+          workflowFile = await persistInlineScript(script, runId, host.cwd)
         } catch (e) {
           ports.logger.warn?.(
             `inline script persist failed: ${(e as Error).message}`,
@@ -226,7 +229,10 @@ function normalizeArgs(raw: unknown): unknown {
 async function resolveScriptSource(
   input: WorkflowInput,
   cwd: string,
-): Promise<{ script: string; workflowFile?: string }> {
+): Promise<{ script: string; workflowFile?: string; workflowName?: string }> {
+  if (input.mode === 'advisor') {
+    return { script: createAdvisorWorkflowScript(), workflowName: 'advisor' }
+  }
   if (input.script) return { script: input.script }
   if (input.scriptPath) {
     const resolved = resolve(cwd, input.scriptPath)
@@ -257,5 +263,5 @@ async function resolveScriptSource(
     }
     return { script: found.content, workflowFile: found.path }
   }
-  throw new Error('One of script, name, or scriptPath must be provided')
+  throw new Error('One of mode, script, name, or scriptPath must be provided')
 }

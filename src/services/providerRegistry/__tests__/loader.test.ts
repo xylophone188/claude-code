@@ -18,9 +18,14 @@ mock.module('src/utils/settings/settings.js', () => ({
 
 let tmpDir: string
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), 'provider-loader-test-'))
   process.env['CLAUDE_CONFIG_DIR'] = tmpDir
+  // J1 fix: clear the per-process cache BEFORE this test runs — an earlier test
+  // file (e.g. directRouter) may have cached providers read from the real
+  // CLAUDE_CONFIG_DIR, so loadProviders() would return stale external entries.
+  const { _invalidateProviderCache } = await import('../loader.js')
+  _invalidateProviderCache()
 })
 
 afterEach(async () => {
@@ -32,12 +37,40 @@ afterEach(async () => {
 })
 
 describe('loadProviders', () => {
-  test('returns built-in providers (core + OmniRoute) when providers.json does not exist', async () => {
+  test('loads usable CCB embed provider credentials without exposing them', async () => {
+    const embedFile = join(tmpDir, 'ccb-providers.json')
+    process.env.CCB_EMBED_PROVIDERS_FILE = embedFile
+    writeFileSync(
+      embedFile,
+      JSON.stringify({
+        providers: [
+          {
+            id: 'sensenova',
+            baseUrl: 'https://token.sensenova.cn/v1',
+            autoModel: 'sensenova-6.7-flash-lite',
+            autoModels: ['glm-5.2'],
+            keys: ['secret-one'],
+          },
+        ],
+      }),
+    )
+    const { loadCcbEmbedProviders } = await import('../loader.js')
+    const provider = loadCcbEmbedProviders()[0]
+    expect(provider).toMatchObject({
+      id: 'sensenova',
+      defaultModel: 'sensenova-6.7-flash-lite',
+      models: ['sensenova-6.7-flash-lite', 'glm-5.2'],
+    })
+    expect(provider?.accounts?.[0]?.apiKey).toBe('secret-one')
+    delete process.env.CCB_EMBED_PROVIDERS_FILE
+  })
+
+  test('returns built-in providers (core + Embedded) when providers.json does not exist', async () => {
     const { loadProviders, BUILTIN_PROVIDERS } = await import('../loader.js')
     const providers = loadProviders()
     const expectedIds = new Set(BUILTIN_PROVIDERS.map(p => p.id))
     const receivedIds = new Set(providers.map(p => p.id))
-    // Same id set, deduplicated (core default beats OmniRoute on overlap)
+    // Same id set, deduplicated (core default beats Embedded on overlap)
     expect(receivedIds).toEqual(expectedIds)
     expect(providers).toHaveLength(BUILTIN_PROVIDERS.length)
   })

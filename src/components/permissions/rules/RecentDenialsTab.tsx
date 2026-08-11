@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- 'r' is a view-specific key, not a global keybinding
@@ -66,7 +67,14 @@ export function RecentDenialsTab({ onHeaderFocusChange, onStateChange }: Props):
   );
 
   if (denials.length === 0) {
-    return <Text dimColor>No recent denials. Commands denied by the auto mode classifier will appear here.</Text>;
+    return (
+      <Text dimColor>
+        {zh(
+          'No recent denials. Commands denied by the auto mode classifier will appear here.',
+          '暂无拒绝记录。被自动模式分类器拒绝的命令会显示在这里。',
+        )}
+      </Text>
+    );
   }
 
   const options = denials.map((d, idx) => {
@@ -86,7 +94,7 @@ export function RecentDenialsTab({ onHeaderFocusChange, onStateChange }: Props):
 
   return (
     <Box flexDirection="column">
-      <Text>Commands recently denied by the auto mode classifier.</Text>
+      <Text>{zh('Commands recently denied by the auto mode classifier.', '最近被自动模式分类器拒绝的命令。')}</Text>
       <Box marginTop={1}>
         <Select
           options={options}

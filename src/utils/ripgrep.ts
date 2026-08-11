@@ -55,7 +55,10 @@ export const getRipgrepConfig = memoize((): RipgrepConfig => {
     }
   }
 
-  const rgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
+  const bundledRgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
+  const rgRoot = existsSync(bundledRgRoot)
+    ? bundledRgRoot
+    : path.resolve(__dirname, 'src', 'utils', 'vendor', 'ripgrep')
   const command =
     process.platform === 'win32'
       ? path.resolve(rgRoot, `${process.arch}-win32`, 'rg.exe')

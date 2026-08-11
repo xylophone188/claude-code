@@ -34,6 +34,25 @@ import { getOpencodeModelName, isOpencodeModel } from './model/model.js'
 import { getAPIProvider } from './model/providers.js'
 import { normalizeModelStringForAPI } from './model/model.js'
 import { getOpenAIClient } from '../services/api/openai/client.js'
+import {
+  CHATGPT_CODEX_DEFAULT_MODEL,
+  isChatGPTAuthMode,
+} from './model/chatgptModels.js'
+import {
+  resolveDirectRoutes,
+  type DirectRoute,
+} from '../services/ccbRouter/directRouter.js'
+import {
+  clearAccountFailure,
+  markAccountFailure,
+  waitForProviderRequestSlot,
+} from '../services/ccbRouter/accountPool.js'
+import { applyCompatRule } from '../services/providerRegistry/providerCompatMatrix.js'
+import {
+  matchUpstreamCustomError,
+  UpstreamBlockedError,
+} from '../services/api/openai/upstreamBlockedError.js'
+import { sanitizeCodeBuddyRequestBody } from '../services/api/openai/requestBody.js'
 import { getGrokClient } from '../services/api/grok/client.js'
 import { isChatGPTAuthEnabled } from '../services/api/openai/chatgptAuth.js'
 import {
@@ -578,6 +597,7 @@ async function sideQueryViaChatGPTResponses(
   }>,
   openaiTools: unknown[] | undefined,
   openaiToolChoice: unknown,
+  onAccountUnavailable?: () => AsyncIterable<Record<string, unknown>>,
 ): Promise<BetaMessage> {
   const start = Date.now()
   const request = buildResponsesRequest({
@@ -591,6 +611,12 @@ async function sideQueryViaChatGPTResponses(
   const rawStream = await createChatGPTResponsesStream({
     request,
     signal: opts.signal ?? new AbortController().signal,
+    ...(onAccountUnavailable
+      ? {
+          onAccountExhausted: onAccountUnavailable,
+          onAccountUnavailable,
+        }
+      : {}),
   })
   const adapted = adaptResponsesStreamToAnthropic(rawStream, openaiModel)
   const betaMessage = await collectAnthropicStreamToBetaMessage(
@@ -651,14 +677,27 @@ async function sideQueryViaOpenAICompatible(
 
   const provider = getAPIProvider()
   const normalizedModel = normalizeModelStringForAPI(model)
-  const isOpencodeRoute = isOpencodeModel(normalizedModel)
+  const directRoutes = resolveDirectRoutes(normalizedModel)
+  const isLocalCodexAdvisor =
+    isChatGPTAuthMode() && /^(?:ccb\/)?advisor$/i.test(normalizedModel)
+  const fallbackRoutes = isLocalCodexAdvisor
+    ? directRoutes.filter(
+        route => route.providerId !== '__ccb_local_codex_advisor__',
+      )
+    : directRoutes
+  const directRoute = fallbackRoutes[0]
+  const isOpencodeRoute =
+    !isLocalCodexAdvisor &&
+    (isOpencodeModel(normalizedModel) || directRoute?.kind === 'opencode')
 
   // Resolve model name per provider
-  const openaiModel = isOpencodeRoute
-    ? getOpencodeModelName(normalizedModel)
-    : provider === 'grok'
-      ? resolveGrokModel(normalizedModel)
-      : resolveOpenAIModel(normalizedModel)
+  const openaiModel = isLocalCodexAdvisor
+    ? CHATGPT_CODEX_DEFAULT_MODEL
+    : isOpencodeRoute
+      ? getOpencodeModelName(normalizedModel)
+      : provider === 'grok'
+        ? resolveGrokModel(normalizedModel)
+        : resolveOpenAIModel(normalizedModel)
 
   // Build system prompt text
   const systemText = extractSystemText(system)
@@ -683,13 +722,57 @@ async function sideQueryViaOpenAICompatible(
     : undefined
 
   // ChatGPT subscription auth: use Responses API + OAuth, never empty API key.
-  if (!isOpencodeRoute && provider === 'openai' && isChatGPTAuthEnabled()) {
+  if (
+    (isLocalCodexAdvisor || !directRoute) &&
+    !isOpencodeRoute &&
+    provider === 'openai' &&
+    isChatGPTAuthEnabled()
+  ) {
     return sideQueryViaChatGPTResponses(
       opts,
       openaiModel,
       openaiMessages,
       openaiTools,
       openaiToolChoice,
+      isLocalCodexAdvisor && fallbackRoutes.length
+        ? async function* () {
+            const fallback = await sideQueryViaOpenAICompatible({
+              ...opts,
+              model: 'auto',
+            })
+            for (const block of fallback.content) {
+              if (block.type === 'text') {
+                yield { type: 'response.output_text.delta', delta: block.text }
+              } else if (block.type === 'tool_use') {
+                yield {
+                  type: 'response.output_item.added',
+                  output_index: 0,
+                  item: {
+                    type: 'function_call',
+                    call_id: block.id,
+                    name: block.name,
+                  },
+                }
+                yield {
+                  type: 'response.function_call_arguments.delta',
+                  output_index: 0,
+                  delta: JSON.stringify(block.input),
+                }
+                yield { type: 'response.output_item.done', output_index: 0 }
+              }
+            }
+            yield {
+              type: 'response.completed',
+              response: {
+                status: 'completed',
+                usage: {
+                  input_tokens: fallback.usage.input_tokens,
+                  output_tokens: fallback.usage.output_tokens,
+                },
+              },
+            }
+          }
+        : undefined,
     )
   }
 
@@ -698,9 +781,12 @@ async function sideQueryViaOpenAICompatible(
   const client: import('openai').default = isOpencodeRoute
     ? getOpenAIClient({
         maxRetries: opts.maxRetries ?? 2,
-        baseURL:
-          process.env.OPENCODE_FREE_BASE_URL ?? 'http://127.0.0.1:8787/v1',
-        apiKey: 'opencode-free-local',
+        baseURL: 'https://opencode.ai/zen/v1',
+        apiKey: 'public',
+        defaultHeaders: {
+          'x-opencode-client': 'desktop',
+          Accept: 'text/event-stream',
+        },
       })
     : provider === 'grok'
       ? getGrokClient({ maxRetries: opts.maxRetries ?? 2 })
@@ -709,14 +795,16 @@ async function sideQueryViaOpenAICompatible(
   const start = Date.now()
 
   const requestParams: Record<string, unknown> = {
-    model: isOpencodeRoute
-      ? `opencode/${process.env.OPENCODE_FREE_MODEL ?? openaiModel}`
-      : openaiModel,
+    model: directRoute
+      ? directRoute.model
+      : isOpencodeRoute
+        ? `opencode/${openaiModel}`
+        : openaiModel,
     messages: openaiMessages,
     max_tokens,
   }
   const promptCacheKey =
-    provider === 'openai'
+    !directRoute && provider === 'openai'
       ? getOfficialOpenAIPromptCacheKey(
           process.env.OPENAI_BASE_URL,
           getSessionId(),
@@ -729,29 +817,76 @@ async function sideQueryViaOpenAICompatible(
     if (openaiToolChoice) requestParams.tool_choice = openaiToolChoice
   }
 
+  const createDirectRequest = (route: DirectRoute) => {
+    const params = {
+      ...requestParams,
+      model: route.model,
+    }
+    const compatibleBody = route.compatRule
+      ? applyCompatRule(params, route.compatRule)
+      : params
+    const body =
+      route.providerId === 'codebuddy-cn'
+        ? sanitizeCodeBuddyRequestBody(compatibleBody)
+        : compatibleBody
+    return getOpenAIClient({
+      maxRetries: 0,
+      baseURL: route.baseURL,
+      apiKey: route.apiKey,
+      defaultHeaders: route.headers,
+      timeoutMs: route.timeoutMs,
+      providerId: route.providerId,
+      accountId: route.accountId,
+    }).chat.completions.create(
+      body as unknown as import('openai/resources/chat/completions/completions.mjs').ChatCompletionCreateParamsNonStreaming,
+      { signal },
+    )
+  }
+
   let response:
     | import('openai/resources/chat/completions/completions.mjs').ChatCompletion
     | undefined
-  for (let attempt = 1; attempt <= (isOpencodeRoute ? 2 : 1); attempt++) {
-    try {
-      response = (await client.chat.completions.create(
-        requestParams as unknown as import('openai/resources/chat/completions/completions.mjs').ChatCompletionCreateParamsNonStreaming,
-        { signal },
-      )) as import('openai/resources/chat/completions/completions.mjs').ChatCompletion
-      const message = response.choices[0]?.message
-      if (
-        isOpencodeRoute &&
-        !message?.content &&
-        !message?.tool_calls?.length &&
-        !(message as { reasoning_content?: string } | undefined)
-          ?.reasoning_content
-      ) {
-        throw new Error('opencode-free returned an empty response')
+  const routes = directRoutes.length ? directRoutes : [undefined]
+  const attempts = isOpencodeRoute ? 2 : 1
+  for (const route of routes) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        if (route)
+          await waitForProviderRequestSlot(route.providerId, route.accountId)
+        const candidate = (await (route
+          ? createDirectRequest(route)
+          : client.chat.completions.create(
+              requestParams as unknown as import('openai/resources/chat/completions/completions.mjs').ChatCompletionCreateParamsNonStreaming,
+              { signal },
+            ))) as import('openai/resources/chat/completions/completions.mjs').ChatCompletion
+        const message = candidate.choices[0]?.message
+        const blocked = matchUpstreamCustomError(message?.content)
+        if (blocked) throw new UpstreamBlockedError(blocked)
+        if (
+          isOpencodeRoute &&
+          !message?.content &&
+          !message?.tool_calls?.length &&
+          !(message as { reasoning_content?: string } | undefined)
+            ?.reasoning_content
+        ) {
+          throw new Error('opencode-free returned an empty response')
+        }
+        if (route?.accountId) {
+          clearAccountFailure(route.providerId, route.accountId)
+        }
+        response = candidate
+        break
+      } catch (error) {
+        if (signal?.aborted) throw error
+        if (attempt < attempts) continue
+        if (route?.accountId) {
+          markAccountFailure(route.providerId, route.accountId)
+        }
+        if (!route || route === routes[routes.length - 1]) throw error
       }
-      break
-    } catch (error) {
-      if (attempt === (isOpencodeRoute ? 2 : 1)) throw error
+      if (response) break
     }
+    if (response) break
   }
 
   if (!response) throw new Error('OpenCode response was not received')

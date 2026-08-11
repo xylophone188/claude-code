@@ -5,6 +5,7 @@ import { gracefulShutdownSync } from '../utils/gracefulShutdown.js';
 import { updateSettingsForSource } from '../utils/settings/settings.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from '@anthropic/ink';
+import { zh } from '../utils/i18n.js';
 
 type Props = {
   onAccept(): void;
@@ -54,17 +55,28 @@ export function BypassPermissionsModeDialog({ onAccept }: Props): React.ReactNod
   }
 
   return (
-    <Dialog title="WARNING: Claude Code running in Bypass Permissions mode" color="error" onCancel={handleEscape}>
+    <Dialog
+      title={zh('WARNING: Claude Code running in Bypass Permissions mode', '警告：Claude Code 正在以绕过权限模式运行')}
+      color="error"
+      onCancel={handleEscape}
+    >
       <Box flexDirection="column" gap={1}>
         <Text>
-          In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous
-          commands.
+          {zh(
+            'In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.',
+            '在绕过权限模式下，Claude Code 执行潜在危险命令前不会征求你的批准。',
+          )}
           <Newline />
-          This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily
-          be restored if damaged.
+          {zh(
+            'This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.',
+            '此模式仅应在网络受限且损坏后易于恢复的沙箱容器/VM 中使用。',
+          )}
         </Text>
         <Text>
-          By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.
+          {zh(
+            'By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.',
+            '继续即表示你接受以绕过权限模式运行期间所有操作的责任。',
+          )}
         </Text>
 
         <Link url="https://code.claude.com/docs/en/security" />
@@ -72,8 +84,8 @@ export function BypassPermissionsModeDialog({ onAccept }: Props): React.ReactNod
 
       <Select
         options={[
-          { label: 'No, exit', value: 'decline' },
-          { label: 'Yes, I accept', value: 'accept' },
+          { label: zh('No, exit', '不，退出'), value: 'decline' },
+          { label: zh('Yes, I accept', '好，我接受'), value: 'accept' },
         ]}
         onChange={value => onChange(value as 'accept' | 'decline')}
       />

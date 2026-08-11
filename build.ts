@@ -106,3 +106,13 @@ chmodSync(cliBun, 0o755)
 chmodSync(cliNode, 0o755)
 
 console.log(`Generated ${cliBun} (shebang: bun) and ${cliNode} (shebang: node)`)
+
+// Step 6: Localize built output with Chinese translations (safe patch — syntax-checked, failures skipped)
+const { spawnSync } = await import('node:child_process')
+const patchDist = join('localization', 'patch-dist.mjs')
+const localize = spawnSync('node', [patchDist, outdir], {
+  encoding: 'utf-8',
+  timeout: 120_000,
+})
+if (localize.stdout.trim()) console.log(localize.stdout.trim())
+if (localize.stderr.trim()) console.error(localize.stderr.trim())

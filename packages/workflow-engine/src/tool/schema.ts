@@ -2,6 +2,12 @@ import { z } from 'zod/v4'
 
 /** Workflow tool input schema. args is any JSON value (object/array/string/etc.). */
 export const workflowInputSchema = z.object({
+  mode: z
+    .enum(['advisor'])
+    .optional()
+    .describe(
+      'Built-in advisor workflow: advisor plans/reviews/accepts; auto executes.',
+    ),
   script: z
     .string()
     .optional()

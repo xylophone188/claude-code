@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { BASH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/BashTool/toolName.js';
 import { extractOutputRedirections } from '../../../utils/bash/commands.js';
 import { isClassifierPermissionsEnabled } from '../../../utils/permissions/bashClassifier.js';
@@ -94,7 +95,7 @@ export function bashToolUseOptions({
         type: 'input',
         label: 'Yes, and don\u2019t ask again for',
         value: 'yes-prefix-edited',
-        placeholder: 'command prefix (e.g., npm run:*)',
+        placeholder: zh('command prefix (e.g., npm run:*)', '命令前缀（例如 npm run:*）'),
         initialValue: editablePrefix,
         onChange: onEditablePrefixChange,
         allowEmptySubmitToCancel: true,

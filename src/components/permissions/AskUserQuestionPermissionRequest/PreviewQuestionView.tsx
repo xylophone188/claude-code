@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useTerminalSize } from '../../../hooks/useTerminalSize.js';
@@ -335,7 +336,7 @@ export function PreviewQuestionView({
                 maxWidth={previewMaxWidth}
               />
               <Box marginTop={1} flexDirection="row" gap={1}>
-                <Text color="suggestion">Notes:</Text>
+                <Text color="suggestion">{zh('Notes:', '备注：')}</Text>
                 {isInNotesInput ? (
                   <TextInput
                     value={notesValue}
@@ -369,7 +370,9 @@ export function PreviewQuestionView({
               ) : (
                 <Text> </Text>
               )}
-              <Text color={isFooterFocused && footerIndex === 0 ? 'suggestion' : undefined}>Chat about this</Text>
+              <Text color={isFooterFocused && footerIndex === 0 ? 'suggestion' : undefined}>
+                {zh('Chat about this', '围绕此内容对话')}
+              </Text>
             </Box>
             {isInPlanMode && (
               <Box flexDirection="row" gap={1}>

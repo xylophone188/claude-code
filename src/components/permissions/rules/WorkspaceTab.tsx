@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import * as React from 'react';
 import { useCallback, useEffect } from 'react';
@@ -79,7 +80,7 @@ export function WorkspaceTab({
       {/* Current working directory section */}
       <Box flexDirection="row" marginTop={1} marginLeft={2} gap={1}>
         <Text>{`-  ${getOriginalCwd()}`}</Text>
-        <Text dimColor>(Original working directory)</Text>
+        <Text dimColor>{zh('(Original working directory)', '(原始工作目录)')}</Text>
       </Box>
       <Select
         options={options}

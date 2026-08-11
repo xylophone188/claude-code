@@ -1,3 +1,4 @@
+import { zh } from '../../utils/i18n.js';
 import React, { useCallback, useMemo } from 'react';
 import { getOriginalCwd } from '../../bootstrap/state.js';
 import { Box, Text, useTheme } from '@anthropic/ink';
@@ -119,7 +120,7 @@ export function FallbackPermissionRequest({
   const options = useMemo((): PermissionPromptOption<FallbackOptionValue>[] => {
     const result: PermissionPromptOption<FallbackOptionValue>[] = [
       {
-        label: 'Yes',
+        label: zh('Yes', '允许'),
         value: 'yes',
         feedbackConfig: { type: 'accept' },
       },
@@ -138,7 +139,7 @@ export function FallbackPermissionRequest({
     }
 
     result.push({
-      label: 'No',
+      label: zh('No', '拒绝'),
       value: 'no',
       feedbackConfig: { type: 'reject' },
     });

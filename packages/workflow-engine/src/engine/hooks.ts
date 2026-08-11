@@ -1,4 +1,9 @@
-import { MAX_ITEMS_PER_CALL, MAX_TOTAL_AGENTS } from '../constants.js'
+import {
+  MAX_ITEMS_PER_CALL,
+  MAX_TOTAL_AGENTS,
+  MAX_TRANSIENT_RETRIES,
+  TRANSIENT_RETRY_BASE_DELAY_MS,
+} from '../constants.js'
 import type {
   AgentProgressUpdate,
   AgentRunParams,
@@ -14,6 +19,32 @@ import {
   assertValidJsonSchema,
   validateAgainstSchema,
 } from './structuredOutput.js'
+
+/**
+ * Signatures of transient connection failures worth retrying with backoff.
+ * These are network/rate-limit blips — a single retry is not enough when the
+ * endpoint is briefly unavailable. Permanent failures (bad schema, missing
+ * structured output, auth) are intentionally NOT listed here.
+ */
+const TRANSIENT_FAILURE_PATTERNS: readonly RegExp[] = [
+  /connection error/i, // Anthropic SDK: "Connection error."
+  /\bETIMEDOUT\b/,
+  /\bECONNRESET\b/,
+  /\bECONNREFUSED\b/,
+  /\bENOTFOUND\b/,
+  /\bEAI_AGAIN\b/,
+  /\bECONNABORTED\b/,
+  /socket hang up/i,
+  /fetch failed/i,
+  /\btimed?\s?out\b/i,
+  /\b429\b/,
+  /\b5\d{2}\b/, // 500/502/503/504 …
+]
+
+/** True when the failure message looks like a transient connection/rate-limit error. */
+function isTransientConnectionMessage(message: string): boolean {
+  return TRANSIENT_FAILURE_PATTERNS.some(re => re.test(message))
+}
 
 /** Sub-workflow executor for the workflow() hook (injected by runWorkflow to avoid circular dependencies). */
 export type SubWorkflowRunner = (opts: {
@@ -188,14 +219,21 @@ export function makeHooks(
         return validateStructuredResult(await rawResult, params.schema)
       }
 
-      // Auto-retry once on failure: dead (terminal API error after retries) or a non-abort throw
-      // both get one retry chance; WorkflowAbortedError (kill) is not retried — it is the user's intent.
-      // If retry still fails: dead stays dead; a throw degrades to dead (one agent must not take down the workflow).
-      // budget is not double-charged: dead does not call addOutputTokens; retry-ok charges once (at the final ok).
-      // dead.reason is passed through to the log: no-structured-output and invalid-structured-output
-      // are high-frequency causes of death; logging detail makes the failed boundary visible immediately.
-      // detail is wrapped with String() defensively: old journals or third-party adapters may write non-strings (corrupted data),
-      // and calling .slice directly would throw a TypeError that pierces the logging path.
+      // Auto-retry on failure. A non-abort throw or a dead result gets one
+      // baseline retry; WorkflowAbortedError (kill) is never retried — it is the
+      // user's intent. Transient connection failures (network blips, timeouts,
+      // HTTP 429/5xx) get extra retries with exponential backoff, because a
+      // single retry is not enough when the endpoint is briefly unavailable and
+      // a transient blip must not kill a workflow phase.
+      // If all retries fail: dead stays dead; a throw degrades to dead (one agent
+      // must not take down the workflow). budget is not double-charged: dead does
+      // not call addOutputTokens; a successful retry charges once (at the final ok).
+      // dead.reason is passed through to the log: no-structured-output and
+      // invalid-structured-output are high-frequency causes of death; logging
+      // detail makes the failed boundary visible immediately. detail is wrapped
+      // with String() defensively: old journals or third-party adapters may
+      // write non-strings (corrupted data), and calling .slice directly would
+      // throw a TypeError that pierces the logging path.
       type BackendAttempt =
         | { kind: 'result'; value: AgentRunResult }
         | { kind: 'error'; error: unknown }
@@ -208,6 +246,54 @@ export function makeHooks(
         }
       }
 
+      /** Best-effort human-readable message for a failed backend attempt. */
+      const failureMessageOf = (attempt: BackendAttempt): string => {
+        if (attempt.kind === 'error') {
+          return attempt.error instanceof Error
+            ? attempt.error.message
+            : String(attempt.error)
+        }
+        const d = attempt.value
+        if (d.kind === 'dead') {
+          return [d.reason ?? '', typeof d.detail === 'string' ? d.detail : '']
+            .filter(Boolean)
+            .join(' ')
+        }
+        return ''
+      }
+
+      /** Convert a failed attempt into the dead result to journal/return. */
+      const toDeadResult = (attempt: BackendAttempt): AgentRunResult => {
+        if (attempt.kind === 'result') return attempt.value
+        return {
+          kind: 'dead',
+          reason: 'runagent-threw',
+          detail:
+            attempt.error instanceof Error
+              ? attempt.error.message
+              : String(attempt.error),
+        }
+      }
+
+      // Abort-aware sleep: resolves after ms, or rejects with WorkflowAbortedError
+      // if the workflow is killed mid-backoff so the retry loop stops promptly.
+      const sleep = (ms: number): Promise<void> =>
+        new Promise<void>((resolve, reject) => {
+          if (ctx.signal.aborted) {
+            reject(new WorkflowAbortedError())
+            return
+          }
+          const timer = setTimeout(() => {
+            ctx.signal.removeEventListener('abort', onAbort)
+            resolve()
+          }, ms)
+          const onAbort = (): void => {
+            clearTimeout(timer)
+            reject(new WorkflowAbortedError())
+          }
+          ctx.signal.addEventListener('abort', onAbort, { once: true })
+        })
+
       const first = await attemptBackend()
       let result: AgentRunResult
       if (first.kind === 'result' && first.value.kind !== 'dead') {
@@ -219,7 +305,7 @@ export function makeHooks(
               ? first.error.message
               : String(first.error)
           ctx.ports.logger.warn?.(
-            `agent "${label ?? `#${agentId}`}" threw (${errorMessage}); retrying once`,
+            `agent "${label ?? `#${agentId}`}" threw (${errorMessage}); retrying`,
           )
         } else if (first.value.kind === 'dead') {
           const detail =
@@ -228,22 +314,37 @@ export function makeHooks(
             `agent "${label ?? `#${agentId}`}" returned dead` +
               (first.value.reason ? ` (${first.value.reason})` : '') +
               (detail ? `: ${detail.slice(0, 150)}` : '') +
-              '; retrying once',
+              '; retrying',
           )
         }
 
-        const retry = await attemptBackend()
-        result =
-          retry.kind === 'result'
-            ? retry.value
-            : {
-                kind: 'dead',
-                reason: 'runagent-threw',
-                detail:
-                  retry.error instanceof Error
-                    ? retry.error.message
-                    : String(retry.error),
-              }
+        if (isTransientConnectionMessage(failureMessageOf(first))) {
+          // Extra retries with exponential backoff for transient connection failures.
+          result = toDeadResult(first)
+          for (let i = 0; i < MAX_TRANSIENT_RETRIES; i++) {
+            await sleep(TRANSIENT_RETRY_BASE_DELAY_MS * 2 ** i)
+            const attempt = await attemptBackend()
+            if (attempt.kind === 'result' && attempt.value.kind !== 'dead') {
+              result = attempt.value
+              break
+            }
+            // Keep the latest failure so the journal reflects the last error seen.
+            result = toDeadResult(attempt)
+          }
+        } else {
+          const retry = await attemptBackend()
+          result =
+            retry.kind === 'result'
+              ? retry.value
+              : {
+                  kind: 'dead',
+                  reason: 'runagent-threw',
+                  detail:
+                    retry.error instanceof Error
+                      ? retry.error.message
+                      : String(retry.error),
+                }
+        }
       }
       if (result.kind === 'ok') {
         ctx.resources.budget.addOutputTokens(result.usage.outputTokens)

@@ -7,6 +7,7 @@ import {
   logEvent,
 } from '../../services/analytics/index.js';
 import { useSetAppState } from '../../state/AppState.js';
+import { zh } from '../../utils/i18n.js';
 import { type OptionWithDescription, Select } from '../CustomSelect/select.js';
 
 export type FeedbackType = 'accept' | 'reject';
@@ -35,8 +36,8 @@ export type PermissionPromptProps<T extends string> = {
 };
 
 const DEFAULT_PLACEHOLDERS: Record<FeedbackType, string> = {
-  accept: 'tell Claude what to do next',
-  reject: 'tell Claude what to do differently',
+  accept: zh('tell Claude what to do next', '告诉 Claude 接下来要做什么'),
+  reject: zh('tell Claude what to do differently', '告诉 Claude 应该怎么做'),
 };
 
 /**
@@ -53,7 +54,7 @@ export function PermissionPrompt<T extends string>({
   options,
   onSelect,
   onCancel,
-  question = 'Do you want to proceed?',
+  question = zh('Do you want to proceed?', '你要继续吗？'),
   toolAnalyticsContext,
 }: PermissionPromptProps<T>): React.ReactNode {
   const setAppState = useSetAppState();
@@ -242,7 +243,10 @@ export function PermissionPrompt<T extends string>({
         onInputModeToggle={handleInputModeToggle}
       />
       <Box marginTop={1}>
-        <Text dimColor>Esc to cancel{showTabHint && ' · Tab to amend'}</Text>
+        <Text dimColor>
+          {zh('Esc to cancel', '按 Esc 取消')}
+          {showTabHint && zh(' · Tab to amend', ' · Tab 修改')}
+        </Text>
       </Box>
     </Box>
   );

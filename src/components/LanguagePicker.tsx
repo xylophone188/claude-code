@@ -2,6 +2,7 @@ import figures from 'figures';
 import React, { useState } from 'react';
 import { Box, Text } from '@anthropic/ink';
 import { useKeybinding } from '../keybindings/useKeybinding.js';
+import { zh } from '../utils/i18n.js';
 import TextInput from './TextInput.js';
 
 type Props = {
@@ -25,7 +26,7 @@ export function LanguagePicker({ initialLanguage, onComplete, onCancel }: Props)
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Text>Enter your preferred response and voice language:</Text>
+      <Text>{zh('Enter your preferred response and voice language:', '输入你偏好的回复与语音语言：')}</Text>
       <Box flexDirection="row" gap={1}>
         <Text>{figures.pointer}</Text>
         <TextInput
@@ -34,13 +35,16 @@ export function LanguagePicker({ initialLanguage, onComplete, onCancel }: Props)
           onSubmit={handleSubmit}
           focus={true}
           showCursor={true}
-          placeholder={`e.g., Japanese, 日本語, Español${figures.ellipsis}`}
+          placeholder={zh(
+            `e.g., Japanese, 日本語, Español${figures.ellipsis}`,
+            `例如：Japanese、日本語、Español${figures.ellipsis}`,
+          )}
           columns={60}
           cursorOffset={cursorOffset}
           onChangeCursorOffset={setCursorOffset}
         />
       </Box>
-      <Text dimColor>Leave empty for default (English)</Text>
+      <Text dimColor>{zh('Leave empty for default (English)', '留空则使用默认语言（English）')}</Text>
     </Box>
   );
 }

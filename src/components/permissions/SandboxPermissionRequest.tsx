@@ -7,6 +7,7 @@ import {
 } from '../../services/analytics/index.js';
 import { Select } from '../CustomSelect/select.js';
 import { PermissionDialog } from './PermissionDialog.js';
+import { zh } from '../../utils/i18n.js';
 
 export type SandboxPermissionRequestProps = {
   hostPattern: NetworkHostPattern;
@@ -44,13 +45,13 @@ export function SandboxPermissionRequest({
   const managedDomainsOnly = shouldAllowManagedSandboxDomainsOnly();
 
   const options = [
-    { label: 'Yes', value: 'yes' },
+    { label: zh('Yes', '允许'), value: 'yes' },
     ...(!managedDomainsOnly
       ? [
           {
             label: (
               <Text>
-                Yes, and don&apos;t ask again for <Text bold>{host}</Text>
+                {zh('Yes, and don\u0027t ask again for', '可以，不再询问')} <Text bold>{host}</Text>
               </Text>
             ),
             value: 'yes-dont-ask-again',
@@ -60,7 +61,7 @@ export function SandboxPermissionRequest({
     {
       label: (
         <Text>
-          No, and tell Claude what to do differently <Text bold>(esc)</Text>
+          {zh('No, and tell Claude what to do differently', '拒绝，并告诉 Claude 应该怎么做')} <Text bold>(esc)</Text>
         </Text>
       ),
       value: 'no',
@@ -68,14 +69,14 @@ export function SandboxPermissionRequest({
   ];
 
   return (
-    <PermissionDialog title="Network request outside of sandbox">
+    <PermissionDialog title={zh('Network request outside of sandbox', '沙箱外的网络请求')}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Box>
-          <Text dimColor>Host:</Text>
+          <Text dimColor>{zh('Host:', '主机：')}</Text>
           <Text> {host}</Text>
         </Box>
         <Box marginTop={1}>
-          <Text>Do you want to allow this connection?</Text>
+          <Text>{zh('Do you want to allow this connection?', '是否允许此连接？')}</Text>
         </Box>
         <Box>
           <Select

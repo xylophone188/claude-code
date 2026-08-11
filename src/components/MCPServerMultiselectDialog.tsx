@@ -7,6 +7,7 @@ import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
 import { SelectMulti } from './CustomSelect/SelectMulti.js';
 import { Byline, Dialog, KeyboardShortcutHint } from '@anthropic/ink';
 import { MCPServerDialogCopy } from './MCPServerDialogCopy.js';
+import { zh } from '../utils/i18n.js';
 
 type Props = {
   serverNames: string[];
@@ -63,8 +64,11 @@ export function MCPServerMultiselectDialog({ serverNames, onDone }: Props): Reac
   return (
     <>
       <Dialog
-        title={`${serverNames.length} new MCP servers found in .mcp.json`}
-        subtitle="Select any you wish to enable."
+        title={zh(
+          `${serverNames.length} new MCP servers found in .mcp.json`,
+          `在 .mcp.json 中发现 ${serverNames.length} 个新 MCP 服务器`,
+        )}
+        subtitle={zh('Select any you wish to enable.', '选择你想启用的服务器。')}
         color="warning"
         onCancel={handleEscRejectAll}
         hideInputGuide
@@ -91,7 +95,7 @@ export function MCPServerMultiselectDialog({ serverNames, onDone }: Props): Reac
               action="confirm:no"
               context="Confirmation"
               fallback="Esc"
-              description="reject all"
+              description={zh('reject all', '全部拒绝')}
             />
           </Byline>
         </Text>

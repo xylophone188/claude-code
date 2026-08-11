@@ -44,6 +44,7 @@ import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
 import { isXtermJs, useHasSelection, useSelection } from '@anthropic/ink';
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getPlatform } from '../../utils/platform.js';
+import { zh } from '../../utils/i18n.js';
 import { PrBadge } from '../PrBadge.js';
 
 // Dead code elimination: conditional import for proactive mode
@@ -125,7 +126,14 @@ function ProactiveCountdown(): React.ReactNode {
 
   if (remainingSeconds === null) return null;
 
-  return <Text dimColor>waiting {formatDuration(remainingSeconds * 1000, { mostSignificantOnly: true })}</Text>;
+  return (
+    <Text dimColor>
+      {zh(
+        `waiting ${formatDuration(remainingSeconds * 1000, { mostSignificantOnly: true })}`,
+        `等待 ${formatDuration(remainingSeconds * 1000, { mostSignificantOnly: true })}`,
+      )}
+    </Text>
+  );
 }
 
 /** Compact "goal (1h22min)" pill for the footer — colored by status. */
@@ -174,7 +182,7 @@ function GoalElapsedIndicator(): React.ReactNode {
       break;
   }
 
-  return <Text color={color as 'ansi:green'}>goal ({timeStr})</Text>;
+  return <Text color={color as 'ansi:green'}>{zh(`goal (${timeStr})`, `目标 (${timeStr})`)}</Text>;
 }
 
 export function PromptInputFooterLeftSide({
@@ -198,14 +206,14 @@ export function PromptInputFooterLeftSide({
   if (exitMessage.show) {
     return (
       <Text dimColor key="exit-message">
-        Press {exitMessage.key} again to exit
+        {zh(`Press ${exitMessage.key} again to exit`, `再按 ${exitMessage.key} 退出`)}
       </Text>
     );
   }
   if (isPasting) {
     return (
       <Text dimColor key="pasting-message">
-        Pasting text…
+        {zh('Pasting text…', '正在粘贴文本…')}
       </Text>
     );
   }
@@ -341,7 +349,7 @@ function ModeIndicator({
     count(Object.values(teamContext.teammates), t => t.name !== 'team-lead') > 0;
 
   if (mode === 'bash') {
-    return <Text color="bashBorder">! for bash mode</Text>;
+    return <Text color="bashBorder">{zh('! for bash mode', '! 进入终端模式')}</Text>;
   }
 
   const currentMode = toolPermissionContext?.mode;
@@ -382,7 +390,11 @@ function ModeIndicator({
   const modePart =
     currentMode && hasActiveMode && !getIsRemoteMode() ? (
       <Text color={getModeColor(currentMode)} key="mode">
-        {permissionModeSymbol(currentMode)} {permissionModeTitle(currentMode).toLowerCase()} on
+        {permissionModeSymbol(currentMode)}{' '}
+        {zh(
+          `${permissionModeTitle(currentMode).toLowerCase()} on`,
+          `${permissionModeTitle(currentMode).toLowerCase()} 已开启`,
+        )}
         {shouldShowModeHint && (
           <Text dimColor>
             {' '}
@@ -399,7 +411,9 @@ function ModeIndicator({
     ...(remoteSessionUrl
       ? [
           <Link url={remoteSessionUrl} key="remote">
-            <Text color="ide">{figures.circleDouble} remote</Text>
+            <Text color="ide">
+              {figures.circleDouble} {zh('remote', '远程')}
+            </Text>
           </Link>,
         ]
       : []),
@@ -512,7 +526,7 @@ function ModeIndicator({
   if (parts.length === 0 && !tasksPart && !modePart && showHint) {
     parts.push(
       <Text dimColor key="shortcuts-hint">
-        ? for shortcuts
+        {zh('? for shortcuts', '? 查看快捷键')}
       </Text>,
     );
   }
@@ -547,7 +561,12 @@ function ModeIndicator({
           {!copyOnSelect && <KeyboardShortcutHint shortcut="ctrl+c" action="copy" />}
           {isXtermJs() &&
             (altClickFailed ? (
-              <Text>set macOptionClickForcesSelection in VS Code settings</Text>
+              <Text>
+                {zh(
+                  'set macOptionClickForcesSelection in VS Code settings',
+                  '在 VS Code 设置中启用 macOptionClickForcesSelection',
+                )}
+              </Text>
             ) : (
               <KeyboardShortcutHint shortcut={isMac ? 'option+click' : 'shift+click'} action="native select" />
             ))}
@@ -565,7 +584,7 @@ function ModeIndicator({
   ) {
     parts.push(
       <Text dimColor key="voice-hint">
-        hold {voiceKeyShortcut} to speak
+        {zh(`hold ${voiceKeyShortcut} to speak`, `按住 ${voiceKeyShortcut} 说话`)}
       </Text>,
     );
   }

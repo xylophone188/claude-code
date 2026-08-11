@@ -5,6 +5,7 @@ import {
 import type { Key } from '@anthropic/ink'
 import { getGlobalConfig } from '../../utils/config.js'
 import { env } from '../../utils/env.js'
+import { zh } from '../../utils/i18n.js'
 /**
  * Helper function to check if vim mode is currently enabled
  * @returns boolean indicating if vim mode is active
@@ -17,18 +18,21 @@ export function isVimModeEnabled(): boolean {
 export function getNewlineInstructions(): string {
   // Apple Terminal on macOS uses native modifier key detection for Shift+Enter
   if (env.terminal === 'Apple_Terminal' && process.platform === 'darwin') {
-    return 'shift + ⏎ for newline'
+    return zh('shift + ⏎ for newline', 'shift + ⏎ 换行')
   }
 
   // For iTerm2 and VSCode, show Shift+Enter instructions if installed
   if (isShiftEnterKeyBindingInstalled()) {
-    return 'shift + ⏎ for newline'
+    return zh('shift + ⏎ for newline', 'shift + ⏎ 换行')
   }
 
   // Otherwise show backslash+return instructions
   return hasUsedBackslashReturn()
-    ? '\\⏎ for newline'
-    : 'backslash (\\) + return (⏎) for newline'
+    ? zh('\\⏎ for newline', '\\⏎ 换行')
+    : zh(
+        'backslash (\\) + return (⏎) for newline',
+        '反斜杠 (\\) + 回车 (⏎) 换行',
+      )
 }
 
 /**

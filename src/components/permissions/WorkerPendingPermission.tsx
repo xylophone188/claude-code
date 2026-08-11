@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { zh } from '../../utils/i18n.js';
 import { Box, Text } from '@anthropic/ink';
 import { getAgentName, getTeammateColor, getTeamName } from '../../utils/teammate.js';
 import { Spinner } from '../Spinner.js';
@@ -24,7 +25,7 @@ export function WorkerPendingPermission({ toolName, description }: Props): React
         <Spinner />
         <Text color="warning" bold>
           {' '}
-          Waiting for team lead approval
+          {zh('Waiting for team lead approval', '等待团队负责人批准')}
         </Text>
       </Box>
 
@@ -35,12 +36,12 @@ export function WorkerPendingPermission({ toolName, description }: Props): React
       )}
 
       <Box>
-        <Text dimColor>Tool: </Text>
+        <Text dimColor>{zh('Tool: ', '工具：')}</Text>
         <Text>{toolName}</Text>
       </Box>
 
       <Box>
-        <Text dimColor>Action: </Text>
+        <Text dimColor>{zh('Action: ', '操作：')}</Text>
         <Text>{description}</Text>
       </Box>
 

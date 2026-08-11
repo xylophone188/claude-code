@@ -50,6 +50,7 @@ import {
 } from '../claudeAiLimits.js'
 import { shouldProcessRateLimits } from '../rateLimitMocking.js' // Used for /mock-limits command
 import { extractConnectionErrorDetails, formatAPIError } from './errorUtils.js'
+import { matchUpstreamCustomError } from './openai/upstreamBlockedError.js'
 
 export const API_ERROR_MESSAGE_PREFIX = 'API Error'
 
@@ -1099,6 +1100,16 @@ export function classifyAPIError(error: unknown): string {
       .includes(CREDIT_BALANCE_TOO_LOW_ERROR_MESSAGE.toLowerCase())
   ) {
     return 'credit_balance_low'
+  }
+
+  // Upstream "fake 200" errors: HTTP 200 whose body carries a custom gateway
+  // error string (content moderation, quota wording). Same failure class as
+  // balance issues — the provider is not usable for this request.
+  if (
+    error instanceof Error &&
+    matchUpstreamCustomError(error.message) !== undefined
+  ) {
+    return 'upstream_blocked'
   }
 
   // Authentication errors

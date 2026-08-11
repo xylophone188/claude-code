@@ -39,6 +39,7 @@ test('concurrency / budget / error classes fully exported', () => {
 
 test('tool descriptor and input schema exported', () => {
   expect(typeof wf.createWorkflowTool).toBe('function')
+  expect(typeof wf.createAdvisorWorkflowScript).toBe('function')
   expect(typeof wf.workflowInputSchema).toBe('object')
   expect(wf.WORKFLOW_TOOL_NAME).toBe('Workflow')
 })

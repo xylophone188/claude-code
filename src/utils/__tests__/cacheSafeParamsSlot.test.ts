@@ -6,21 +6,38 @@
  * side_question, SDK promptSuggestion) reading a stale snapshot would send
  * the previous conversation's history to the API.
  *
- * Uses the real bootstrap/state module (no mocks): regenerateSessionId and
- * switchSession are exactly what /clear and /resume call in production.
+ * Uses a faithful self-mock of bootstrap/state: regenerating/switchSession
+ * mutate a session id exactly like /clear and /resume do in production. A
+ * self-mock (rather than the real module) is required because 20+ other test
+ * files mock `src/bootstrap/state.js` via process-global mock.module
+ * (last-write-wins); an earlier file's no-op regenerateSessionId/switchSession
+ * would otherwise leak into the slot and break these invalidation assertions.
  */
-import { beforeEach, describe, expect, test } from 'bun:test'
-import {
-  getSessionId,
-  regenerateSessionId,
-  switchSession,
-} from 'src/bootstrap/state.js'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { asSessionId } from 'src/types/ids.js'
-import {
-  getLastCacheSafeParams,
-  saveCacheSafeParams,
-} from 'src/utils/cacheSafeParamsSlot.js'
+import type { SessionId } from 'src/types/ids.js'
 import type { CacheSafeParams } from 'src/utils/forkedAgent.js'
+
+let sessionId: SessionId = asSessionId('00000000-0000-4000-8000-000000000000')
+let regenerateCount = 0
+
+mock.module('src/bootstrap/state.js', () => ({
+  getSessionId: () => sessionId,
+  regenerateSessionId: () => {
+    sessionId = asSessionId(`mock-regenerated-${++regenerateCount}`)
+    return sessionId
+  },
+  switchSession: (id: SessionId) => {
+    sessionId = id
+  },
+}))
+
+const { getSessionId, regenerateSessionId, switchSession } = await import(
+  'src/bootstrap/state.js'
+)
+const { getLastCacheSafeParams, saveCacheSafeParams } = await import(
+  'src/utils/cacheSafeParamsSlot.js'
+)
 
 function makeParams(tag: string): CacheSafeParams {
   // Only identity matters for the slot; the shape is opaque to it.

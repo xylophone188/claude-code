@@ -83,10 +83,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Bare `ccb` is the advisor entrypoint. Explicit CLI arguments retain their
-  // normal behavior; the advisor uses the local CCB Codex account pool.
-  if (args.length === 0) {
-    process.argv.push('--model', 'advisor');
+  // Ordinary CCB sessions use the ordered L1-L6 provider chain. Advisor is
+  // opt-in; defaulting here to advisor incorrectly forced the Codex backend.
+  if (!args.some(arg => arg === '--model' || arg.startsWith('--model='))) {
+    process.argv.push('--model', 'ccb');
   }
 
   // For all other paths, load the startup profiler
@@ -144,6 +144,62 @@ async function main(): Promise<void> {
     const { logForDebugging } = await import('../utils/debug.js');
     const { ChannelPermissionRequestNotificationSchema } = await import('../services/mcp/channelNotification.js');
     await handleWeixinCli(
+      args.slice(1),
+      {
+        enableConfigs,
+        initializeAnalyticsSink,
+        shutdownDatadog,
+        shutdown1PEventLogging,
+        logForDebugging,
+        registerPermissionHandler(server, handler) {
+          server.setNotificationHandler(ChannelPermissionRequestNotificationSchema(), async notification =>
+            handler(notification.params),
+          );
+        },
+      },
+      MACRO.VERSION,
+    );
+    return;
+  }
+
+  if (args[0] === 'qqbot') {
+    profileCheckpoint('cli_qqbot_path');
+    const { handleQqbotCli } = await import('@claude-code-best/qqbot');
+    const { enableConfigs } = await import('../utils/config.js');
+    const { initializeAnalyticsSink } = await import('../services/analytics/sink.js');
+    const { shutdownDatadog } = await import('../services/analytics/datadog.js');
+    const { shutdown1PEventLogging } = await import('../services/analytics/firstPartyEventLogger.js');
+    const { logForDebugging } = await import('../utils/debug.js');
+    const { ChannelPermissionRequestNotificationSchema } = await import('../services/mcp/channelNotification.js');
+    await handleQqbotCli(
+      args.slice(1),
+      {
+        enableConfigs,
+        initializeAnalyticsSink,
+        shutdownDatadog,
+        shutdown1PEventLogging,
+        logForDebugging,
+        registerPermissionHandler(server, handler) {
+          server.setNotificationHandler(ChannelPermissionRequestNotificationSchema(), async notification =>
+            handler(notification.params),
+          );
+        },
+      },
+      MACRO.VERSION,
+    );
+    return;
+  }
+
+  if (args[0] === 'telegram') {
+    profileCheckpoint('cli_telegram_path');
+    const { handleTelegramCli } = await import('@claude-code-best/telegram');
+    const { enableConfigs } = await import('../utils/config.js');
+    const { initializeAnalyticsSink } = await import('../services/analytics/sink.js');
+    const { shutdownDatadog } = await import('../services/analytics/datadog.js');
+    const { shutdown1PEventLogging } = await import('../services/analytics/firstPartyEventLogger.js');
+    const { logForDebugging } = await import('../utils/debug.js');
+    const { ChannelPermissionRequestNotificationSchema } = await import('../services/mcp/channelNotification.js');
+    await handleTelegramCli(
       args.slice(1),
       {
         enableConfigs,

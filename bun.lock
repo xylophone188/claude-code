@@ -35,6 +35,7 @@
         "@claude-code-best/agent-tools": "workspace:*",
         "@claude-code-best/builtin-tools": "workspace:*",
         "@claude-code-best/mcp-client": "workspace:*",
+        "@claude-code-best/qqbot": "workspace:*",
         "@claude-code-best/weixin": "workspace:*",
         "@commander-js/extra-typings": "^14.0.0",
         "@growthbook/growthbook": "^1.6.5",
@@ -281,6 +282,13 @@
       "name": "modifiers-napi",
       "version": "1.0.0",
     },
+    "packages/qqbot": {
+      "name": "@claude-code-best/qqbot",
+      "version": "1.0.0",
+      "dependencies": {
+        "ws": "^8.20.0",
+      },
+    },
     "packages/remote-control-server": {
       "name": "@anthropic/remote-control-server",
       "version": "0.1.0",
@@ -332,6 +340,10 @@
         "typescript": "^5.7.0",
         "vite": "^6.0.0",
       },
+    },
+    "packages/telegram": {
+      "name": "@claude-code-best/telegram",
+      "version": "1.0.0",
     },
     "packages/url-handler-napi": {
       "name": "url-handler-napi",
@@ -607,6 +619,10 @@
     "@claude-code-best/mcp-chrome-bridge": ["@claude-code-best/mcp-chrome-bridge@3.0.1", "", { "dependencies": { "@hono/node-server": "^1.19.13", "@modelcontextprotocol/sdk": "^1.11.0", "commander": "^13.1.0", "hono": "^4.12.12", "is-admin": "^4.0.0" }, "bin": { "mcp-chrome-bridge": "dist/cli.js", "mcp-chrome-stdio": "dist/mcp/mcp-server-stdio.js" } }, "sha512-ozeLHVOdckTUsWKJneJAL+CclrUlwVyBpfzFxgsrSL9f0LvjlJXE7+VcF5OmjDPwmZy6QNorvtg3/8NT2cIlzA=="],
 
     "@claude-code-best/mcp-client": ["@claude-code-best/mcp-client@workspace:packages/mcp-client"],
+
+    "@claude-code-best/qqbot": ["@claude-code-best/qqbot@workspace:packages/qqbot"],
+
+    "@claude-code-best/telegram": ["@claude-code-best/telegram@workspace:packages/telegram"],
 
     "@claude-code-best/weixin": ["@claude-code-best/weixin@workspace:packages/weixin"],
 
@@ -3143,6 +3159,8 @@
     "@claude-code-best/mcp-client/p-map": ["p-map@4.0.0", "https://registry.npmmirror.com/p-map/-/p-map-4.0.0.tgz", { "dependencies": { "aggregate-error": "^3.0.0" } }, "sha512-/bjOqmgETBYB5BoEeGVea8dmvHb2m9GLy1E9W43yeyfP6QQCZGFNa+XRceJEuDB6zqr+gKpIAmlLebMpykw/MQ=="],
 
     "@claude-code-best/mcp-client/zod": ["zod@3.25.76", "https://registry.npmmirror.com/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+
+    "@claude-code-best/qqbot/ws": ["ws@8.21.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g=="],
 
     "@cspotcode/source-map-support/@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 

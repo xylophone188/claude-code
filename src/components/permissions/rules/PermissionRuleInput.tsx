@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import * as React from 'react';
 import { useState } from 'react';
@@ -52,7 +53,7 @@ export function PermissionRuleInput({ onCancel, onSubmit, ruleBehavior }: Permis
             Permission rules are a tool name, optionally followed by a specifier in parentheses.
             <Newline />
             e.g., <Text bold>{permissionRuleValueToString({ toolName: WebFetchTool.name })}</Text>
-            <Text bold={false}> or </Text>
+            <Text bold={false}>{zh(' or ', ' 或 ')}</Text>
             <Text bold>
               {permissionRuleValueToString({
                 toolName: BashTool.name,
@@ -76,9 +77,13 @@ export function PermissionRuleInput({ onCancel, onSubmit, ruleBehavior }: Permis
       </Box>
       <Box marginLeft={3}>
         {exitState.pending ? (
-          <Text dimColor>Press {exitState.keyName} again to exit</Text>
+          <Text dimColor>
+            {zh('Press ', '再次按 ')}
+            {exitState.keyName}
+            {zh(' again to exit', ' 退出')}
+          </Text>
         ) : (
-          <Text dimColor>Enter to submit · Esc to cancel</Text>
+          <Text dimColor>{zh('Enter to submit · Esc to cancel', 'Enter 提交 · Esc 取消')}</Text>
         )}
       </Box>
     </>

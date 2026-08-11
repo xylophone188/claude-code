@@ -232,6 +232,37 @@ const MAX_PTL_RETRIES = 3
 const PTL_RETRY_MARKER = '[earlier conversation truncated for compaction retry]'
 
 /**
+ * Detect a prompt-too-long (413) failure on a compaction summary response.
+ *
+ * The canonical Anthropic error text is "Prompt is too long", but OpenAI-compatible
+ * gateways (ccb-embed, vLLM, etc.) phrase 413s differently — "context length",
+ * "maximum context", "request too large", "413", etc. Without matching these, the
+ * PTL retry loop silently treats the error text as a valid summary, or never
+ * triggers truncation at all, leaving the user stuck in a 413 death loop.
+ *
+ * Only matches when `isApiErrorMessage` is true (so real summaries containing
+ * the word "context" are never misclassified). The bare
+ * PROMPT_TOO_LONG_ERROR_MESSAGE prefix is also matched for the synthetic
+ * blocking-limit preempt path that isn't flagged isApiErrorMessage.
+ */
+function isPromptTooLongResponse(response: AssistantMessage): boolean {
+  const text = (getAssistantMessageText(response) ?? '').toLowerCase()
+  if (!text) return false
+  if (text.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE.toLowerCase())) return true
+  if (!response.isApiErrorMessage) return false
+  return (
+    text.includes('prompt is too long') ||
+    text.includes('too long') ||
+    text.includes('context length') ||
+    text.includes('context window') ||
+    text.includes('maximum context') ||
+    text.includes('request too large') ||
+    text.includes('413') ||
+    text.includes('reduce the length')
+  )
+}
+
+/**
  * Drops the oldest API-round groups from messages until tokenGap is covered.
  * Falls back to dropping 20% of groups when the gap is unparseable (some
  * Vertex/Bedrock error formats). Returns null when nothing can be dropped
@@ -481,7 +512,27 @@ export async function compactConversation(
         cacheSafeParams: retryCacheSafeParams,
       })
       summary = getAssistantMessageText(summaryResponse)
-      if (!summary?.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) break
+
+      // Non-PTL API error (500, network, auth, etc.) — must NOT be treated as
+      // a valid summary. Previously the startsWith guard below would break and
+      // the error text would silently become the "summary", replacing the
+      // conversation with an error message. Throw so the caller surfaces it.
+      if (
+        summaryResponse.isApiErrorMessage &&
+        !isPromptTooLongResponse(summaryResponse)
+      ) {
+        logEvent('tengu_compact_failed', {
+          reason:
+            'api_error' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          preCompactTokenCount,
+          promptCacheSharingEnabled,
+          errorMessage: (summary?.slice(0, 200) ??
+            '') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        })
+        throw new Error(summary || 'Compact API error')
+      }
+
+      if (!isPromptTooLongResponse(summaryResponse)) break
 
       // CC-1180: compact request itself hit prompt-too-long. Truncate the
       // oldest API-round groups and retry rather than leaving the user stuck.
@@ -898,7 +949,14 @@ export async function partialCompactConversation(
         cacheSafeParams: retryCacheSafeParams,
       })
       summary = getAssistantMessageText(summaryResponse)
-      if (!summary?.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) break
+      // Non-PTL API error — don't use error text as summary (see compactConversation).
+      if (
+        summaryResponse.isApiErrorMessage &&
+        !isPromptTooLongResponse(summaryResponse)
+      ) {
+        throw new Error(summary || 'Compact API error')
+      }
+      if (!isPromptTooLongResponse(summaryResponse)) break
 
       ptlAttempts++
       const truncated =
@@ -1167,6 +1225,25 @@ export function createCompactCanUseTool(): CanUseToolFn {
   })
 }
 
+/**
+ * Resolve the model used for conversation compaction/summarization.
+ *
+ * Defaults to the main-loop model (preserves current behavior). When
+ * `CCB_COMPACT_MODEL` is set, compaction uses that model instead — this is how
+ * compaction is routed to a low-cost "auto pool" model (e.g. gpt-5.4-mini /
+ * gpt-5.6-luna) to cut summarization cost without touching the main model.
+ * The special value `auto` is passed through verbatim: the OpenAI adapter
+ * resolves it to the top-scored auto-pool route via `resolveDirectRoutes`,
+ * so the provider stays out of this layer.
+ *
+ * The override is read live from the environment so it can be flipped per
+ * `ccb` invocation without a rebuild.
+ */
+export function resolveCompactModel(mainLoopModel: string): string {
+  const override = process.env.CCB_COMPACT_MODEL?.trim()
+  return override ? override : mainLoopModel
+}
+
 async function streamCompactSummary({
   messages,
   summaryRequest,
@@ -1182,14 +1259,19 @@ async function streamCompactSummary({
   preCompactTokenCount: number
   cacheSafeParams: CacheSafeParams
 }): Promise<AssistantMessage> {
+  // When an explicit compaction model is configured it differs from the main
+  // loop's model, so the forked-agent prompt-cache prefix would no longer
+  // match — skip cache sharing and let the streaming path below handle it.
+  const compactModel = resolveCompactModel(context.options.mainLoopModel)
+  const useForkedCacheSharing = compactModel === context.options.mainLoopModel
+
   // When prompt cache sharing is enabled, use forked agent to reuse the
   // main conversation's cached prefix (system prompt, tools, context messages).
   // Falls back to regular streaming path on failure.
   // 3P default: true — see comment at the other tengu_compact_cache_prefix read above.
-  const promptCacheSharingEnabled = getFeatureValue_CACHED_MAY_BE_STALE(
-    'tengu_compact_cache_prefix',
-    true,
-  )
+  const promptCacheSharingEnabled =
+    useForkedCacheSharing &&
+    getFeatureValue_CACHED_MAY_BE_STALE('tengu_compact_cache_prefix', true)
   // Send keep-alive signals during compaction to prevent remote session
   // WebSocket idle timeouts from dropping bridge connections. Compaction
   // API calls can take 5-10+ seconds, during which no other messages
@@ -1219,6 +1301,8 @@ async function streamCompactSummary({
         // creating a thinking config mismatch that invalidates the cache.
         // The streaming fallback path (below) can safely set maxOutputTokensOverride
         // since it doesn't share cache with the main thread.
+        // NOTE: we only reach here when compactModel === mainLoopModel (see
+        // useForkedCacheSharing above), so the forked cache prefix stays valid.
         const result = await runForkedAgent({
           promptMessages: [summaryRequest],
           cacheSafeParams,
@@ -1350,13 +1434,13 @@ async function streamCompactSummary({
             const appState = context.getAppState()
             return appState.toolPermissionContext
           },
-          model: context.options.mainLoopModel,
+          model: compactModel,
           toolChoice: undefined,
           isNonInteractiveSession: context.options.isNonInteractiveSession,
           hasAppendSystemPrompt: !!context.options.appendSystemPrompt,
           maxOutputTokensOverride: Math.min(
             COMPACT_MAX_OUTPUT_TOKENS,
-            getMaxOutputTokensForModel(context.options.mainLoopModel),
+            getMaxOutputTokensForModel(compactModel),
           ),
           querySource: 'compact',
           agents: context.options.agentDefinitions.activeAgents,

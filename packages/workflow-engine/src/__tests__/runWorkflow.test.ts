@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { runWorkflow } from '../engine/runWorkflow.js'
 import { agentCallKey, createFileJournalStore } from '../engine/journal.js'
 import { createHostHandle, type WorkflowPorts } from '../ports.js'
+import { createAdvisorWorkflowScript } from '../tool/advisorWorkflow.js'
 import type { AgentRunParams, AgentRunResult, ProgressEvent } from '../types.js'
 
 function portsWith(
@@ -90,6 +91,141 @@ test('end-to-end: script returns agent result, status completed', async () => {
     })
     expect(result.status).toBe('completed')
     expect(result.returnValue).toBe('42')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('advisor workflow always performs final acceptance', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
+  try {
+    const calls: string[] = []
+    const ports = portsWith(dir, new Map())
+    ports.agentRunner.runAgentToResult = async params => {
+      calls.push(params.label ?? '')
+      if (params.label === 'advisor:plan') {
+        return {
+          kind: 'ok',
+          output: { plan: 'do work', acceptance: ['test passes'] },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'advisor:review') {
+        return {
+          kind: 'ok',
+          output: { accepted: true, revisions: [], summary: 'looks good' },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'advisor:accept') {
+        return {
+          kind: 'ok',
+          output: { accepted: true, revisions: [], summary: 'accepted' },
+          usage: { outputTokens: 1 },
+        }
+      }
+      return { kind: 'ok', output: 'done', usage: { outputTokens: 1 } }
+    }
+    const result = await runWorkflow({
+      script: createAdvisorWorkflowScript(),
+      args: { task: 'fix it' },
+      runId: 'advisor-run',
+      ports,
+      host: createHostHandle(null),
+      signal: new AbortController().signal,
+      cwd: dir,
+      budgetTotal: null,
+    })
+    expect(result.status).toBe('completed')
+    expect(calls).toEqual([
+      'advisor:plan',
+      'auto:execute',
+      'advisor:review',
+      'advisor:accept',
+    ])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('advisor workflow stops when execution does not complete', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
+  try {
+    const calls: string[] = []
+    const ports = portsWith(dir, new Map())
+    ports.agentRunner.runAgentToResult = async params => {
+      calls.push(params.label ?? '')
+      if (params.label === 'advisor:plan') {
+        return {
+          kind: 'ok',
+          output: { plan: 'do work', acceptance: ['test passes'] },
+          usage: { outputTokens: 1 },
+        }
+      }
+      return { kind: 'dead' }
+    }
+    const result = await runWorkflow({
+      script: createAdvisorWorkflowScript(),
+      args: { task: 'fix it' },
+      runId: 'advisor-execution-dead',
+      ports,
+      host: createHostHandle(null),
+      signal: new AbortController().signal,
+      cwd: dir,
+      budgetTotal: null,
+    })
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/auto execution did not complete/)
+    expect(calls).not.toContain('advisor:review')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('advisor workflow fails when final acceptance rejects', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
+  try {
+    const ports = portsWith(dir, new Map())
+    ports.agentRunner.runAgentToResult = async params => {
+      if (params.label === 'advisor:plan') {
+        return {
+          kind: 'ok',
+          output: { plan: 'do work', acceptance: ['test passes'] },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'advisor:review') {
+        return {
+          kind: 'ok',
+          output: { accepted: true, revisions: [], summary: 'looks good' },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'advisor:accept') {
+        return {
+          kind: 'ok',
+          output: {
+            accepted: false,
+            revisions: ['fix test'],
+            summary: 'test fails',
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      return { kind: 'ok', output: 'done', usage: { outputTokens: 1 } }
+    }
+    const result = await runWorkflow({
+      script: createAdvisorWorkflowScript(),
+      args: { task: 'fix it' },
+      runId: 'advisor-acceptance-rejected',
+      ports,
+      host: createHostHandle(null),
+      signal: new AbortController().signal,
+      cwd: dir,
+      budgetTotal: null,
+    })
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/advisor acceptance rejected: test fails/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

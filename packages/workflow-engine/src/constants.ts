@@ -30,3 +30,20 @@ export const MAX_TOTAL_AGENTS = 1000
 
 /** Items cap per single parallel()/pipeline() call. */
 export const MAX_ITEMS_PER_CALL = 4096
+
+/**
+ * Extra retries (beyond the baseline single retry) granted to transient
+ * connection failures — network blips, timeouts, HTTP 429/5xx. The model
+ * provider SDK already retries internally, but a single retry is not enough
+ * when the endpoint is briefly unavailable; a transient blip must not kill a
+ * workflow phase (e.g. the advisor Plan agent). Permanent failures (bad
+ * schema, missing structured output, auth) intentionally keep the single retry
+ * and are NOT retried here.
+ */
+export const MAX_TRANSIENT_RETRIES = 2
+
+/**
+ * Base delay (ms) for the exponential backoff between transient-connection
+ * retries; the delay doubles on each attempt (1s, 2s, …).
+ */
+export const TRANSIENT_RETRY_BASE_DELAY_MS = 1000

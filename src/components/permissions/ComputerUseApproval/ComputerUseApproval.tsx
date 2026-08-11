@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { getSentinelCategory } from '@ant/computer-use-mcp/sentinelApps';
 import type { CuPermissionRequest, CuPermissionResponse } from '@ant/computer-use-mcp/types';
 import { DEFAULT_GRANT_FLAGS } from '@ant/computer-use-mcp/types';
@@ -197,7 +198,7 @@ function ComputerUseAppListPanel({ request, onDone }: ComputerUseApprovalProps):
               return (
                 <Text key={a.requestedName} dimColor>
                   {'  '}
-                  {figures.circle} {a.requestedName} <Text dimColor>(not installed)</Text>
+                  {figures.circle} {a.requestedName} <Text dimColor>{zh('(not installed)', '(未安装)')}</Text>
                 </Text>
               );
             }
@@ -205,7 +206,7 @@ function ComputerUseAppListPanel({ request, onDone }: ComputerUseApprovalProps):
               return (
                 <Text key={resolved.bundleId} dimColor>
                   {'  '}
-                  {figures.tick} {resolved.displayName} <Text dimColor>(already granted)</Text>
+                  {figures.tick} {resolved.displayName} <Text dimColor>{zh('(already granted)', '(已授予)')}</Text>
                 </Text>
               );
             }
@@ -230,7 +231,7 @@ function ComputerUseAppListPanel({ request, onDone }: ComputerUseApprovalProps):
 
         {requestedFlagKeys.length > 0 ? (
           <Box flexDirection="column">
-            <Text dimColor>Also requested:</Text>
+            <Text dimColor>{zh('Also requested:', '同时请求了：')}</Text>
             {requestedFlagKeys.map(flag => (
               <Text key={flag} dimColor>
                 {'  '}· {flag}

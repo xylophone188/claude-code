@@ -6,6 +6,7 @@ import { isKeybindingCustomizationEnabled } from '../../keybindings/loadUserBind
 import { useShortcutDisplay } from '../../keybindings/useShortcutDisplay.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js';
 import { isFastModeAvailable, isFastModeEnabled } from '../../utils/fastMode.js';
+import { zh } from '../../utils/i18n.js';
 import { getNewlineInstructions } from './utils.js';
 
 /** Format a shortcut for display in the help menu (e.g., "ctrl+o" → "ctrl + o") */
@@ -39,7 +40,7 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
   const terminalShortcutElement = feature('TERMINAL_PANEL') ? (
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_terminal_panel', false) ? (
       <Box>
-        <Text dimColor={dimColor}>{terminalShortcut} for terminal</Text>
+        <Text dimColor={dimColor}>{zh(`${terminalShortcut} for terminal`, `${terminalShortcut} 打开终端`)}</Text>
       </Box>
     ) : null
   ) : null;
@@ -48,35 +49,40 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
     <Box paddingX={paddingX} flexDirection="row" gap={gap}>
       <Box flexDirection="column" width={fixedWidth ? 24 : undefined}>
         <Box>
-          <Text dimColor={dimColor}>! for bash mode</Text>
+          <Text dimColor={dimColor}>{zh('! for bash mode', '! 进入终端模式')}</Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>/ for commands</Text>
+          <Text dimColor={dimColor}>{zh('/ for commands', '/ 快速启动')}</Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>@ for file paths</Text>
+          <Text dimColor={dimColor}>{zh('@ for file paths', '@ 引用文件或行号')}</Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>& for background</Text>
+          <Text dimColor={dimColor}>{zh('& for background', '& 后台执行')}</Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>/btw for side question</Text>
+          <Text dimColor={dimColor}>{zh('/btw for side question', '/btw 旁路提问')}</Text>
         </Box>
       </Box>
       <Box flexDirection="column" width={fixedWidth ? 35 : undefined}>
         <Box>
-          <Text dimColor={dimColor}>double tap esc to clear input</Text>
+          <Text dimColor={dimColor}>{zh('double tap esc to clear input', '按两下 esc 清除输入')}</Text>
         </Box>
         <Box>
           <Text dimColor={dimColor}>
-            {cycleModeShortcut} {process.env.USER_TYPE === 'ant' ? 'to cycle modes' : 'to auto-accept edits'}
+            {cycleModeShortcut}{' '}
+            {process.env.USER_TYPE === 'ant'
+              ? zh('to cycle modes', '切换模式')
+              : zh('to auto-accept edits', '自动接受编辑')}
           </Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>{transcriptShortcut} for verbose output</Text>
+          <Text dimColor={dimColor}>
+            {zh(`${transcriptShortcut} for verbose output`, `${transcriptShortcut} 详细输出`)}
+          </Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>{todosShortcut} to toggle tasks</Text>
+          <Text dimColor={dimColor}>{zh(`${todosShortcut} to toggle tasks`, `${todosShortcut} 切换任务`)}</Text>
         </Box>
         {terminalShortcutElement}
         <Box>
@@ -85,33 +91,41 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
       </Box>
       <Box flexDirection="column">
         <Box>
-          <Text dimColor={dimColor}>{undoShortcut} to undo</Text>
+          <Text dimColor={dimColor}>{zh(`${undoShortcut} to undo`, `${undoShortcut} 撤销`)}</Text>
         </Box>
         {getPlatform() !== 'windows' && (
           <Box>
-            <Text dimColor={dimColor}>ctrl + z to suspend</Text>
+            <Text dimColor={dimColor}>{zh('ctrl + z to suspend', 'ctrl + z 暂停')}</Text>
           </Box>
         )}
         <Box>
-          <Text dimColor={dimColor}>{imagePasteShortcut} to paste images</Text>
+          <Text dimColor={dimColor}>
+            {zh(`${imagePasteShortcut} to paste images`, `${imagePasteShortcut} 粘贴图片`)}
+          </Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>{modelPickerShortcut} to switch model</Text>
+          <Text dimColor={dimColor}>
+            {zh(`${modelPickerShortcut} to switch model`, `${modelPickerShortcut} 切换模型`)}
+          </Text>
         </Box>
         {isFastModeEnabled() && isFastModeAvailable() && (
           <Box>
-            <Text dimColor={dimColor}>{fastModeShortcut} to toggle fast mode</Text>
+            <Text dimColor={dimColor}>
+              {zh(`${fastModeShortcut} to toggle fast mode`, `${fastModeShortcut} 切换快速模式`)}
+            </Text>
           </Box>
         )}
         <Box>
-          <Text dimColor={dimColor}>{stashShortcut} to stash prompt</Text>
+          <Text dimColor={dimColor}>{zh(`${stashShortcut} to stash prompt`, `${stashShortcut} 暂存提示`)}</Text>
         </Box>
         <Box>
-          <Text dimColor={dimColor}>{externalEditorShortcut} to edit in $EDITOR</Text>
+          <Text dimColor={dimColor}>
+            {zh(`${externalEditorShortcut} to edit in $EDITOR`, `${externalEditorShortcut} 在 $EDITOR 中编辑`)}
+          </Text>
         </Box>
         {isKeybindingCustomizationEnabled() && (
           <Box>
-            <Text dimColor={dimColor}>/keybindings to customize</Text>
+            <Text dimColor={dimColor}>{zh('/keybindings to customize', '/keybindings 自定义快捷键')}</Text>
           </Box>
         )}
       </Box>

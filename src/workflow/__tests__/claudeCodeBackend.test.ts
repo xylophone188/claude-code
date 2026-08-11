@@ -137,6 +137,15 @@ test('text agent → ok + token/tool/model accounting', async () => {
   }
 })
 
+test('workflow-advisor always uses the read-only Plan agent', () => {
+  const definition = resolveAgentDefinition('workflow-advisor', {
+    options: { agentDefinitions: { activeAgents: [] } },
+  } as never)
+  expect(definition.agentType).toBe('Plan')
+  expect(definition.disallowedTools).toContain('Edit')
+  expect(definition.disallowedTools).toContain('Write')
+})
+
 test('isolation:worktree → create worktree + auto-cleanup on no changes; slug matches cleanup regex', async () => {
   worktreeState.shouldThrow = false
   worktreeState.hasChanges = false

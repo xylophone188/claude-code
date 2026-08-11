@@ -1,3 +1,4 @@
+import { zh } from '../../utils/i18n.js';
 import { basename, sep } from 'path';
 import { type ReactNode } from 'react';
 import { getOriginalCwd } from '../../bootstrap/state.js';
@@ -117,14 +118,18 @@ export function generateShellSuggestionsLabel(
       const dirName = basename(firstPath) || firstPath;
       return (
         <Text>
-          Yes, allow reading from <Text bold>{dirName}</Text>
-          {sep} from this project
+          {zh('Allow reading from', '允许从')} <Text bold>{dirName}</Text>
+          {sep} {zh('this project', '此项目')}
         </Text>
       );
     }
 
     // Multiple read paths
-    return <Text>Yes, allow reading from {formatPathList(readPaths)} from this project</Text>;
+    return (
+      <Text>
+        {zh('Allow reading from', '允许从')} {formatPathList(readPaths)} {zh('this project', '此项目')}
+      </Text>
+    );
   }
 
   if (hasDirectories && !hasReadPaths && !hasCommands) {
@@ -134,21 +139,26 @@ export function generateShellSuggestionsLabel(
       const dirName = basename(firstDir) || firstDir;
       return (
         <Text>
-          Yes, and always allow access to <Text bold>{dirName}</Text>
-          {sep} from this project
+          {zh('Allow and always allow access to', '允许并始终访问')} <Text bold>{dirName}</Text>
+          {sep} {zh('this project', '此项目')}
         </Text>
       );
     }
 
     // Multiple directories
-    return <Text>Yes, and always allow access to {formatPathList(directories)} from this project</Text>;
+    return (
+      <Text>
+        {zh('Allow and always allow access to', '允许并始终访问')} {formatPathList(directories)}{' '}
+        {zh('this project', '此项目')}
+      </Text>
+    );
   }
 
   if (hasCommands && !hasDirectories && !hasReadPaths) {
     // Only shell command permissions
     return (
       <Text>
-        {"Yes, and don't ask again for "}
+        {zh("Yes, and don't ask again for ", '可以，不再询问 ')}
         {commandListDisplayTruncated(shellCommands)} commands in <Text bold>{getOriginalCwd()}</Text>
       </Text>
     );
@@ -160,7 +170,12 @@ export function generateShellSuggestionsLabel(
     const allPaths = [...directories, ...readPaths];
     if (hasDirectories && hasReadPaths) {
       // Mixed - use generic "access to"
-      return <Text>Yes, and always allow access to {formatPathList(allPaths)} from this project</Text>;
+      return (
+        <Text>
+          {zh('Allow and always allow access to', '允许并始终访问')} {formatPathList(allPaths)}{' '}
+          {zh('this project', '此项目')}
+        </Text>
+      );
     }
   }
 

@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import * as React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useRegisterOverlay } from '../context/overlayContext.js';
@@ -98,8 +99,14 @@ export function HistorySearchDialog({ initialQuery, onSelect, onCancel }: Props)
         void item.entry.resolve().then(onSelect);
       }}
       onCancel={onCancel}
-      emptyMessage={q => (items === null ? 'Loading…' : q ? 'No matching prompts' : 'No history yet')}
-      selectAction="use"
+      emptyMessage={q =>
+        items === null
+          ? zh('Loading…', '正在加载…')
+          : q
+            ? zh('No matching prompts', '没有匹配的提示词')
+            : zh('No history yet', '暂无历史记录')
+      }
+      selectAction={zh('use', '使用')}
       direction="up"
       previewPosition={previewOnRight ? 'right' : 'bottom'}
       renderItem={(item, isFocused) => (
@@ -122,7 +129,7 @@ export function HistorySearchDialog({ initialQuery, onSelect, onCancel }: Props)
                 {row}
               </Text>
             ))}
-            {more > 0 && <Text dimColor>{`… +${more} more lines`}</Text>}
+            {more > 0 && <Text dimColor>{zh(`… +${more} more lines`, `… 还有 ${more} 行`)}</Text>}
           </Box>
         );
       }}

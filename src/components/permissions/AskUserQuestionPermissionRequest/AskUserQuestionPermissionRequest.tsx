@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import type { Base64ImageSource, ImageBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs';
 import React, { Suspense, use, useCallback, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../../../hooks/useSettings.js';
@@ -343,7 +344,7 @@ Questions asked and answers provided:\n${questionsWithAnswers}`;
           const questionImages = Object.values(pastedContentsByQuestion[questionText] ?? {}).filter(
             c => c.type === 'image',
           );
-          answer = questionImages.length > 0 ? '(Image attached)' : label;
+          answer = questionImages.length > 0 ? zh('(Image attached)', '(已附加图片)') : label;
         } else {
           answer = label;
         }

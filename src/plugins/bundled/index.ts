@@ -15,10 +15,14 @@
  */
 
 import { registerWeixinBuiltinPlugin } from './weixin.js'
+import { registerQqbotBuiltinPlugin } from './qqbot.js'
+import { registerTelegramBuiltinPlugin } from './telegram.js'
 
 /**
  * Initialize built-in plugins. Called during CLI startup.
  */
 export function initBuiltinPlugins(): void {
   registerWeixinBuiltinPlugin()
+  registerQqbotBuiltinPlugin()
+  registerTelegramBuiltinPlugin()
 }

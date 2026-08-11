@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { feature } from 'bun:bundle';
 import figures from 'figures';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,7 +43,7 @@ import { useShellPermissionFeedback } from '../useShellPermissionFeedback.js';
 import { logUnaryPermissionEvent } from '../utils.js';
 import { bashToolUseOptions } from './bashToolUseOptions.js';
 
-const CHECKING_TEXT = 'Attempting to auto-approve\u2026';
+const CHECKING_TEXT = zh('Attempting to auto-approve…', '正在尝试自动批准…');
 
 // Isolates the 20fps shimmer clock from BashPermissionRequestInner. Before this
 // extraction, useShimmerAnimation lived inside the 535-line Inner body, so every
@@ -450,7 +451,7 @@ function BashPermissionRequestInner({
     ) : toolUseConfirm.classifierCheckInProgress ? (
       <ClassifierCheckingSubtitle />
     ) : classifierWasChecking ? (
-      <Text dimColor>Requires manual approval</Text>
+      <Text dimColor>{zh('Requires manual approval', '需要手动批准')}</Text>
     ) : undefined
   ) : undefined;
 
@@ -475,7 +476,7 @@ function BashPermissionRequestInner({
           <PermissionDecisionDebugInfo permissionResult={toolUseConfirm.permissionResult} toolName="Bash" />
           {toolUseContext.options.debug && (
             <Box justifyContent="flex-end" marginTop={1}>
-              <Text dimColor>Ctrl-D to hide debug info</Text>
+              <Text dimColor>{zh('Ctrl-D to hide debug info', 'Ctrl-D 隐藏调试信息')}</Text>
             </Box>
           )}
         </>
@@ -519,7 +520,9 @@ function BashPermissionRequestInner({
                 ' · Tab to add feedback'}
               {explainerState.enabled && ` · ctrl+e to ${explainerState.visible ? 'hide' : 'explain'}`}
             </Text>
-            {toolUseContext.options.debug && <Text dimColor>Ctrl+d to show debug info</Text>}
+            {toolUseContext.options.debug && (
+              <Text dimColor>{zh('Ctrl+d to show debug info', 'Ctrl+d 显示调试信息')}</Text>
+            )}
           </Box>
         </>
       )}

@@ -234,6 +234,20 @@ export function createWeixinMcpServer(version: string): Server {
   return server
 }
 
+/**
+ * True when the parent session enabled the weixin channel via `--channels`.
+ * The CLI publishes the opt-in list as CLAUDE_ACTIVE_CHANNELS before spawning
+ * MCP servers, which inherit the env.
+ */
+export function isChannelActive(): boolean {
+  const raw = process.env.CLAUDE_ACTIVE_CHANNELS
+  if (!raw) return true
+  return raw
+    .split(',')
+    .map(name => name.trim())
+    .includes('weixin')
+}
+
 export async function runWeixinMcpServer(
   version: string,
   deps: WeixinServerDeps,
@@ -317,6 +331,24 @@ export async function runWeixinMcpServer(
       void shutdownAndExit()
     }
   }, 5000)
+
+  // Polling is exclusive: one bot inbox, one shared cursor. If this session
+  // did not opt in via `--channels`, its notifications would be dropped by
+  // gateChannelServer() anyway — but the poll would still consume the message
+  // and starve the session that did opt in. Serve tools only in that case.
+  if (!isChannelActive()) {
+    deps.logForDebugging(
+      '[Weixin MCP] weixin not in --channels for this session; serving tools without polling',
+    )
+    await new Promise<void>(resolve => {
+      controller.signal.addEventListener('abort', () => resolve(), {
+        once: true,
+      })
+    })
+    clearInterval(parentCheck)
+    await shutdownAndExit()
+    return
+  }
 
   deps.logForDebugging('[Weixin MCP] Starting poll loop')
   await startPollLoop({

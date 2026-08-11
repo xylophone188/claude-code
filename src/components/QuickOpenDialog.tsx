@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import * as path from 'path';
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -136,12 +137,14 @@ export function QuickOpenDialog({ onDone, onInsert }: Props): React.ReactNode {
       onSelect={handleOpen}
       onTab={{ action: 'mention', handler: p => handleInsert(p, true) }}
       onShiftTab={{
-        action: 'insert path',
+        action: zh('insert path', '插入路径'),
         handler: p => handleInsert(p, false),
       }}
       onCancel={onDone}
-      emptyMessage={q => (q ? 'No matching files' : 'Start typing to search…')}
-      selectAction="open in editor"
+      emptyMessage={q =>
+        q ? zh('No matching files', '没有匹配的文件') : zh('Start typing to search…', '开始输入以搜索…')
+      }
+      selectAction={zh('open in editor', '在编辑器中打开')}
       renderItem={(p, isFocused) => (
         <Text color={isFocused ? 'suggestion' : undefined}>{truncatePathMiddle(p, maxPathWidth)}</Text>
       )}
@@ -150,14 +153,14 @@ export function QuickOpenDialog({ onDone, onInsert }: Props): React.ReactNode {
           <>
             <Text dimColor>
               {truncatePathMiddle(p, previewWidth)}
-              {preview.path !== p ? ' · loading…' : ''}
+              {preview.path !== p ? zh(' · loading…', ' · 加载中…') : ''}
             </Text>
             {preview.content.split('\n').map((line, i) => (
               <Text key={i}>{highlightMatch(truncateToWidth(line, previewWidth), query)}</Text>
             ))}
           </>
         ) : (
-          <LoadingState message="Loading preview…" dimColor />
+          <LoadingState message={zh('Loading preview…', '正在加载预览…')} dimColor />
         )
       }
     />

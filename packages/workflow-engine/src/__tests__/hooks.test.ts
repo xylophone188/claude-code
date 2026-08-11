@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { MAX_TRANSIENT_RETRIES } from '../constants.js'
 import { AgentAdapterRegistry } from '../agentAdapter.js'
 import { createEngineContext } from '../engine/context.js'
 import { maxConcurrency, Semaphore } from '../engine/concurrency.js'
@@ -226,6 +227,64 @@ test('agent throw WorkflowAbortedError → no retry, rethrow directly (kill does
   })
   await expect(hooks.agent('p')).rejects.toBeInstanceOf(WorkflowAbortedError)
   expect(calls).toBe(1)
+})
+
+// Transient connection failures get extra retries with backoff: a single retry is
+// not enough when the endpoint is briefly unavailable, and a transient blip must
+// not kill a workflow phase (e.g. the advisor Plan agent).
+test('agent connection error → transient retry recovers after extra attempts → ok', async () => {
+  let calls = 0
+  const { hooks } = buildCtx({
+    runner: async () => {
+      calls++
+      if (calls < MAX_TRANSIENT_RETRIES + 1)
+        throw new Error('Connection error.')
+      return {
+        kind: 'ok' as const,
+        output: 'recovered',
+        usage: { outputTokens: 3 },
+      }
+    },
+    loggerWarn: () => {},
+  })
+  expect(await hooks.agent('p')).toBe('recovered')
+  // 1 initial attempt + MAX_TRANSIENT_RETRIES extra attempts
+  expect(calls).toBe(1 + MAX_TRANSIENT_RETRIES)
+})
+
+test('agent persistent connection error → transient retries exhausted → dead (returns null)', async () => {
+  let calls = 0
+  const { ctx, hooks } = buildCtx({
+    runner: async () => {
+      calls++
+      throw new Error('API Error: Connection error.')
+    },
+    loggerWarn: () => {},
+  })
+  expect(await hooks.agent('p')).toBeNull()
+  // 1 initial attempt + MAX_TRANSIENT_RETRIES extra attempts
+  expect(calls).toBe(1 + MAX_TRANSIENT_RETRIES)
+  const final = ctx.journal[0]!.result
+  expect(final.kind).toBe('dead')
+})
+
+test('agent 5xx API error is treated as transient and retried with backoff', async () => {
+  let calls = 0
+  const { hooks } = buildCtx({
+    runner: async () => {
+      calls++
+      if (calls < MAX_TRANSIENT_RETRIES + 1)
+        throw new Error('API Error: 503 Service Unavailable')
+      return {
+        kind: 'ok' as const,
+        output: 'recovered',
+        usage: { outputTokens: 2 },
+      }
+    },
+    loggerWarn: () => {},
+  })
+  expect(await hooks.agent('p')).toBe('recovered')
+  expect(calls).toBe(1 + MAX_TRANSIENT_RETRIES)
 })
 
 test('agent ok → no retry (calls=1, saves a backend round-trip)', async () => {

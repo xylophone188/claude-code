@@ -1,6 +1,6 @@
 {
   "name": "claude-code-best",
-  "version": "2.8.4",
+  "version": "2.8.4+melody",
   "description": "Reverse-engineered Anthropic Claude Code CLI — interactive AI coding assistant in the terminal",
   "type": "module",
   "author": "claude-code-best <claude-code-best@proton.me>",
@@ -42,7 +42,6 @@
   ],
   "scripts": {
     "build": "bun run build.ts",
-    "gen:omniroute": "node scripts/gen-omniroute-providers.mjs",
     "build:vite": "vite build && bun run scripts/post-build.ts",
     "build:vite:only": "vite build",
     "build:bun": "bun run build.ts",
@@ -100,6 +99,7 @@
     "@claude-code-best/agent-tools": "workspace:*",
     "@claude-code-best/builtin-tools": "workspace:*",
     "@claude-code-best/mcp-client": "workspace:*",
+    "@claude-code-best/qqbot": "workspace:*",
     "@claude-code-best/weixin": "workspace:*",
     "@commander-js/extra-typings": "^14.0.0",
     "@growthbook/growthbook": "^1.6.5",

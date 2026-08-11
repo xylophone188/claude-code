@@ -15,6 +15,7 @@ import {
   type AgentDefinition,
   type BuiltInAgentDefinition,
 } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { PLAN_AGENT } from '@claude-code-best/builtin-tools/tools/AgentTool/built-in/planAgent.js'
 import { createUserMessage, extractTextContent } from '../../utils/messages.js'
 import { getTokenCountFromUsage } from '../../utils/tokens.js'
 import { createHash } from 'node:crypto'
@@ -48,6 +49,7 @@ export function resolveAgentDefinition(
   agentType: string | undefined,
   toolUseContext: ToolUseContext,
 ): AgentDefinition {
+  if (agentType === 'workflow-advisor') return PLAN_AGENT
   if (!agentType) return WORKFLOW_AGENT
   const found = toolUseContext.options.agentDefinitions.activeAgents.find(
     a => a.agentType === agentType,

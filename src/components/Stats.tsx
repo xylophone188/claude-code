@@ -24,6 +24,7 @@ import { useKeybinding } from '../keybindings/useKeybinding.js';
 import { getGlobalConfig } from '../utils/config.js';
 import { formatDuration, formatNumber } from '../utils/format.js';
 import { generateHeatmap } from '../utils/heatmap.js';
+import { zh } from '../utils/i18n.js';
 import { renderModelName } from '../utils/model/model.js';
 import { copyAnsiToClipboard } from '../utils/screenshotClipboard.js';
 import {
@@ -51,9 +52,9 @@ type Props = {
 type StatsResult = { type: 'success'; data: ClaudeCodeStats } | { type: 'error'; message: string } | { type: 'empty' };
 
 const DATE_RANGE_LABELS: Record<StatsDateRange, string> = {
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  all: 'All time',
+  '7d': zh('Last 7 days', '近 7 天'),
+  '30d': zh('Last 30 days', '近 30 天'),
+  all: zh('All time', '全部时间'),
 };
 
 const DATE_RANGE_ORDER: StatsDateRange[] = ['all', '7d', '30d'];
@@ -76,7 +77,7 @@ function createAllTimeStatsPromise(): Promise<StatsResult> {
       return { type: 'success', data };
     })
     .catch((err): StatsResult => {
-      const message = err instanceof Error ? err.message : 'Failed to load stats';
+      const message = err instanceof Error ? err.message : zh('Failed to load stats', '加载统计失败');
       return { type: 'error', message };
     });
 }
@@ -90,7 +91,7 @@ export function Stats({ onClose }: Props): React.ReactNode {
       fallback={
         <Box marginTop={1}>
           <Spinner />
-          <Text> Loading your Claude Code stats…</Text>
+          <Text>{zh(' Loading your Claude Code stats…', ' 正在加载你的 Claude Code 统计…')}</Text>
         </Box>
       }
     >
@@ -187,7 +188,10 @@ function StatsContent({ allTimePromise, onClose }: StatsContentProps): React.Rea
   if (allTimeResult.type === 'error') {
     return (
       <Box marginTop={1}>
-        <Text color="error">Failed to load stats: {allTimeResult.message}</Text>
+        <Text color="error">
+          {zh('Failed to load stats: ', '统计加载失败：')}
+          {allTimeResult.message}
+        </Text>
       </Box>
     );
   }
@@ -195,7 +199,9 @@ function StatsContent({ allTimePromise, onClose }: StatsContentProps): React.Rea
   if (allTimeResult.type === 'empty') {
     return (
       <Box marginTop={1}>
-        <Text color="warning">No stats available yet. Start using Claude Code!</Text>
+        <Text color="warning">
+          {zh('No stats available yet. Start using Claude Code!', '暂无统计数据，快去使用 Claude Code 吧！')}
+        </Text>
       </Box>
     );
   }
@@ -204,7 +210,7 @@ function StatsContent({ allTimePromise, onClose }: StatsContentProps): React.Rea
     return (
       <Box marginTop={1}>
         <Spinner />
-        <Text> Loading stats…</Text>
+        <Text>{zh(' Loading stats…', ' 正在加载统计…')}</Text>
       </Box>
     );
   }
@@ -213,7 +219,7 @@ function StatsContent({ allTimePromise, onClose }: StatsContentProps): React.Rea
     <Pane color="claude">
       <Box flexDirection="row" gap={1} marginBottom={1}>
         <Tabs title="" color="claude" defaultTab="Overview">
-          <Tab title="Overview">
+          <Tab id="Overview" title={zh('Overview', '概览')}>
             <OverviewTab
               stats={displayStats}
               allTimeStats={allTimeStats}
@@ -221,14 +227,14 @@ function StatsContent({ allTimePromise, onClose }: StatsContentProps): React.Rea
               isLoading={isLoadingFiltered}
             />
           </Tab>
-          <Tab title="Models">
+          <Tab id="Models" title={zh('Models', '模型')}>
             <ModelsTab stats={displayStats} dateRange={dateRange} isLoading={isLoadingFiltered} />
           </Tab>
         </Tabs>
       </Box>
       <Box paddingLeft={2}>
         <Text dimColor>
-          Esc to cancel · r to cycle dates · ctrl+s to copy
+          {zh('Esc to cancel · r to cycle dates · ctrl+s to copy', 'Esc 取消 · r 切换日期 · ctrl+s 复制')}
           {copyStatus ? ` · ${copyStatus}` : ''}
         </Text>
       </Box>
@@ -315,10 +321,14 @@ function OverviewTab({
       shotStatsData = {
         avgShots: (totalShots / total).toFixed(1),
         buckets: [
-          { label: '1-shot', count: b1, pct: pct(b1) },
-          { label: '2\u20135 shot', count: b2_5, pct: pct(b2_5) },
-          { label: '6\u201310 shot', count: b6_10, pct: pct(b6_10) },
-          { label: '11+ shot', count: b11, pct: pct(b11) },
+          { label: zh('1-shot', '1 次'), count: b1, pct: pct(b1) },
+          { label: zh('2\u20135 shot', '2–5 次'), count: b2_5, pct: pct(b2_5) },
+          {
+            label: zh('6\u201310 shot', '6–10 次'),
+            count: b6_10,
+            pct: pct(b6_10),
+          },
+          { label: zh('11+ shot', '11+ 次'), count: b11, pct: pct(b11) },
         ],
       };
     }
@@ -341,7 +351,7 @@ function OverviewTab({
         <Box flexDirection="column" width={28}>
           {favoriteModel && (
             <Text wrap="truncate">
-              Favorite model:{' '}
+              {zh('Favorite model:', '常用模型')}{' '}
               <Text color="claude" bold>
                 {renderModelName(favoriteModel[0])}
               </Text>
@@ -350,7 +360,7 @@ function OverviewTab({
         </Box>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
-            Total tokens: <Text color="claude">{formatNumber(totalTokens)}</Text>
+            {zh('Total tokens:', '总 tokens')} <Text color="claude">{formatNumber(totalTokens)}</Text>
           </Text>
         </Box>
       </Box>
@@ -359,13 +369,14 @@ function OverviewTab({
       <Box flexDirection="row" gap={4}>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
-            Sessions: <Text color="claude">{formatNumber(stats.totalSessions)}</Text>
+            {zh('Sessions:', '会话数')} <Text color="claude">{formatNumber(stats.totalSessions)}</Text>
           </Text>
         </Box>
         <Box flexDirection="column" width={28}>
           {stats.longestSession && (
             <Text wrap="truncate">
-              Longest session: <Text color="claude">{formatDuration(stats.longestSession.duration)}</Text>
+              {zh('Longest session:', '最长会话')}{' '}
+              <Text color="claude">{formatDuration(stats.longestSession.duration)}</Text>
             </Text>
           )}
         </Box>
@@ -375,17 +386,17 @@ function OverviewTab({
       <Box flexDirection="row" gap={4}>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
-            Active days: <Text color="claude">{stats.activeDays}</Text>
+            {zh('Active days:', '活跃天数')} <Text color="claude">{stats.activeDays}</Text>
             <Text color="subtle">/{rangeDays}</Text>
           </Text>
         </Box>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
-            Longest streak:{' '}
+            {zh('Longest streak:', '最长连续')}{' '}
             <Text color="claude" bold>
               {stats.streaks.longestStreak}
             </Text>{' '}
-            {stats.streaks.longestStreak === 1 ? 'day' : 'days'}
+            {stats.streaks.longestStreak === 1 ? zh('day', '天') : zh('days', '天')}
           </Text>
         </Box>
       </Box>
@@ -395,17 +406,18 @@ function OverviewTab({
         <Box flexDirection="column" width={28}>
           {stats.peakActivityDay && (
             <Text wrap="truncate">
-              Most active day: <Text color="claude">{formatPeakDay(stats.peakActivityDay)}</Text>
+              {zh('Most active day:', '最活跃的一天')}{' '}
+              <Text color="claude">{formatPeakDay(stats.peakActivityDay)}</Text>
             </Text>
           )}
         </Box>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
-            Current streak:{' '}
+            {zh('Current streak:', '当前连续')}{' '}
             <Text color="claude" bold>
               {allTimeStats.streaks.currentStreak}
             </Text>{' '}
-            {allTimeStats.streaks.currentStreak === 1 ? 'day' : 'days'}
+            {allTimeStats.streaks.currentStreak === 1 ? zh('day', '天') : zh('days', '天')}
           </Text>
         </Box>
       </Box>
@@ -415,7 +427,8 @@ function OverviewTab({
         <Box flexDirection="row" gap={4}>
           <Box flexDirection="column" width={28}>
             <Text wrap="truncate">
-              Speculation saved: <Text color="claude">{formatDuration(stats.totalSpeculationTimeSavedMs)}</Text>
+              {zh('Speculation saved:', '节省的推测时间')}{' '}
+              <Text color="claude">{formatDuration(stats.totalSpeculationTimeSavedMs)}</Text>
             </Text>
           </Box>
         </Box>
@@ -425,7 +438,7 @@ function OverviewTab({
       {shotStatsData && (
         <>
           <Box marginTop={1}>
-            <Text>Shot distribution</Text>
+            <Text>{zh('Shot distribution', '轮次分布')}</Text>
           </Box>
           <Box flexDirection="row" gap={4}>
             <Box flexDirection="column" width={28}>
@@ -458,7 +471,7 @@ function OverviewTab({
           <Box flexDirection="row" gap={4}>
             <Box flexDirection="column" width={28}>
               <Text wrap="truncate">
-                Avg/session: <Text color="claude">{shotStatsData.avgShots}</Text>
+                {zh('Avg/session:', '平均每会话')} <Text color="claude">{shotStatsData.avgShots}</Text>
               </Text>
             </Box>
           </Box>
@@ -527,9 +540,16 @@ function generateFunFactoid(stats: ClaudeCodeStats, totalTokens: number): string
     for (const book of matchingBooks) {
       const times = totalTokens / book.tokens;
       if (times >= 2) {
-        factoids.push(`You've used ~${Math.floor(times)}x more tokens than ${book.name}`);
+        factoids.push(
+          zh(
+            `You've used ~${Math.floor(times)}x more tokens than ${book.name}`,
+            `你使用的 tokens 约为《${book.name}》的 ${Math.floor(times)} 倍`,
+          ),
+        );
       } else {
-        factoids.push(`You've used the same number of tokens as ${book.name}`);
+        factoids.push(
+          zh(`You've used the same number of tokens as ${book.name}`, `你使用的 tokens 数量与《${book.name}》相同`),
+        );
       }
     }
   }
@@ -539,7 +559,12 @@ function generateFunFactoid(stats: ClaudeCodeStats, totalTokens: number): string
     for (const comparison of TIME_COMPARISONS) {
       const ratio = sessionMinutes / comparison.minutes;
       if (ratio >= 2) {
-        factoids.push(`Your longest session is ~${Math.floor(ratio)}x longer than ${comparison.name}`);
+        factoids.push(
+          zh(
+            `Your longest session is ~${Math.floor(ratio)}x longer than ${comparison.name}`,
+            `你的最长会话时长约为 ${comparison.name} 的 ${Math.floor(ratio)} 倍`,
+          ),
+        );
       }
     }
   }
@@ -589,7 +614,7 @@ function ModelsTab({
   if (modelEntries.length === 0) {
     return (
       <Box>
-        <Text color="subtle">No model usage data available</Text>
+        <Text color="subtle">{zh('No model usage data available', '暂无模型用量数据')}</Text>
       </Box>
     );
   }
@@ -618,7 +643,7 @@ function ModelsTab({
       {/* Token usage chart */}
       {chartOutput && (
         <Box flexDirection="column" marginBottom={1}>
-          <Text bold>Tokens per Day</Text>
+          <Text bold>{zh('Tokens per Day', '每日 tokens')}</Text>
           <Ansi>{chartOutput.chart}</Ansi>
           <Text color="subtle">{chartOutput.xAxisLabels}</Text>
           <Box>
@@ -654,8 +679,8 @@ function ModelsTab({
         <Box marginTop={1}>
           <Text color="subtle">
             {canScrollUp ? figures.arrowUp : ' '} {canScrollDown ? figures.arrowDown : ' '} {scrollOffset + 1}-
-            {Math.min(scrollOffset + VISIBLE_MODELS, modelEntries.length)} of {modelEntries.length} models (↑↓ to
-            scroll)
+            {Math.min(scrollOffset + VISIBLE_MODELS, modelEntries.length)} of{' '}
+            {zh(`${modelEntries.length} models (↑↓ to scroll)`, `${modelEntries.length} 个模型（↑↓ 滚动）`)}
           </Text>
         </Box>
       )}
@@ -683,7 +708,10 @@ function ModelEntry({ model, usage, totalTokens }: ModelEntryProps): React.React
         {figures.bullet} <Text bold>{renderModelName(model)}</Text> <Text color="subtle">({percentage}%)</Text>
       </Text>
       <Text color="subtle">
-        {'  '}In: {formatNumber(usage.inputTokens)} · Out: {formatNumber(usage.outputTokens)}
+        {'  '}
+        {zh('In: ', '输入: ')}
+        {formatNumber(usage.inputTokens)} · {zh('Out: ', '输出: ')}
+        {formatNumber(usage.outputTokens)}
       </Text>
     </Box>
   );
@@ -907,34 +935,43 @@ function renderOverviewToAnsi(stats: ClaudeCodeStats): string[] {
 
   // Row 1: Favorite model | Total tokens
   if (favoriteModel) {
-    lines.push(row('Favorite model', renderModelName(favoriteModel[0]), 'Total tokens', formatNumber(totalTokens)));
+    lines.push(
+      row(
+        zh('Favorite model', '常用模型'),
+        renderModelName(favoriteModel[0]),
+        zh('Total tokens', '总 tokens'),
+        formatNumber(totalTokens),
+      ),
+    );
   }
   lines.push('');
 
   // Row 2: Sessions | Longest session
   lines.push(
     row(
-      'Sessions',
+      zh('Sessions', '会话数'),
       formatNumber(stats.totalSessions),
-      'Longest session',
+      zh('Longest session', '最长会话'),
       stats.longestSession ? formatDuration(stats.longestSession.duration) : 'N/A',
     ),
   );
 
   // Row 3: Current streak | Longest streak
-  const currentStreakVal = `${stats.streaks.currentStreak} ${stats.streaks.currentStreak === 1 ? 'day' : 'days'}`;
-  const longestStreakVal = `${stats.streaks.longestStreak} ${stats.streaks.longestStreak === 1 ? 'day' : 'days'}`;
-  lines.push(row('Current streak', currentStreakVal, 'Longest streak', longestStreakVal));
+  const currentStreakVal = `${stats.streaks.currentStreak} ${stats.streaks.currentStreak === 1 ? zh('day', '天') : zh('days', '天')}`;
+  const longestStreakVal = `${stats.streaks.longestStreak} ${stats.streaks.longestStreak === 1 ? zh('day', '天') : zh('days', '天')}`;
+  lines.push(
+    row(zh('Current streak', '当前连续'), currentStreakVal, zh('Longest streak', '最长连续'), longestStreakVal),
+  );
 
   // Row 4: Active days | Peak hour
   const activeDaysVal = `${stats.activeDays}/${stats.totalDays}`;
   const peakHourVal =
     stats.peakActivityHour !== null ? `${stats.peakActivityHour}:00-${stats.peakActivityHour + 1}:00` : 'N/A';
-  lines.push(row('Active days', activeDaysVal, 'Peak hour', peakHourVal));
+  lines.push(row(zh('Active days', '活跃天数'), activeDaysVal, zh('Peak hour', '高峰时段'), peakHourVal));
 
   // Speculation time saved (ant-only)
   if (process.env.USER_TYPE === 'ant' && stats.totalSpeculationTimeSavedMs > 0) {
-    const label = 'Speculation saved:'.padEnd(COL1_LABEL_WIDTH);
+    const label = zh('Speculation saved:', '节省的推测时间').padEnd(COL1_LABEL_WIDTH);
     lines.push(label + h(formatDuration(stats.totalSpeculationTimeSavedMs)));
   }
 
@@ -959,10 +996,19 @@ function renderOverviewToAnsi(stats: ClaudeCodeStats): string[] {
       const b6_10 = bucket(6, 10);
       const b11 = bucket(11);
       lines.push('');
-      lines.push('Shot distribution');
-      lines.push(row('1-shot', fmtBucket(b1, pct(b1)), '2\u20135 shot', fmtBucket(b2_5, pct(b2_5))));
-      lines.push(row('6\u201310 shot', fmtBucket(b6_10, pct(b6_10)), '11+ shot', fmtBucket(b11, pct(b11))));
-      lines.push(`${'Avg/session:'.padEnd(COL1_LABEL_WIDTH)}${h(avgShots)}`);
+      lines.push(zh('Shot distribution', '轮次分布'));
+      lines.push(
+        row(zh('1-shot', '1 次'), fmtBucket(b1, pct(b1)), zh('2\u20135 shot', '2–5 次'), fmtBucket(b2_5, pct(b2_5))),
+      );
+      lines.push(
+        row(
+          zh('6\u201310 shot', '6–10 次'),
+          fmtBucket(b6_10, pct(b6_10)),
+          zh('11+ shot', '11+ 次'),
+          fmtBucket(b11, pct(b11)),
+        ),
+      );
+      lines.push(`${zh('Avg/session:', '平均每会话').padEnd(COL1_LABEL_WIDTH)}${h(avgShots)}`);
     }
   }
 
@@ -971,7 +1017,7 @@ function renderOverviewToAnsi(stats: ClaudeCodeStats): string[] {
   // Fun factoid
   const factoid = generateFunFactoid(stats, totalTokens);
   lines.push(h(factoid));
-  lines.push(chalk.gray(`Stats from the last ${stats.totalDays} days`));
+  lines.push(chalk.gray(zh(`Stats from the last ${stats.totalDays} days`, `近 ${stats.totalDays} 天的统计`)));
 
   return lines;
 }
@@ -984,7 +1030,7 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   );
 
   if (modelEntries.length === 0) {
-    lines.push(chalk.gray('No model usage data available'));
+    lines.push(chalk.gray(zh('No model usage data available', '暂无模型用量数据')));
     return lines;
   }
 
@@ -999,7 +1045,7 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   );
 
   if (chartOutput) {
-    lines.push(chalk.bold('Tokens per Day'));
+    lines.push(chalk.bold(zh('Tokens per Day', '每日 tokens')));
     lines.push(chartOutput.chart);
     lines.push(chalk.gray(chartOutput.xAxisLabels));
     // Legend - use pre-colored bullets from chart output
@@ -1010,7 +1056,10 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
 
   // Summary
   lines.push(
-    `${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens`,
+    zh(
+      `${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens`,
+      `${figures.star} 常用: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} · ${figures.circle} 总计: ${chalk.magenta(formatNumber(totalTokens))} tokens`,
+    ),
   );
   lines.push('');
 
@@ -1020,7 +1069,14 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
     const modelTokens = usage.inputTokens + usage.outputTokens;
     const percentage = ((modelTokens / totalTokens) * 100).toFixed(1);
     lines.push(`${figures.bullet} ${chalk.bold(renderModelName(model))} ${chalk.gray(`(${percentage}%)`)}`);
-    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
+    lines.push(
+      chalk.dim(
+        zh(
+          `  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`,
+          `  输入: ${formatNumber(usage.inputTokens)} · 输出: ${formatNumber(usage.outputTokens)}`,
+        ),
+      ),
+    );
   }
 
   return lines;

@@ -20,6 +20,7 @@ import { checkAndRefreshOAuthTokenIfNeeded } from '../utils/auth.js';
 import { openBrowser } from '../utils/browser.js';
 import { logForDebugging } from '../utils/debug.js';
 import { env } from '../utils/env.js';
+import { zh } from '../utils/i18n.js';
 import { type GitRepoState, getGitState, getIsGit } from '../utils/git.js';
 import { getAuthHeaders, getUserAgent } from '../utils/http.js';
 import { getInMemoryErrors, logError } from '../utils/log.js';
@@ -139,7 +140,10 @@ function getSanitizedErrorLogs(): Array<{
   // Sanitize error logs to remove any API keys
   return getInMemoryErrors().map(errorInfo => {
     // Create a copy of the error info to avoid modifying the original
-    const errorCopy = { ...errorInfo } as { error?: string; timestamp?: string };
+    const errorCopy = { ...errorInfo } as {
+      error?: string;
+      timestamp?: string;
+    };
 
     // Sanitize error if present and is a string
     if (errorCopy && typeof errorCopy.error === 'string') {
@@ -322,28 +326,38 @@ export function Feedback({
 
   return (
     <Dialog
-      title="Submit Feedback / Bug Report"
+      title={zh('Submit Feedback / Bug Report', '提交反馈 / Bug 报告')}
       onCancel={handleCancel}
       isCancelActive={step !== 'userInput'}
       inputGuide={exitState =>
         exitState.pending ? (
-          <Text>Press {exitState.keyName} again to exit</Text>
+          <Text>{zh(`Press ${exitState.keyName} again to exit`, `再按一次 ${exitState.keyName} 退出`)}</Text>
         ) : step === 'userInput' ? (
           <Byline>
             <KeyboardShortcutHint shortcut="Enter" action="continue" />
-            <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
+            <ConfigurableShortcutHint
+              action="confirm:no"
+              context="Confirmation"
+              fallback="Esc"
+              description={zh('cancel', '取消')}
+            />
           </Byline>
         ) : step === 'consent' ? (
           <Byline>
             <KeyboardShortcutHint shortcut="Enter" action="submit" />
-            <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
+            <ConfigurableShortcutHint
+              action="confirm:no"
+              context="Confirmation"
+              fallback="Esc"
+              description={zh('cancel', '取消')}
+            />
           </Byline>
         ) : null
       }
     >
       {step === 'userInput' && (
         <Box flexDirection="column" gap={1}>
-          <Text>Describe the issue below:</Text>
+          <Text>{zh('Describe the issue below:', '请在下方描述问题：')}</Text>
           <TextInput
             value={description}
             onChange={value => {
@@ -363,7 +377,9 @@ export function Feedback({
           {error && (
             <Box flexDirection="column" gap={1}>
               <Text color="error">{error}</Text>
-              <Text dimColor>Edit and press Enter to retry, or Esc to cancel</Text>
+              <Text dimColor>
+                {zh('Edit and press Enter to retry, or Esc to cancel', '修改后按 Enter 重试，或按 Esc 取消')}
+              </Text>
             </Box>
           )}
         </Box>
@@ -371,40 +387,45 @@ export function Feedback({
 
       {step === 'consent' && (
         <Box flexDirection="column">
-          <Text>This report will include:</Text>
+          <Text>{zh('This report will include:', '这份报告将包含：')}</Text>
           <Box marginLeft={2} flexDirection="column">
             <Text>
-              - Your feedback / bug description: <Text dimColor>{description}</Text>
+              {zh('- Your feedback / bug description: ', '- 你的反馈 / Bug 描述: ')}
+              <Text dimColor>{description}</Text>
             </Text>
             <Text>
-              - Environment info:{' '}
+              {zh('- Environment info:', '- 环境信息:')}{' '}
               <Text dimColor>
                 {env.platform}, {env.terminal}, v{MACRO.VERSION}
               </Text>
             </Text>
             {envInfo.gitState && (
               <Text>
-                - Git repo metadata:{' '}
+                {zh('- Git repo metadata:', '- Git 仓库元数据:')}{' '}
                 <Text dimColor>
                   {envInfo.gitState.branchName}
                   {envInfo.gitState.commitHash ? `, ${envInfo.gitState.commitHash.slice(0, 7)}` : ''}
                   {envInfo.gitState.remoteUrl ? ` @ ${envInfo.gitState.remoteUrl}` : ''}
-                  {!envInfo.gitState.isHeadOnRemote && ', not synced'}
-                  {!envInfo.gitState.isClean && ', has local changes'}
+                  {!envInfo.gitState.isHeadOnRemote && zh(', not synced', '，未同步')}
+                  {!envInfo.gitState.isClean && zh(', has local changes', '，有本地改动')}
                 </Text>
               </Text>
             )}
-            <Text>- Current session transcript</Text>
+            <Text>{zh('- Current session transcript', '- 当前会话记录')}</Text>
           </Box>
           <Box marginTop={1}>
             <Text wrap="wrap" dimColor>
-              We will use your feedback to debug related issues or to improve Claude Code&apos;s functionality (eg. to
-              reduce the risk of bugs occurring in the future).
+              {zh(
+                'We will use your feedback to debug related issues or to improve Claude Code&apos;s functionality (eg. to reduce the risk of bugs occurring in the future).',
+                '我们会用你的反馈来排查相关问题或改进 Claude Code 的功能（例如降低未来出现 Bug 的风险）。',
+              )}
             </Text>
           </Box>
           <Box marginTop={1}>
             <Text>
-              Press <Text bold>Enter</Text> to confirm and submit.
+              {zh('Press ', '按 ')}
+              <Text bold>Enter</Text>
+              {zh(' to confirm and submit.', ' 确认并提交。')}
             </Text>
           </Box>
         </Box>
@@ -412,18 +433,32 @@ export function Feedback({
 
       {step === 'submitting' && (
         <Box flexDirection="row" gap={1}>
-          <Text>Submitting report…</Text>
+          <Text>{zh('Submitting report…', '正在提交报告…')}</Text>
         </Box>
       )}
 
       {step === 'done' && (
         <Box flexDirection="column">
-          {error ? <Text color="error">{error}</Text> : <Text color="success">Thank you for your report!</Text>}
-          {feedbackId && <Text dimColor>Feedback ID: {feedbackId}</Text>}
+          {error ? (
+            <Text color="error">{error}</Text>
+          ) : (
+            <Text color="success">{zh('Thank you for your report!', '感谢你的反馈！')}</Text>
+          )}
+          {feedbackId && (
+            <Text dimColor>
+              {zh('Feedback ID: ', '反馈 ID: ')}
+              {feedbackId}
+            </Text>
+          )}
           <Box marginTop={1}>
-            <Text>Press </Text>
+            <Text>{zh('Press ', '按 ')}</Text>
             <Text bold>Enter </Text>
-            <Text>to open your browser and draft a GitHub issue, or any other key to close.</Text>
+            <Text>
+              {zh(
+                'to open your browser and draft a GitHub issue, or any other key to close.',
+                '在浏览器中打开并撰写 GitHub issue，或按其他任意键关闭。',
+              )}
+            </Text>
           </Box>
         </Box>
       )}
@@ -449,7 +484,7 @@ export function createGitHubIssueUrl(
     `- Platform: ${env.platform}\n` +
     `- Terminal: ${env.terminal}\n` +
     `- Version: ${MACRO.VERSION || 'unknown'}\n` +
-    `- Feedback ID: ${feedbackId}\n` +
+    zh(`- Feedback ID: ${feedbackId}\n`, `- 反馈 ID: ${feedbackId}\n`) +
     `\n**Errors**\n\`\`\`json\n`;
   const errorSuffix = `\n\`\`\`\n`;
   const errorsJson = jsonStringify(errors);

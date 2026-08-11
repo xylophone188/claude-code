@@ -202,6 +202,7 @@ let _searchExtraToolsEnabled = false
 let _lastCreateArgs: Record<string, any> | null = null
 
 mock.module('@ant/model-provider', () => ({
+  asSystemPrompt: (value: readonly string[]) => value,
   resolveOpenAIModel: (m: string) => m,
   adaptOpenAIStreamToAnthropic: (_stream: any, _model: string) =>
     eventStream(_nextEvents),

@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { useSyncExternalStore } from 'react';
@@ -120,8 +121,8 @@ export function TokenWarning({ tokenUsage, model }: Props): React.ReactNode {
   }
 
   const autocompactLabel = reactiveOnlyMode
-    ? `${100 - displayPercentLeft}% context used`
-    : `${displayPercentLeft}% until auto-compact`;
+    ? zh(`${100 - displayPercentLeft}% context used`, `已用 ${100 - displayPercentLeft}% 上下文`)
+    : zh(`${displayPercentLeft}% until auto-compact`, `距自动压缩还有 ${displayPercentLeft}%`);
 
   return (
     <Box flexDirection="row">

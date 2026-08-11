@@ -1,3 +1,4 @@
+import { zh } from './i18n.js';
 import chalk from 'chalk';
 import figures from 'figures';
 import * as React from 'react';
@@ -207,7 +208,7 @@ export function buildSettingSourcesProperties(): Property[] {
 
   return [
     {
-      label: 'Setting sources',
+      label: zh('Setting sources', '设置来源'),
       value: sourceNames,
     },
   ];
@@ -252,14 +253,14 @@ export function buildAccountProperties(): Property[] {
 
   if (accountInfo.subscription) {
     properties.push({
-      label: 'Login method',
+      label: zh('Login method', '登录方式'),
       value: `${accountInfo.subscription} Account`,
     });
   }
 
   if (accountInfo.tokenSource) {
     properties.push({
-      label: 'Auth token',
+      label: zh('Auth token', '认证令牌'),
       value: accountInfo.tokenSource,
     });
   }
@@ -274,13 +275,13 @@ export function buildAccountProperties(): Property[] {
   // Hide sensitive account info in demo mode
   if (accountInfo.organization && !process.env.IS_DEMO) {
     properties.push({
-      label: 'Organization',
+      label: zh('Organization', '组织'),
       value: accountInfo.organization,
     });
   }
   if (accountInfo.email && !process.env.IS_DEMO) {
     properties.push({
-      label: 'Email',
+      label: zh('Email', '邮箱'),
       value: accountInfo.email,
     });
   }
@@ -354,7 +355,7 @@ export function buildAPIProviderProperties(): Property[] {
     }
 
     properties.push({
-      label: 'Default region',
+      label: zh('Default region', '默认区域'),
       value: getDefaultVertexRegion(),
     });
 
@@ -408,7 +409,7 @@ export function buildAPIProviderProperties(): Property[] {
   const proxyUrl = getProxyUrl();
   if (proxyUrl) {
     properties.push({
-      label: 'Proxy',
+      label: zh('Proxy', '代理'),
       value: proxyUrl,
     });
   }

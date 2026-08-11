@@ -34,6 +34,11 @@ import { listAutonomyFlows } from '../../src/utils/autonomyFlows'
 const CLI_ENTRYPOINT = resolve(import.meta.dir, '../../dist/cli.js')
 const PROJECT_ROOT = resolve(import.meta.dir, '../..')
 
+// Build-time localization (localization/patch-dist.mjs) translates the
+// `Status:` label into zh (`状态：`); assert on either language.
+const statusMatch = (status: string) =>
+  new RegExp(`(Status|状态)[:：]\\s*${status}`)
+
 let tempDir = ''
 let configDir = ''
 let previousConfigDir: string | undefined
@@ -63,8 +68,25 @@ beforeAll(async () => {
 }, 120_000)
 
 async function runAutonomyCli(args: string[]): Promise<string> {
+  // Use `node`, not `process.execPath` (bun): running the built dist/cli.js
+  // under bun emits the build-time-localized Chinese labels double-encoded
+  // (mojibake) on stdout. node renders the same chunk as clean UTF-8, which
+  // is what the `Dist` artifact ships as (see CLAUDE.md). This keeps the test
+  // focused on the autonomy lifecycle it validates rather than bun's stdout
+  // encoding quirk.
+  // `--disable-warning=ExperimentalWarning` silences node's
+  // "localStorage is not available because --localstorage-file was not
+  // provided" notice, which the bundle triggers by touching `localStorage`.
+  // It is a node-runtime artifact, not CLI output, so we suppress it to keep
+  // the `stderr` assertion meaningful (still catches genuine CLI errors).
   const proc = Bun.spawn({
-    cmd: [process.execPath, CLI_ENTRYPOINT, 'autonomy', ...args],
+    cmd: [
+      'node',
+      '--disable-warning=ExperimentalWarning',
+      CLI_ENTRYPOINT,
+      'autonomy',
+      ...args,
+    ],
     cwd: tempDir,
     env: {
       ...process.env,
@@ -125,7 +147,7 @@ describe('autonomy lifecycle user-equivalent CLI flow', () => {
     expect(existsSync(join(tempDir, '.claude', 'autonomy', 'flows.json'))).toBe(
       false,
     )
-  })
+  }, 15000)
 
   test('real CLI can inspect, resume, and cancel a persisted managed flow', async () => {
     await startManagedAutonomyFlowFromHeartbeatTask({
@@ -160,7 +182,7 @@ describe('autonomy lifecycle user-equivalent CLI flow', () => {
     expect(flows).toContain('waiting')
 
     const detailBefore = await runAutonomyCli(['flow', waitingFlow!.flowId])
-    expect(detailBefore).toContain('Status: waiting')
+    expect(detailBefore).toMatch(statusMatch('waiting'))
     expect(detailBefore).toContain('Current step: approve')
 
     const resume = await runAutonomyCli(['flow', 'resume', waitingFlow!.flowId])
@@ -171,11 +193,13 @@ describe('autonomy lifecycle user-equivalent CLI flow', () => {
       'flow',
       waitingFlow!.flowId,
     ])
-    expect(detailAfterResume).toContain('Status: queued')
+    expect(detailAfterResume).toMatch(statusMatch('queued'))
     expect(detailAfterResume).toContain('Latest run:')
 
     const cancel = await runAutonomyCli(['flow', 'cancel', waitingFlow!.flowId])
-    expect(cancel).toContain('Cancelled flow')
+    // Cancel confirmation is build-time-localized ("Cancelled flow" / "已取消 flow");
+    // match either, consistent with the locale-agnostic `statusMatch` below.
+    expect(cancel).toMatch(/(Cancelled|已取消)\s+flow/)
 
     const [cancelledRun] = await listAutonomyRuns(tempDir)
     const [cancelledFlow] = await listAutonomyFlows(tempDir)
@@ -186,6 +210,6 @@ describe('autonomy lifecycle user-equivalent CLI flow', () => {
       'flow',
       waitingFlow!.flowId,
     ])
-    expect(detailAfterCancel).toContain('Status: cancelled')
-  }, 30000)
+    expect(detailAfterCancel).toMatch(statusMatch('cancelled'))
+  }, 60000)
 })

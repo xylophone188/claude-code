@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -74,7 +75,7 @@ function DirectoryInput({
 }): React.ReactNode {
   return (
     <Box flexDirection="column">
-      <Text>Enter the path to the directory:</Text>
+      <Text>{zh('Enter the path to the directory:', '输入目录路径：')}</Text>
       <Box borderDimColor borderStyle="round" marginY={1} paddingLeft={1}>
         <TextInput
           showCursor
@@ -224,7 +225,11 @@ export function AddWorkspaceDirectory({
             ? undefined
             : exitState =>
                 exitState.pending ? (
-                  <Text>Press {exitState.keyName} again to exit</Text>
+                  <Text>
+                    {zh('Press ', '再次按 ')}
+                    {exitState.keyName}
+                    {zh(' again to exit', ' 退出')}
+                  </Text>
                 ) : (
                   <Byline>
                     <KeyboardShortcutHint shortcut="Tab" action="complete" />

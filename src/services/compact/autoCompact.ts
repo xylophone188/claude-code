@@ -274,6 +274,7 @@ export async function autoCompactIfNeeded(
   querySource?: QuerySource,
   tracking?: AutoCompactTrackingState,
   snipTokensFreed?: number,
+  compressionApproved = false,
 ): Promise<{
   wasCompacted: boolean
   compactionResult?: CompactionResult
@@ -294,12 +295,11 @@ export async function autoCompactIfNeeded(
   }
 
   const model = toolUseContext.options.mainLoopModel
-  const shouldCompact = await shouldAutoCompact(
-    messages,
-    model,
-    querySource,
-    snipTokensFreed,
-  )
+  // Hard context protection always remains active. Approval only enables the
+  // optional post-tool intelligent decision before that limit.
+  const shouldCompact =
+    compressionApproved ||
+    (await shouldAutoCompact(messages, model, querySource, snipTokensFreed))
 
   if (!shouldCompact) {
     return { wasCompacted: false }

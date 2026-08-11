@@ -14,13 +14,7 @@ const __dirname = dirname(__filename)
 const projectRoot = join(__dirname, '..')
 const cliPath = join(projectRoot, 'src/entrypoints/cli.tsx')
 
-const defines = {
-  ...getMacroDefines(),
-  // React production mode — prevents 6,889+ _debugStack Error objects
-  // (12MB) from accumulating during long-running sessions.
-  // dev 模式使用 development 模式
-  'process.env.NODE_ENV': JSON.stringify('production'),
-}
+const defines = getMacroDefines()
 
 const defineArgs = Object.entries(defines).flatMap(([k, v]) => [
   '-d',
@@ -54,7 +48,24 @@ const result = Bun.spawnSync(
     cliPath,
     ...process.argv.slice(2),
   ],
-  { stdio: ['inherit', 'inherit', 'inherit'], cwd: projectRoot },
+  {
+    stdio: ['inherit', 'inherit', 'inherit'],
+    cwd: projectRoot,
+    // React production mode — prevents 6,889+ _debugStack Error objects
+    // (12MB) from accumulating during long-running sessions.
+    //
+    // This must be an env var, NOT a `-d process.env.NODE_ENV:"production"`
+    // define. A define rewrites every `process.env.NODE_ENV` read into a
+    // string literal, and the literal's quotes only survive while the flag is
+    // passed as an argv element. Any child re-exec that routes execArgv
+    // through a shell (tmux/ssh launchers) drops them, so React's
+    // `if (process.env.NODE_ENV === 'production')` became the bare identifier
+    // `production` and the process died with
+    // `ReferenceError: production is not defined`. React reads NODE_ENV at
+    // runtime, so the env var yields the identical production build with no
+    // quoting hazard.
+    env: { ...process.env, NODE_ENV: 'production' },
+  },
 )
 
 process.exit(result.exitCode ?? 0)

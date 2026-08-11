@@ -22,10 +22,12 @@ import {
 } from './tool/WorkflowTool.js'
 import { workflowInputSchema, type WorkflowInput } from './tool/schema.js'
 import { persistInlineScript } from './tool/persistInline.js'
+import { createAdvisorWorkflowScript } from './tool/advisorWorkflow.js'
 export {
   createWorkflowTool,
   type WorkflowToolDescriptor,
   workflowInputSchema,
   type WorkflowInput,
   persistInlineScript,
+  createAdvisorWorkflowScript,
 }

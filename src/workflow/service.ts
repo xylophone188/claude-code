@@ -54,6 +54,7 @@ export type WorkflowService = {
     input: Pick<
       WorkflowInput,
       | 'script'
+      | 'mode'
       | 'name'
       | 'scriptPath'
       | 'args'
@@ -139,6 +140,7 @@ export function makeService(
   })
 
   async function resolveSource(input: {
+    mode?: 'advisor'
     script?: string
     name?: string
     scriptPath?: string
@@ -151,6 +153,12 @@ export function makeService(
     // Mirrors WorkflowTool.ts: name takes priority over title; only fall back to the literal
     // 'workflow' when neither is supplied (so /workflows tabs don't pile up under a same default name).
     const workflowName = input.name ?? input.title ?? 'workflow'
+    if (input.mode === 'advisor') {
+      const { createAdvisorWorkflowScript } = await import(
+        '@claude-code-best/workflow-engine'
+      )
+      return { script: createAdvisorWorkflowScript(), workflowName: 'advisor' }
+    }
     if (input.script) {
       return { script: input.script, workflowName }
     }

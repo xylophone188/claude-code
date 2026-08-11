@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import React from 'react';
 import { Text } from '@anthropic/ink';
 import { Select } from './CustomSelect/index.js';
@@ -24,19 +25,31 @@ export function ChannelDowngradeDialog({ currentVersion, onChoice }: Props): Rea
   }
 
   return (
-    <Dialog title="Switch to Stable Channel" onCancel={handleCancel} color="permission" hideBorder hideInputGuide>
+    <Dialog
+      title={zh('Switch to Stable Channel', '切换到稳定版频道')}
+      onCancel={handleCancel}
+      color="permission"
+      hideBorder
+      hideInputGuide
+    >
       <Text>
-        The stable channel may have an older version than what you&apos;re currently running ({currentVersion}).
+        {zh(
+          'The stable channel may have an older version than what you are currently running ({currentVersion}).',
+          '稳定版频道可能比你当前运行的版本 ({currentVersion}) 更旧。',
+        )}
       </Text>
-      <Text dimColor>How would you like to handle this?</Text>
+      <Text dimColor>{zh('How would you like to handle this?', '你想怎么处理？')}</Text>
       <Select
         options={[
           {
-            label: 'Allow possible downgrade to stable version',
+            label: zh('Allow possible downgrade to stable version', '允许降级到稳定版'),
             value: 'downgrade' as ChannelDowngradeChoice,
           },
           {
-            label: `Stay on current version (${currentVersion}) until stable catches up`,
+            label: zh(
+              `Stay on current version (${currentVersion}) until stable catches up`,
+              `保持当前版本 (${currentVersion})，直到稳定版追上`,
+            ),
             value: 'stay' as ChannelDowngradeChoice,
           },
         ]}

@@ -4,6 +4,7 @@ import {
   logEvent,
 } from 'src/services/analytics/index.js';
 import { getSettings_DEPRECATED, updateSettingsForSource } from '../utils/settings/settings.js';
+import { zh } from '../utils/i18n.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from '@anthropic/ink';
 import { MCPServerDialogCopy } from './MCPServerDialogCopy.js';
@@ -59,17 +60,27 @@ export function MCPServerApprovalDialog({ serverName, onDone }: Props): React.Re
   }
 
   return (
-    <Dialog title={`New MCP server found in .mcp.json: ${serverName}`} color="warning" onCancel={() => onChange('no')}>
+    <Dialog
+      title={zh(`New MCP server found in .mcp.json: ${serverName}`, `在 .mcp.json 中发现新 MCP 服务器：${serverName}`)}
+      color="warning"
+      onCancel={() => onChange('no')}
+    >
       <MCPServerDialogCopy />
 
       <Select
         options={[
           {
-            label: `Use this and all future MCP servers in this project`,
+            label: zh(`Use this and all future MCP servers in this project`, `使用这个及以后项目中的所有 MCP 服务器`),
             value: 'yes_all',
           },
-          { label: `Use this MCP server`, value: 'yes' },
-          { label: `Continue without using this MCP server`, value: 'no' },
+          {
+            label: zh(`Use this MCP server`, `使用这个 MCP 服务器`),
+            value: 'yes',
+          },
+          {
+            label: zh(`Continue without using this MCP server`, `不使用这个 MCP 服务器继续`),
+            value: 'no',
+          },
         ]}
         onChange={value => onChange(value as 'yes_all' | 'yes' | 'no')}
         onCancel={() => onChange('no')}

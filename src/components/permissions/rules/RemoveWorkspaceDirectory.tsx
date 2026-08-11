@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import * as React from 'react';
 import { useCallback } from 'react';
 import { Select } from '../../../components/CustomSelect/select.js';
@@ -48,13 +49,18 @@ export function RemoveWorkspaceDirectory({
       <Box marginX={2} flexDirection="column">
         <Text bold>{directoryPath}</Text>
       </Box>
-      <Text>Claude Code will no longer have access to files in this directory.</Text>
+      <Text>
+        {zh(
+          'Claude Code will no longer have access to files in this directory.',
+          'Claude Code 将不再能够访问此目录中的文件。',
+        )}
+      </Text>
       <Select
         onChange={handleSelect}
         onCancel={onCancel}
         options={[
           { label: 'Yes', value: 'yes' },
-          { label: 'No', value: 'no' },
+          { label: zh('No', '拒绝'), value: 'no' },
         ]}
       />
     </Dialog>

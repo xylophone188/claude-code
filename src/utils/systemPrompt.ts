@@ -47,14 +47,23 @@ export function buildEffectiveSystemPrompt({
   overrideSystemPrompt,
 }: {
   mainThreadAgentDefinition: AgentDefinition | undefined
-  toolUseContext: Pick<ToolUseContext, 'options'>
+  toolUseContext?: Pick<ToolUseContext, 'options'>
   customSystemPrompt: string | undefined
   defaultSystemPrompt: string[]
   appendSystemPrompt: string | undefined
   overrideSystemPrompt?: string | null
 }): SystemPrompt {
+  const advisorRoutingInstructions =
+    toolUseContext?.options?.mainLoopModel?.trim().toLowerCase() === 'advisor'
+      ? `# Advisor Routing
+
+You are the decision-maker, not the worker. For a task requiring workspace changes, tests, investigation, or implementation, start the Workflow tool with mode="advisor" and args={"task":"<the user's complete task>"}. That workflow runs in the background: advisor-model subagents create the plan, review results, and accept or request one bounded revision; auto-routed subagents do execution. Do not perform the worker task yourself. For a question that needs only judgment or explanation, answer directly.`
+      : undefined
   if (overrideSystemPrompt) {
-    return asSystemPrompt([overrideSystemPrompt])
+    return asSystemPrompt([
+      overrideSystemPrompt,
+      ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
+    ])
   }
   // Coordinator mode: use coordinator prompt instead of default
   // Use inline env check instead of coordinatorModule to avoid circular
@@ -70,6 +79,7 @@ export function buildEffectiveSystemPrompt({
       require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js')
     return asSystemPrompt([
       getCoordinatorSystemPrompt(),
+      ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
       ...(appendSystemPrompt ? [appendSystemPrompt] : []),
     ])
   }
@@ -77,7 +87,7 @@ export function buildEffectiveSystemPrompt({
   const agentSystemPrompt = mainThreadAgentDefinition
     ? isBuiltInAgent(mainThreadAgentDefinition)
       ? mainThreadAgentDefinition.getSystemPrompt({
-          toolUseContext: { options: toolUseContext.options },
+          toolUseContext: { options: toolUseContext!.options },
         })
       : mainThreadAgentDefinition.getSystemPrompt()
     : undefined
@@ -108,6 +118,7 @@ export function buildEffectiveSystemPrompt({
     return asSystemPrompt([
       ...defaultSystemPrompt,
       `\n# Custom Agent Instructions\n${agentSystemPrompt}`,
+      ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
       ...(appendSystemPrompt ? [appendSystemPrompt] : []),
     ])
   }
@@ -118,6 +129,7 @@ export function buildEffectiveSystemPrompt({
       : customSystemPrompt
         ? [customSystemPrompt]
         : defaultSystemPrompt),
+    ...(advisorRoutingInstructions ? [advisorRoutingInstructions] : []),
     ...(appendSystemPrompt ? [appendSystemPrompt] : []),
   ])
 }

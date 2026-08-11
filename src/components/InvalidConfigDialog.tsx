@@ -7,6 +7,7 @@ import { getBaseRenderOptions } from '../utils/renderOptions.js';
 import { jsonStringify, writeFileSync_DEPRECATED } from '../utils/slowOperations.js';
 import type { ThemeName } from '../utils/theme.js';
 import { Select } from './CustomSelect/index.js';
+import { zh } from '../utils/i18n.js';
 
 interface InvalidConfigHandlerProps {
   error: ConfigParseError;
@@ -38,19 +39,21 @@ function InvalidConfigDialog({
   };
 
   return (
-    <Dialog title="Configuration Error" color="error" onCancel={onExit}>
+    <Dialog title={zh('Configuration Error', '配置错误')} color="error" onCancel={onExit}>
       <Box flexDirection="column" gap={1}>
         <Text>
-          The configuration file at <Text bold>{filePath}</Text> contains invalid JSON.
+          {zh('The configuration file at ', '配置文件 ')}
+          <Text bold>{filePath}</Text>
+          {zh(' contains invalid JSON.', ' 包含无效的 JSON。')}
         </Text>
         <Text>{errorDescription}</Text>
       </Box>
       <Box flexDirection="column">
-        <Text bold>Choose an option:</Text>
+        <Text bold>{zh('Choose an option:', '请选择操作：')}</Text>
         <Select
           options={[
-            { label: 'Exit and fix manually', value: 'exit' },
-            { label: 'Reset with default configuration', value: 'reset' },
+            { label: zh('Exit and fix manually', '退出并手动修复'), value: 'exit' },
+            { label: zh('Reset with default configuration', '用默认配置重置'), value: 'reset' },
           ]}
           onChange={handleSelect}
           onCancel={onExit}

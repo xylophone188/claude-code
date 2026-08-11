@@ -13,6 +13,7 @@ import { jsonStringify } from '../../utils/slowOperations.js';
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
 import { Byline, ProgressBar } from '@anthropic/ink';
 import { isEligibleForOverageCreditGrant, OverageCreditUpsell } from '../LogoV2/OverageCreditUpsell.js';
+import { zh } from '../../utils/i18n.js';
 
 type LimitBarProps = {
   title: string;
@@ -29,11 +30,12 @@ function LimitBar({ title, limit, maxWidth, showTimeInReset = true, extraSubtext
   }
 
   // Calculate usage percentage
-  const usedText = `${Math.floor(utilization)}% used`;
+  const usedText = zh(`${Math.floor(utilization)}% used`, `${Math.floor(utilization)}% 已用`);
 
   let subtext: string | undefined;
   if (resets_at) {
-    subtext = `Resets ${formatResetText(resets_at, true, showTimeInReset)}`;
+    const resetText = formatResetText(resets_at, true, showTimeInReset);
+    subtext = zh(`Resets ${resetText}`, `重置时间 ${resetText}`);
   }
 
   if (extraSubtext) {
@@ -105,7 +107,11 @@ export function Usage(): React.ReactNode {
       logError(err as Error);
       const axiosError = err as { response?: { data?: unknown } };
       const responseBody = axiosError.response?.data ? jsonStringify(axiosError.response.data) : undefined;
-      setError(responseBody ? `Failed to load usage data: ${responseBody}` : 'Failed to load usage data');
+      setError(
+        responseBody
+          ? zh(`Failed to load usage data: ${responseBody}`, `加载用量数据失败：${responseBody}`)
+          : zh('Failed to load usage data', '加载用量数据失败'),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -126,11 +132,24 @@ export function Usage(): React.ReactNode {
   if (error) {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text color="error">Error: {error}</Text>
+        <Text color="error">
+          {zh('Error: ', '错误：')}
+          {error}
+        </Text>
         <Text dimColor>
           <Byline>
-            <ConfigurableShortcutHint action="settings:retry" context="Settings" fallback="r" description="retry" />
-            <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />
+            <ConfigurableShortcutHint
+              action="settings:retry"
+              context="Settings"
+              fallback="r"
+              description={zh('retry', '重试')}
+            />
+            <ConfigurableShortcutHint
+              action="confirm:no"
+              context="Settings"
+              fallback="Esc"
+              description={zh('cancel', '取消')}
+            />
           </Byline>
         </Text>
       </Box>
@@ -140,9 +159,14 @@ export function Usage(): React.ReactNode {
   if (!utilization) {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text dimColor>Loading usage data…</Text>
+        <Text dimColor>{zh('Loading usage data…', '加载用量…')}</Text>
         <Text dimColor>
-          <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />
+          <ConfigurableShortcutHint
+            action="confirm:no"
+            context="Settings"
+            fallback="Esc"
+            description={zh('cancel', '取消')}
+          />
         </Text>
       </Box>
     );
@@ -157,17 +181,17 @@ export function Usage(): React.ReactNode {
 
   const limits = [
     {
-      title: 'Current session',
+      title: zh('Current session', '当前会话'),
       limit: utilization.five_hour,
     },
     {
-      title: 'Current week (all models)',
+      title: zh('Current week (all models)', '本周（所有模型）'),
       limit: utilization.seven_day,
     },
     ...(showSonnetBar
       ? [
           {
-            title: 'Current week (Sonnet only)',
+            title: zh('Current week (Sonnet only)', '本周（仅 Sonnet）'),
             limit: utilization.seven_day_sonnet,
           },
         ]
@@ -176,7 +200,9 @@ export function Usage(): React.ReactNode {
 
   return (
     <Box flexDirection="column" gap={1} width="100%">
-      {limits.some(({ limit }) => limit) || <Text dimColor>/usage is only available for subscription plans.</Text>}
+      {limits.some(({ limit }) => limit) || (
+        <Text dimColor>{zh('/usage is only available for subscription plans.', '/usage 仅限订阅方案使用。')}</Text>
+      )}
 
       {limits.map(
         ({ title, limit }) => limit && <LimitBar key={title} title={title} limit={limit} maxWidth={maxWidth} />,
@@ -187,7 +213,12 @@ export function Usage(): React.ReactNode {
       {isEligibleForOverageCreditGrant() && <OverageCreditUpsell maxWidth={maxWidth} />}
 
       <Text dimColor>
-        <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />
+        <ConfigurableShortcutHint
+          action="confirm:no"
+          context="Settings"
+          fallback="Esc"
+          description={zh('cancel', '取消')}
+        />
       </Text>
     </Box>
   );
@@ -198,7 +229,7 @@ type ExtraUsageSectionProps = {
   maxWidth: number;
 };
 
-const EXTRA_USAGE_SECTION_TITLE = 'Extra usage';
+const EXTRA_USAGE_SECTION_TITLE = zh('Extra usage', '额外用量');
 
 function ExtraUsageSection({ extraUsage, maxWidth }: ExtraUsageSectionProps): React.ReactNode {
   const subscriptionType = getSubscriptionType();
@@ -213,7 +244,9 @@ function ExtraUsageSection({ extraUsage, maxWidth }: ExtraUsageSectionProps): Re
       return (
         <Box flexDirection="column">
           <Text bold>{EXTRA_USAGE_SECTION_TITLE}</Text>
-          <Text dimColor>Extra usage not enabled · /extra-usage to enable</Text>
+          <Text dimColor>
+            {zh('Extra usage not enabled · /extra-usage to enable', '额外用量未启用 • /extra-usage 启用')}
+          </Text>
         </Box>
       );
     }
@@ -225,7 +258,7 @@ function ExtraUsageSection({ extraUsage, maxWidth }: ExtraUsageSectionProps): Re
     return (
       <Box flexDirection="column">
         <Text bold>{EXTRA_USAGE_SECTION_TITLE}</Text>
-        <Text dimColor>Unlimited</Text>
+        <Text dimColor>{zh('Unlimited', '无限制')}</Text>
       </Box>
     );
   }
@@ -248,7 +281,10 @@ function ExtraUsageSection({ extraUsage, maxWidth }: ExtraUsageSectionProps): Re
         resets_at: oneMonthReset.toISOString(),
       }}
       showTimeInReset={false}
-      extraSubtext={`${formattedUsedCredits} / ${formattedMonthlyLimit} spent`}
+      extraSubtext={zh(
+        `${formattedUsedCredits} / ${formattedMonthlyLimit} spent`,
+        `${formattedUsedCredits} / ${formattedMonthlyLimit} 已用`,
+      )}
       maxWidth={maxWidth}
     />
   );

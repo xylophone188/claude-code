@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import chalk from 'chalk';
 import figures from 'figures';
 import * as React from 'react';
@@ -84,9 +85,13 @@ function RuleDetails({
   const footer = (
     <Box marginLeft={3}>
       {exitState.pending ? (
-        <Text dimColor>Press {exitState.keyName} again to exit</Text>
+        <Text dimColor>
+          {zh('Press ', '再次按 ')}
+          {exitState.keyName}
+          {zh(' again to exit', ' 退出')}
+        </Text>
       ) : (
-        <Text dimColor>Esc to cancel</Text>
+        <Text dimColor>{zh('Esc to cancel', 'Esc 取消')}</Text>
       )}
     </Box>
   );
@@ -125,7 +130,7 @@ function RuleDetails({
           Delete {getRuleBehaviorLabel(rule.ruleBehavior)} tool?
         </Text>
         {ruleDescription}
-        <Text>Are you sure you want to delete this permission rule?</Text>
+        <Text>{zh('Are you sure you want to delete this permission rule?', '确定要删除此权限规则吗？')}</Text>
         <Select
           onChange={_ => (_ === 'yes' ? onDelete() : onCancel())}
           onCancel={onCancel}
@@ -684,7 +689,11 @@ export function PermissionRuleList({ onExit, initialTab, onRetryDenials }: Props
         <Box marginTop={1} paddingLeft={1}>
           <Text dimColor>
             {exitState.pending ? (
-              <>Press {exitState.keyName} again to exit</>
+              <>
+                {zh('Press ', '再次按 ')}
+                {exitState.keyName}
+                {zh(' again to exit', ' 退出')}
+              </>
             ) : headerFocused ? (
               <>←/→ tab switch · ↓ return · Esc cancel</>
             ) : isSearchMode ? (

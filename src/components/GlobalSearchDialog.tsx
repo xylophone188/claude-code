@@ -1,3 +1,4 @@
+import { zh } from '../utils/i18n.js';
 import { resolve as resolvePath } from 'path';
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -213,12 +214,17 @@ export function GlobalSearchDialog({ onDone, onInsert }: Props): React.ReactNode
   // Always pass a non-empty string so the line is reserved — prevents the
   // searchBox from bouncing when the count appears/disappears.
   const matchLabel =
-    matches.length > 0 ? `${matches.length}${truncated ? '+' : ''} matches${isSearching ? '…' : ''}` : ' ';
+    matches.length > 0
+      ? zh(
+          `${matches.length}${truncated ? '+' : ''} matches${isSearching ? '…' : ''}`,
+          `${matches.length}${truncated ? '+' : ''} 个匹配${isSearching ? '…' : ''}`,
+        )
+      : ' ';
 
   return (
     <FuzzyPicker
-      title="Global Search"
-      placeholder="Type to search…"
+      title={zh('Global Search', '全局搜索')}
+      placeholder={zh('Type to search…', '输入以搜索…')}
       items={matches}
       getKey={matchKey}
       visibleCount={visibleResults}
@@ -227,15 +233,21 @@ export function GlobalSearchDialog({ onDone, onInsert }: Props): React.ReactNode
       onQueryChange={handleQueryChange}
       onFocus={m => setFocused(m)}
       onSelect={handleOpen}
-      onTab={{ action: 'mention', handler: m => handleInsert(m, true) }}
+      onTab={{ action: zh('mention', '提及'), handler: m => handleInsert(m, true) }}
       onShiftTab={{
-        action: 'insert path',
+        action: zh('insert path', '插入路径'),
         handler: m => handleInsert(m, false),
       }}
       onCancel={onDone}
-      emptyMessage={q => (isSearching ? 'Searching…' : q ? 'No matches' : 'Type to search…')}
+      emptyMessage={q =>
+        isSearching
+          ? zh('Searching…', '正在搜索…')
+          : q
+            ? zh('No matches', '无匹配结果')
+            : zh('Type to search…', '输入以搜索…')
+      }
       matchLabel={matchLabel}
-      selectAction="open in editor"
+      selectAction={zh('open in editor', '在编辑器中打开')}
       renderItem={(m, isFocused) => (
         <Text color={isFocused ? 'suggestion' : undefined}>
           <Text dimColor>
@@ -255,7 +267,7 @@ export function GlobalSearchDialog({ onDone, onInsert }: Props): React.ReactNode
             ))}
           </>
         ) : (
-          <LoadingState message="Loading…" dimColor />
+          <LoadingState message={zh('Loading…', '正在加载…')} dimColor />
         )
       }
     />

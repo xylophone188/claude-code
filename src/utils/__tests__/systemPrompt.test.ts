@@ -20,6 +20,13 @@ describe('buildEffectiveSystemPrompt', () => {
     expect(Array.from(result)).toEqual(defaultPrompt)
   })
 
+  test('advisor model receives workflow delegation instructions', () => {
+    const result = buildPrompt({
+      toolUseContext: { options: { mainLoopModel: 'advisor' } as any },
+    })
+    expect(Array.from(result).join('\n')).toContain('mode="advisor"')
+  })
+
   test('overrideSystemPrompt replaces everything', () => {
     const result = buildPrompt({ overrideSystemPrompt: 'override' })
     expect(Array.from(result)).toEqual(['override'])

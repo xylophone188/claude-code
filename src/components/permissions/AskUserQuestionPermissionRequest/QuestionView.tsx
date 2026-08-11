@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import figures from 'figures';
 import React, { useCallback, useState } from 'react';
 import { type KeyboardEvent, Box, Text } from '@anthropic/ink';
@@ -318,7 +319,14 @@ export function QuestionView({
               ) : (
                 'Tab/Arrow keys to navigate'
               )}
-              {isOtherFocused && editorName && <> · ctrl+g to edit in {editorName}</>} · Esc to cancel
+              {isOtherFocused && editorName && (
+                <>
+                  {' '}
+                  · {zh('ctrl+g to edit in', '按 ctrl+g 在')} {editorName}
+                  {zh('', '中编辑')}
+                </>
+              )}{' '}
+              · {zh('Esc to cancel', 'Esc 取消')}
             </Text>
           </Box>
         </Box>

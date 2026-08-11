@@ -74,6 +74,34 @@ test('call returns launch message and completes in background', async () => {
   }
 })
 
+test('advisor mode starts the built-in plan, execute, review workflow', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-tool-'))
+  try {
+    const { ports } = mockPorts(dir, new Map())
+    const tool = createWorkflowTool(ports)
+    const res = await tool.call(
+      { mode: 'advisor', args: { task: 'fix it' } },
+      undefined,
+      undefined,
+      undefined,
+    )
+    expect(res.data.output).toContain('workflow: advisor')
+    expect(tool.renderToolUseMessage({ mode: 'advisor' })).toBe(
+      'Workflow: advisor',
+    )
+    const script = await readFile(
+      join(dir, '.claude', 'workflow-runs', 'run-x', 'script.js'),
+      'utf-8',
+    )
+    expect(script).toContain("model: 'advisor'")
+    expect(script).toContain("model: 'auto'")
+    expect(script).toContain("agentType: 'workflow-advisor'")
+    expect(script).toContain("phase('Acceptance')")
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('inline script persists to run directory, returns real scriptPath', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'wf-tool-'))
   try {

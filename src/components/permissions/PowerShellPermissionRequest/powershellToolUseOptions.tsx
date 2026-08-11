@@ -1,3 +1,4 @@
+import { zh } from '../../../utils/i18n.js';
 import { POWERSHELL_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/PowerShellTool/toolName.js';
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js';
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
@@ -60,7 +61,7 @@ export function powershellToolUseOptions({
         type: 'input',
         label: 'Yes, and don\u2019t ask again for',
         value: 'yes-prefix-edited',
-        placeholder: 'command prefix (e.g., Get-Process:*)',
+        placeholder: zh('command prefix (e.g., Get-Process:*)', '命令前缀（例如 Get-Process:*）'),
         initialValue: editablePrefix,
         onChange: onEditablePrefixChange,
         allowEmptySubmitToCancel: true,

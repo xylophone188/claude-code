@@ -106,11 +106,43 @@ test('advisor workflow always performs final acceptance', async () => {
       if (params.label === 'advisor:plan') {
         return {
           kind: 'ok',
-          output: { plan: 'do work', acceptance: ['test passes'] },
+          output: {
+            plan: 'do work',
+            acceptance: ['test passes'],
+            subtasks: [
+              {
+                title: 'inspect',
+                kind: 'local-code',
+                prompt: 'inspect workspace',
+              },
+            ],
+          },
           usage: { outputTokens: 1 },
         }
       }
-      if (params.label === 'advisor:review') {
+      if (params.label?.startsWith('auto:worker:')) {
+        return {
+          kind: 'ok',
+          output: {
+            status: 'complete',
+            summary: 'Inspected the workspace and found the required change.',
+            evidence: ['src/example.ts'],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'auto:lead') {
+        return {
+          kind: 'ok',
+          output: {
+            accepted: true,
+            brief: 'Apply the required change.',
+            gaps: [],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'auto:review') {
         return {
           kind: 'ok',
           output: { accepted: true, revisions: [], summary: 'looks good' },
@@ -139,8 +171,10 @@ test('advisor workflow always performs final acceptance', async () => {
     expect(result.status).toBe('completed')
     expect(calls).toEqual([
       'advisor:plan',
+      'auto:worker:1',
+      'auto:lead',
       'auto:execute',
-      'advisor:review',
+      'auto:review',
       'advisor:accept',
     ])
   } finally {
@@ -158,7 +192,39 @@ test('advisor workflow stops when execution does not complete', async () => {
       if (params.label === 'advisor:plan') {
         return {
           kind: 'ok',
-          output: { plan: 'do work', acceptance: ['test passes'] },
+          output: {
+            plan: 'do work',
+            acceptance: ['test passes'],
+            subtasks: [
+              {
+                title: 'inspect',
+                kind: 'local-code',
+                prompt: 'inspect workspace',
+              },
+            ],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label?.startsWith('auto:worker:')) {
+        return {
+          kind: 'ok',
+          output: {
+            status: 'complete',
+            summary: 'Inspected the workspace and found the required change.',
+            evidence: ['src/example.ts'],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'auto:lead') {
+        return {
+          kind: 'ok',
+          output: {
+            accepted: true,
+            brief: 'Apply the required change.',
+            gaps: [],
+          },
           usage: { outputTokens: 1 },
         }
       }
@@ -176,7 +242,60 @@ test('advisor workflow stops when execution does not complete', async () => {
     })
     expect(result.status).toBe('failed')
     expect(result.error).toMatch(/auto execution did not complete/)
-    expect(calls).not.toContain('advisor:review')
+    expect(calls).not.toContain('auto:review')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('advisor workflow rejects empty worker results', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
+  try {
+    const calls: string[] = []
+    const ports = portsWith(dir, new Map())
+    ports.agentRunner.runAgentToResult = async params => {
+      calls.push(params.label ?? '')
+      if (params.label === 'advisor:plan') {
+        return {
+          kind: 'ok',
+          output: {
+            plan: 'do work',
+            acceptance: ['test passes'],
+            subtasks: [
+              {
+                title: 'inspect',
+                kind: 'local-code',
+                prompt: 'inspect workspace',
+              },
+            ],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label?.startsWith('auto:worker:')) {
+        return {
+          kind: 'ok',
+          output: { status: 'complete', summary: '', evidence: [] },
+          usage: { outputTokens: 1 },
+        }
+      }
+      return { kind: 'dead' }
+    }
+
+    const result = await runWorkflow({
+      script: createAdvisorWorkflowScript(),
+      args: { task: 'fix it' },
+      runId: 'advisor-empty-worker',
+      ports,
+      host: createHostHandle(null),
+      signal: new AbortController().signal,
+      cwd: dir,
+      budgetTotal: null,
+    })
+
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/valid result/)
+    expect(calls).toEqual(['advisor:plan', 'auto:worker:1'])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -190,11 +309,43 @@ test('advisor workflow fails when final acceptance rejects', async () => {
       if (params.label === 'advisor:plan') {
         return {
           kind: 'ok',
-          output: { plan: 'do work', acceptance: ['test passes'] },
+          output: {
+            plan: 'do work',
+            acceptance: ['test passes'],
+            subtasks: [
+              {
+                title: 'inspect',
+                kind: 'local-code',
+                prompt: 'inspect workspace',
+              },
+            ],
+          },
           usage: { outputTokens: 1 },
         }
       }
-      if (params.label === 'advisor:review') {
+      if (params.label?.startsWith('auto:worker:')) {
+        return {
+          kind: 'ok',
+          output: {
+            status: 'complete',
+            summary: 'Inspected the workspace and found the required change.',
+            evidence: ['src/example.ts'],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'auto:lead') {
+        return {
+          kind: 'ok',
+          output: {
+            accepted: true,
+            brief: 'Apply the required change.',
+            gaps: [],
+          },
+          usage: { outputTokens: 1 },
+        }
+      }
+      if (params.label === 'auto:review') {
         return {
           kind: 'ok',
           output: { accepted: true, revisions: [], summary: 'looks good' },

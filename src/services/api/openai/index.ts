@@ -223,8 +223,21 @@ const OPENCODE_FREE_MODEL = 'deepseek-v4-flash-free'
 const OPENCODE_FREE_RETRIES = 11 // 1 initial + 10 immediate retries
 const DIRECT_ROUTE_RETRIES = 11 // 1 initial + 10 retries for transient upstream failures
 const ADVISOR_AUTO_MAX_TOKENS = 8_192
+const AUTO_TIER_TTFS_TIMEOUT_MS = [
+  4_000, 8_000, 12_000, 16_000, 20_000, 24_000,
+] as const
+
+export function autoTierTtfsTimeoutMs(level: number): number {
+  return (
+    AUTO_TIER_TTFS_TIMEOUT_MS[
+      Math.min(Math.max(level, 1), AUTO_TIER_TTFS_TIMEOUT_MS.length) - 1
+    ] ?? AUTO_TIER_TTFS_TIMEOUT_MS[5]
+  )
+}
+
 const AUTO_L1_RACE_TIMEOUT_MS =
-  Number(process.env.CCB_AUTO_L1_RACE_TIMEOUT_MS) || 45_000
+  Number(process.env.CCB_AUTO_L1_RACE_TIMEOUT_MS) ||
+  AUTO_TIER_TTFS_TIMEOUT_MS[0]
 /**
  * How many L1 contenders must return a meaningful first response before the
  * race decides. Once the quorum is met we stop the rest immediately and pick
@@ -399,6 +412,7 @@ export async function* retryDirectProviderStream(
     route: DirectRoute,
   ) => Promise<AsyncIterable<ChatCompletionChunk>>,
   signal: AbortSignal,
+  onFirstMeaningful?: () => void,
 ): AsyncGenerator<ChatCompletionChunk, void> {
   let lastError: unknown
   const skippedProviders = new Set<string>()
@@ -429,7 +443,11 @@ export async function* retryDirectProviderStream(
         const streamText = { text: '' }
         for await (const event of await createStream(route)) {
           events.push(event)
-          meaningful ||= isMeaningfulOpenAIEvent(event)
+          const eventMeaningful = isMeaningfulOpenAIEvent(event)
+          if (!meaningful && eventMeaningful) {
+            meaningful = true
+            onFirstMeaningful?.()
+          }
           throwIfUpstreamBlocked(event, streamText)
         }
         if (!meaningful)
@@ -500,6 +518,41 @@ export async function* retryDirectProviderStream(
           markAccountFailure(route.providerId, route.accountId)
         break
       }
+    }
+  }
+  throw lastError ?? new Error('all direct providers failed')
+}
+
+export async function* retryTierDirectProviderStream(
+  routes: DirectRoute[],
+  timeoutMs: number,
+  createStream: (
+    route: DirectRoute,
+    signal: AbortSignal,
+  ) => Promise<AsyncIterable<ChatCompletionChunk>>,
+  signal: AbortSignal,
+): AsyncGenerator<ChatCompletionChunk, void> {
+  let lastError: unknown
+  for (const route of routes) {
+    const attemptController = new AbortController()
+    const abortAttempt = () => attemptController.abort()
+    signal.addEventListener('abort', abortAttempt, { once: true })
+    const timeout = setTimeout(abortAttempt, timeoutMs)
+    try {
+      yield* retryDirectProviderStream(
+        [route],
+        current => createStream(current, attemptController.signal),
+        attemptController.signal,
+        () => clearTimeout(timeout),
+      )
+      return
+    } catch (error) {
+      if (signal.aborted) throw error
+      lastError = error
+    } finally {
+      clearTimeout(timeout)
+      signal.removeEventListener('abort', abortAttempt)
+      abortAttempt()
     }
   }
   throw lastError ?? new Error('all direct providers failed')
@@ -908,11 +961,12 @@ async function* raceThenFallbackStream(
         level++
         continue
       }
+      const timeoutMs = autoTierTtfsTimeoutMs(level)
       if (!l1TimedOut)
         routeError(`auto L${level - 1} exhausted; entering L${level} pool`, {
           l1: (l1Group ?? []).length,
           [`l${level}`]: group.length,
-          timeoutMs: AUTO_L1_RACE_TIMEOUT_MS,
+          timeoutMs,
         })
       try {
         yield* retryDirectProviderStream(

@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions/completions.mjs'
 import {
+  autoTierTtfsTimeoutMs,
   raceDirectProviderStream,
+  retryTierDirectProviderStream,
   retryDirectProviderStream,
   retryOpencodeFreeStream,
 } from '../index.js'
@@ -284,4 +286,77 @@ test('does not wait for a delayed extra contender once the quorum is satisfied',
     (events[0] as unknown as { choices: [{ delta: { content: string } }] })
       .choices[0].delta.content,
   ).toBe('bbbbb')
+})
+
+test('uses CCB tier TTFS budgets', () => {
+  expect([1, 2, 3, 4, 5, 6].map(autoTierTtfsTimeoutMs)).toEqual([
+    4_000, 8_000, 12_000, 16_000, 20_000, 24_000,
+  ])
+})
+
+test('continues within a tier after TTFS timeout', async () => {
+  const route = (model: string): DirectRoute => ({
+    providerId: 'tier-timeout',
+    baseURL: 'https://example.test/v1',
+    model,
+    apiKey: 'test',
+    kind: 'provider',
+  })
+  const slow = route('slow')
+  const fast = route('fast')
+  const calls: string[] = []
+  const events = await Array.fromAsync(
+    retryTierDirectProviderStream(
+      [slow, fast],
+      10,
+      async (current, signal) => {
+        calls.push(current.model)
+        if (current === slow)
+          return {
+            async *[Symbol.asyncIterator]() {
+              await new Promise<void>((_, reject) =>
+                signal.addEventListener(
+                  'abort',
+                  () => reject(new Error('aborted')),
+                  {
+                    once: true,
+                  },
+                ),
+              )
+            },
+          }
+        return streamOf(textChunk('ok'))
+      },
+      new AbortController().signal,
+    ),
+  )
+
+  expect(calls).toEqual(['slow', 'fast'])
+  expect(events).toHaveLength(1)
+})
+
+test('keeps valid stream after TTFS arrives', async () => {
+  const route: DirectRoute = {
+    providerId: 'tier-ttfs',
+    baseURL: 'https://example.test/v1',
+    model: 'model',
+    apiKey: 'test',
+    kind: 'provider',
+  }
+  const events = await Array.fromAsync(
+    retryTierDirectProviderStream(
+      [route],
+      10,
+      async () => ({
+        async *[Symbol.asyncIterator]() {
+          yield textChunk('ok')
+          await new Promise(resolve => setTimeout(resolve, 30))
+          yield finishChunk
+        },
+      }),
+      new AbortController().signal,
+    ),
+  )
+
+  expect(events).toHaveLength(2)
 })

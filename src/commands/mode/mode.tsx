@@ -55,8 +55,21 @@ function ModePicker({ onDone }: { onDone: LocalJSXCommandOnDone }) {
   );
 }
 
+const WORKFLOW_ALIASES: Record<string, string> = {
+  code: 'default',
+  implement: 'workhorse',
+  debug: 'sharp',
+  review: 'sharp',
+  fast: 'token-saver',
+};
+
+export function resolveWorkflowMode(slug: string): string {
+  return WORKFLOW_ALIASES[slug] ?? slug;
+}
+
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
-  const slug = args?.trim().toLowerCase();
+  const requestedSlug = args?.trim().toLowerCase();
+  const slug = requestedSlug ? resolveWorkflowMode(requestedSlug) : undefined;
 
   if (slug) {
     const modes = listModes();

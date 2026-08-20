@@ -266,6 +266,7 @@ export interface OmniRouteReceipt {
   latencyMs?: number
   fallbackAttempts?: number
   compression?: string
+  decision?: string
 }
 
 let lastOmniRouteReceipt: OmniRouteReceipt | null = null
@@ -285,6 +286,7 @@ export function parseOmniRouteReceipt(
     latencyMs: number('x-omniroute-latency-ms'),
     fallbackAttempts: number('x-omniroute-fallback-attempts'),
     compression: value('x-omniroute-compression'),
+    decision: value('x-omniroute-decision'),
   }
   if (!Object.values(receipt).some(v => v !== undefined)) return null
   lastOmniRouteReceipt = receipt

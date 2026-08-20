@@ -11,6 +11,7 @@ describe('OmniRoute receipt', () => {
         'X-OmniRoute-Latency-Ms': '321',
         'X-OmniRoute-Fallback-Attempts': '2',
         'X-OmniRoute-Compression': 'gateway-cache',
+        'X-OmniRoute-Decision': 'strategy=single; provider=glm',
       }),
     )
     expect(receipt).toEqual({
@@ -20,6 +21,7 @@ describe('OmniRoute receipt', () => {
       latencyMs: 321,
       fallbackAttempts: 2,
       compression: 'gateway-cache',
+      decision: 'strategy=single; provider=glm',
     })
     expect(getLastOmniRouteReceipt()).toEqual(receipt)
   })

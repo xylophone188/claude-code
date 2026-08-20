@@ -899,6 +899,7 @@ export function setCostStateForRestore({
 
 // Only used in tests
 export function resetStateForTests(): void {
+  // Only allow in NODE_ENV=test to prevent accidental production state corruption
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('resetStateForTests can only be called in tests')
   }

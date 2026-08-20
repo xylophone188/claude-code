@@ -7,8 +7,10 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { findProvider } from '../providerRegistry/loader.js'
-import { chooseAccounts } from '../ccbRouter/accountPool.js'
-import { getRaceMetricPreferences } from '../ccbRouter/raceMetrics.js'
+import {
+  chooseAccounts,
+  getRaceMetricPreferences,
+} from '../omniroute/adapter.js'
 import { routeLog, routeError } from './stageLog.js'
 import { fetchCodeBuddyQuota } from './usage/codebuddy.js'
 
@@ -596,6 +598,19 @@ export async function refreshAutoHealth(): Promise<void> {
 }
 
 async function refreshAutoHealthOnce(): Promise<void> {
+  // Routing/health/quota belong to OmniRoute when server-side routing is on.
+  // CCB remains a client; probing upstreams here duplicates traffic and can
+  // disagree with the gateway's account/circuit state.
+  if (process.env.OMNIROUTE_SERVER_ROUTING !== '0') {
+    probeCache = {
+      ts: Date.now(),
+      health: new Map(),
+      latency: new Map(),
+      quota: new Map(),
+    }
+    routeLog('probe', 'refresh delegated to OmniRoute')
+    return
+  }
   await refreshOpenCodeModels()
   const probes = await buildProbes(getAutoCandidates())
   if (!probes.length) {

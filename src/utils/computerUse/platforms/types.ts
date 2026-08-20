@@ -69,6 +69,8 @@ export interface InputPlatform {
   keys(combo: string[]): Promise<void>
   scroll(amount: number, direction: 'vertical' | 'horizontal'): Promise<void>
   mouseLocation(): Promise<{ x: number; y: number }>
+  mouseDown?(): Promise<void>
+  mouseUp?(): Promise<void>
 
   // --- Mode B: Window-bound input (Windows only, optional) ---
   sendChar?(hwnd: string, char: string): Promise<void>

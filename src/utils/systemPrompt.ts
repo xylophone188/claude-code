@@ -8,10 +8,6 @@ import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/Agen
 import { isBuiltInAgent } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
 import { isEnvTruthy } from './envUtils.js'
 import { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
-import { getCavemanInstructions } from '../commands/caveman/cavemanMode.js'
-import { getPonytailInstructions } from '../commands/ponytail/ponytailMode.js'
-import { getRtkInstructions } from '../commands/rtk/rtkMode.js'
-
 export { asSystemPrompt, type SystemPrompt } from './systemPromptType.js'
 
 const proactiveModule =
@@ -19,19 +15,34 @@ const proactiveModule =
     ? (require('../proactive/index.js') as typeof import('../proactive/index.js'))
     : null
 
-/* eslint-enable @typescript-eslint/no-require-imports */
+/**
+ * Conditionally load the mode-instruction modules behind their feature flags.
+ * Static imports would force the heavy command modules into every process
+ * even when the feature is off; loading lazily keeps the default path lean.
+ */
+function getModeInstructions(): string | undefined {
+  const parts: Array<string | undefined> = []
+  if (feature('CAVEMAN')) {
+    const { getCavemanInstructions } =
+      require('../commands/caveman/cavemanMode.js') as typeof import('../commands/caveman/cavemanMode.js')
+    parts.push(getCavemanInstructions())
+  }
+  if (feature('PONYTAIL')) {
+    const { getPonytailInstructions } =
+      require('../commands/ponytail/ponytailMode.js') as typeof import('../commands/ponytail/ponytailMode.js')
+    parts.push(getPonytailInstructions())
+  }
+  if (feature('RTK')) {
+    const { getRtkInstructions } =
+      require('../commands/rtk/rtkMode.js') as typeof import('../commands/rtk/rtkMode.js')
+    parts.push(getRtkInstructions())
+  }
+  const present = parts.filter((p): p is string => Boolean(p))
+  return present.length ? present.join('\n\n') : undefined
+}
 
 function isProactiveActive_SAFE_TO_CALL_ANYWHERE(): boolean {
   return proactiveModule?.isProactiveActive() ?? false
-}
-
-function getModeInstructions(): string | undefined {
-  const parts = [
-    getCavemanInstructions(),
-    getPonytailInstructions(),
-    getRtkInstructions(),
-  ].filter((p): p is string => Boolean(p))
-  return parts.length ? parts.join('\n\n') : undefined
 }
 
 export function buildEffectiveSystemPrompt({

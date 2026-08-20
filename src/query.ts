@@ -235,6 +235,19 @@ function getAutonomyTurnOutcome(params: {
   }
 }
 
+export const DEFAULT_MAIN_THREAD_MAX_TURNS = 500
+export const DEFAULT_SUBAGENT_MAX_TURNS = 50
+
+export function resolveMaxTurns(
+  explicitMaxTurns: number | undefined,
+  hasAgentId: boolean,
+): number {
+  return (
+    explicitMaxTurns ??
+    (hasAgentId ? DEFAULT_SUBAGENT_MAX_TURNS : DEFAULT_MAIN_THREAD_MAX_TURNS)
+  )
+}
+
 export type QueryParams = {
   messages: Message[]
   systemPrompt: SystemPrompt
@@ -312,13 +325,20 @@ export async function* query(
         toolUseContext: { ...params.toolUseContext, langfuseTrace },
       }
     : params
+  const requestParams: QueryParams = {
+    ...paramsWithTrace,
+    maxTurns: resolveMaxTurns(
+      params.maxTurns,
+      params.toolUseContext.agentId !== undefined,
+    ),
+  }
 
   let terminal: Terminal | undefined
   let didThrow = false
   let thrownError: unknown
   try {
     terminal = yield* queryLoop(
-      paramsWithTrace,
+      requestParams,
       consumedCommandUuids,
       consumedAutonomyCommands,
     )

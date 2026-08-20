@@ -5886,7 +5886,7 @@ export function REPL({
         {transcriptScrollRef ? (
           <FullscreenLayout
             scrollRef={scrollRef}
-            sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel columns={transcriptCols} /> : undefined}
+            sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel /> : undefined}
             scrollable={
               <>
                 {transcriptMessagesElement}
@@ -6078,7 +6078,7 @@ export function REPL({
       <MCPConnectionManager key={remountKey} dynamicMcpConfig={dynamicMcpConfig} isStrictMcpConfig={strictMcpConfig}>
         <FullscreenLayout
           scrollRef={scrollRef}
-          sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel columns={transcriptCols} /> : undefined}
+          sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel /> : undefined}
           overlay={toolPermissionOverlay}
           bottomFloat={
             feature('BUDDY') && companionVisible && !companionNarrow ? <CompanionFloatingBubble /> : undefined

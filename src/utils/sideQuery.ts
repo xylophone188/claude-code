@@ -41,12 +41,12 @@ import {
 import {
   resolveDirectRoutes,
   type DirectRoute,
-} from '../services/ccbRouter/directRouter.js'
+} from '../services/omniroute/adapter.js'
 import {
   clearAccountFailure,
   markAccountFailure,
   waitForProviderRequestSlot,
-} from '../services/ccbRouter/accountPool.js'
+} from '../services/omniroute/adapter.js'
 import { applyCompatRule } from '../services/providerRegistry/providerCompatMatrix.js'
 import {
   matchUpstreamCustomError,
@@ -680,10 +680,10 @@ async function sideQueryViaOpenAICompatible(
   const directRoutes = resolveDirectRoutes(normalizedModel)
   const isLocalCodexAdvisor =
     isChatGPTAuthMode() && /^(?:ccb\/)?advisor$/i.test(normalizedModel)
+  // Native Codex remains the primary advisor path. OmniRoute supplies only the
+  // fallback route, so an unavailable subscription cannot halt the session.
   const fallbackRoutes = isLocalCodexAdvisor
-    ? directRoutes.filter(
-        route => route.providerId !== '__ccb_local_codex_advisor__',
-      )
+    ? resolveDirectRoutes('auto')
     : directRoutes
   const directRoute = fallbackRoutes[0]
   const isOpencodeRoute =

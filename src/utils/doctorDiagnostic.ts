@@ -539,6 +539,37 @@ export function detectLinuxGlobPatternWarnings(): Array<{
   return warnings
 }
 
+export function detectAutomationDependencies(): Array<{
+  issue: string
+  fix: string
+}> {
+  if (getPlatform() !== 'linux') return []
+
+  const warnings: Array<{ issue: string; fix: string }> = []
+  const cuDeps: Array<{ cmd: string; desc: string }> = [
+    { cmd: 'xdotool', desc: 'Mouse/keyboard input' },
+    { cmd: 'scrot', desc: 'Screenshots' },
+    { cmd: 'xrandr', desc: 'Display detection' },
+    { cmd: 'wmctrl', desc: 'Window management' },
+    { cmd: 'xclip', desc: 'Clipboard' },
+  ]
+  const missing = cuDeps.filter(d => {
+    const r = Bun.spawnSync({
+      cmd: ['which', d.cmd],
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    return r.exitCode !== 0
+  })
+  if (missing.length > 0) {
+    warnings.push({
+      issue: `Missing Linux Computer Use dependencies: ${missing.map(d => d.cmd).join(', ')}`,
+      fix: `Install: sudo apt-get install ${missing.map(d => d.cmd).join(' ')}`,
+    })
+  }
+  return warnings
+}
+
 export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
   const installationType = await getCurrentInstallationType()
   const version =
@@ -550,6 +581,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
 
   // Add glob pattern warnings for Linux sandboxing
   warnings.push(...detectLinuxGlobPatternWarnings())
+  warnings.push(...detectAutomationDependencies())
 
   // Add warnings for leftover npm installations when running native
   if (installationType === 'native') {

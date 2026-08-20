@@ -206,6 +206,8 @@ export async function getAutonomyCommandText(
   options?: {
     enqueueInMemory?: boolean
     removeQueuedInMemory?: boolean
+    rootDir?: string
+    startL5Supervisor?: boolean
   },
 ): Promise<string> {
   const parsed = parseAutonomyArgs(args)
@@ -227,6 +229,43 @@ export async function getAutonomyCommandText(
       return resumeAutonomyFlowText(parsed.flowId, {
         enqueueInMemory: options?.enqueueInMemory,
       })
+    case 'l5': {
+      const { readL5State, onL5, pauseL5, resumeL5, offL5, buildL5StatusText } =
+        await import('../../utils/autonomyL5.js')
+      if (parsed.action === 'status') {
+        const state = readL5State(options?.rootDir)
+        return buildL5StatusText(state)
+      }
+      if (parsed.action === 'on') {
+        const state = onL5(options?.rootDir)
+        if (options?.startL5Supervisor !== false) {
+          const { ensureAutonomyL5Supervisor } = await import(
+            '../../utils/autonomyL5.js'
+          )
+          ensureAutonomyL5Supervisor(state.rootDir)
+        }
+        return `L5 enabled. Status: ${state.status}\n${buildL5StatusText(state)}`
+      }
+      if (parsed.action === 'pause') {
+        const state = pauseL5(options?.rootDir)
+        return `L5 paused.\n${buildL5StatusText(state)}`
+      }
+      if (parsed.action === 'resume') {
+        const state = resumeL5(options?.rootDir)
+        if (options?.startL5Supervisor !== false) {
+          const { ensureAutonomyL5Supervisor } = await import(
+            '../../utils/autonomyL5.js'
+          )
+          ensureAutonomyL5Supervisor(state.rootDir)
+        }
+        return `L5 resumed. Status: ${state.status}\n${buildL5StatusText(state)}`
+      }
+      if (parsed.action === 'off') {
+        const state = offL5(options?.rootDir)
+        return `L5 disabled.\n${buildL5StatusText(state)}`
+      }
+      return AUTONOMY_USAGE
+    }
     case 'usage':
       return AUTONOMY_USAGE
   }

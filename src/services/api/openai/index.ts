@@ -37,7 +37,7 @@ import { getOpenAIClient } from './client.js'
 import {
   resolveDirectRoutes,
   type DirectRoute,
-} from '../../ccbRouter/directRouter.js'
+} from '../../omniroute/adapter.js'
 import {
   clearAccountFailure,
   clearModelFailure,
@@ -47,8 +47,13 @@ import {
   markModelFailure,
   markProviderFailure,
   waitForProviderRequestSlot,
-} from '../../ccbRouter/accountPool.js'
-import { recordRaceMetric } from '../../ccbRouter/raceMetrics.js'
+} from '../../omniroute/adapter.js'
+import {
+  classifyErrorStatus,
+  recordRaceMetric,
+  setActiveCcbRoute,
+} from '../../omniroute/adapter.js'
+import { classifyError } from '../../omniroute/adapter.js'
 import { fuseAnswers, type PanelAnswer } from '../../routing/fusion.js'
 import {
   invalidateOpenCodeModelsCache,
@@ -423,11 +428,8 @@ export async function* retryOpencodeFreeStream(
 }
 
 function routeFailureScope(error: unknown): 'provider' | 'model' | 'account' {
-  if (error instanceof ProviderOutputError) return 'model'
-  const status = (error as { status?: number } | undefined)?.status
-  if (status === undefined || status >= 500) return 'provider'
-  if (status >= 400 && ![401, 403, 429].includes(status)) return 'model'
-  return 'account'
+  const { scope } = classifyError(error)
+  return scope
 }
 
 export async function* retryDirectProviderStream(
@@ -441,13 +443,18 @@ export async function* retryDirectProviderStream(
   let lastError: unknown
   const skippedProviders = new Set<string>()
   const skippedModels = new Set<string>()
+  const skippedAccounts = new Set<string>()
   for (const route of routes) {
     const modelKey = `${route.providerId}/${route.model}`
+    const accountKey = route.accountId
+      ? `${route.providerId}/${route.accountId}`
+      : undefined
     if (
       skippedProviders.has(route.providerId) ||
       isProviderFailure(route.providerId) ||
       skippedModels.has(modelKey) ||
-      isModelFailure(route.providerId, route.model)
+      isModelFailure(route.providerId, route.model) ||
+      (accountKey && skippedAccounts.has(accountKey))
     )
       continue
     throwIfAborted(signal)
@@ -470,6 +477,7 @@ export async function* retryDirectProviderStream(
           const eventMeaningful = isMeaningfulOpenAIEvent(event)
           if (!meaningful && eventMeaningful) {
             meaningful = true
+            setActiveCcbRoute(route.providerId, route.model)
             onFirstMeaningful?.()
           }
           throwIfUpstreamBlocked(event, streamText)
@@ -536,6 +544,15 @@ export async function* retryDirectProviderStream(
           routeError(`${modelKey} invalid; skipping its remaining accounts`, {
             status,
           })
+        } else if (scope === 'account' && accountKey) {
+          skippedAccounts.add(accountKey)
+          markAccountFailure(route.providerId, route.accountId!)
+          routeError(
+            `${accountKey} unavailable; skipping its remaining routes`,
+            {
+              status,
+            },
+          )
         }
         lastError = error
         if (route.accountId)
@@ -600,6 +617,8 @@ export async function* raceDirectProviderStream(
     toolCalls: number
   }
   let selected: Contender | undefined
+  const raceId =
+    Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const controllers = new Map(
     routes.map(route => [route, new AbortController()] as const),
   )
@@ -652,12 +671,14 @@ export async function* raceDirectProviderStream(
       }
       recordRaceMetric({
         at: new Date().toISOString(),
+        raceId,
         provider: route.providerId,
         model: route.model,
         account: route.accountId ?? 'default',
         outcome: requestSignal.aborted ? 'cancelled' : 'failed',
         elapsedMs: Date.now() - started,
         ...(status === undefined ? {} : { status }),
+        errorCategory: classifyErrorStatus(status, requestSignal.aborted),
       })
       throw error
     }
@@ -713,12 +734,14 @@ export async function* raceDirectProviderStream(
       collected[0],
     )
     selected = winner
+    setActiveCcbRoute(winner.route.providerId, winner.route.model)
     onSelected?.()
     controllers.forEach((controller, route) => {
       if (route !== winner.route) controller.abort()
     })
     recordRaceMetric({
       at: new Date().toISOString(),
+      raceId,
       provider: winner.route.providerId,
       model: winner.route.model,
       account: winner.route.accountId ?? 'default',
@@ -752,6 +775,7 @@ export async function* raceDirectProviderStream(
     }
     recordRaceMetric({
       at: new Date().toISOString(),
+      raceId,
       provider: winner.route.providerId,
       model: winner.route.model,
       account: winner.route.accountId ?? 'default',
@@ -761,6 +785,7 @@ export async function* raceDirectProviderStream(
       outputChars: winner.text.length,
       streamEvents: winner.events.length,
       toolCalls: winner.toolCalls,
+      responseValid: winner.text.trim().length > 0,
     })
   } finally {
     signal.removeEventListener('abort', abort)
@@ -772,6 +797,7 @@ export async function* raceDirectProviderStream(
         if (contender === selected) continue
         recordRaceMetric({
           at: new Date().toISOString(),
+          raceId,
           provider: contender.route.providerId,
           model: contender.route.model,
           account: contender.route.accountId ?? 'default',
@@ -935,6 +961,7 @@ async function* allOfRaceStream(
     return
   }
   const quorum = Math.min(RACE_QUORUM, routes.length)
+  const started = Date.now()
   const controllers = new Map(
     routes.map(route => [route, new AbortController()] as const),
   )
@@ -1001,7 +1028,8 @@ async function* allOfRaceStream(
       model: answers[0].model,
       account: 'allOf',
       outcome: 'selected',
-      elapsedMs: Date.now(),
+      elapsedMs: Date.now() - started,
+      responseValid: hasMeaningfulContent(fused),
     })
     const baseChunk = {
       id: `allOf-${Date.now()}`,

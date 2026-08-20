@@ -3,6 +3,7 @@ import { chmod, mkdir, readFile, writeFile } from 'fs/promises'
 import { homedir } from 'os'
 import { join } from 'path'
 import {
+  getChromeFlagOverride,
   getIsInteractive,
   getIsNonInteractiveSession,
   getSessionBypassPermissionsMode,
@@ -70,6 +71,10 @@ export function shouldEnableClaudeInChrome(chromeFlag?: boolean): boolean {
 let shouldAutoEnable: boolean | undefined
 
 export function shouldAutoEnableClaudeInChrome(): boolean {
+  if (getChromeFlagOverride() === false) {
+    return false
+  }
+
   if (shouldAutoEnable !== undefined) {
     return shouldAutoEnable
   }

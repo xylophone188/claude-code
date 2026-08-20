@@ -6,7 +6,12 @@ import {
   setOriginalCwd,
   setProjectRoot,
 } from '../bootstrap/state'
-import { query } from '../query'
+import {
+  DEFAULT_MAIN_THREAD_MAX_TURNS,
+  DEFAULT_SUBAGENT_MAX_TURNS,
+  query,
+  resolveMaxTurns,
+} from '../query'
 import { getEmptyToolPermissionContext } from '../Tool'
 import type { AssistantMessage } from '../types/message'
 import { asSystemPrompt } from '../utils/systemPromptType'
@@ -142,6 +147,107 @@ function createToolUseContext(): any {
     messages: [],
   } as any
 }
+
+describe('query max turns', () => {
+  test('uses bounded defaults and preserves explicit limits', () => {
+    expect(DEFAULT_MAIN_THREAD_MAX_TURNS).toBe(500)
+    expect(DEFAULT_SUBAGENT_MAX_TURNS).toBe(50)
+    expect(resolveMaxTurns(undefined, false)).toBe(500)
+    expect(resolveMaxTurns(undefined, true)).toBe(50)
+    expect(resolveMaxTurns(1, false)).toBe(1)
+    expect(resolveMaxTurns(75, true)).toBe(75)
+    expect(resolveMaxTurns(200, true)).toBe(200)
+  })
+
+  test('applies the default subagent limit to the query loop', async () => {
+    const toolUseContext = createToolUseContext()
+    toolUseContext.agentId = 'agent-budget-test'
+    let callCount = 0
+    const generator = query({
+      messages: [createUserMessage({ content: 'exercise subagent limit' })],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext,
+      querySource: 'agent:test',
+      deps: {
+        uuid: () => 'query-chain-id',
+        microcompact: async (messages: unknown[]) => ({ messages }),
+        autocompact: async () => ({
+          compactionResult: undefined,
+          consecutiveFailures: 0,
+        }),
+        callModel: async function* () {
+          callCount += 1
+          yield createToolUseAssistantMessage()
+        },
+      } as never,
+    })
+
+    let next = await generator.next()
+    while (!next.done) {
+      next = await generator.next()
+    }
+
+    expect(callCount).toBe(DEFAULT_SUBAGENT_MAX_TURNS)
+    expect(next.value).toEqual({ reason: 'max_turns', turnCount: 51 })
+  })
+
+  test('emits max_turns_reached before terminating at an explicit limit', async () => {
+    const callModel = async function* () {
+      yield createToolUseAssistantMessage()
+    }
+    const generator = query({
+      messages: [createUserMessage({ content: 'exercise max turns' })],
+      systemPrompt: asSystemPrompt([]),
+      userContext: {},
+      systemContext: {},
+      canUseTool: async (_tool, input) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
+      toolUseContext: createToolUseContext(),
+      querySource: 'sdk',
+      maxTurns: 1,
+      deps: {
+        uuid: () => 'query-chain-id',
+        microcompact: async (messages: unknown[]) => ({ messages }),
+        autocompact: async () => ({
+          compactionResult: undefined,
+          consecutiveFailures: 0,
+        }),
+        callModel,
+      } as never,
+    })
+
+    const emitted: unknown[] = []
+    let next = await generator.next()
+    while (!next.done) {
+      emitted.push(next.value)
+      next = await generator.next()
+    }
+
+    expect(next.value).toEqual({ reason: 'max_turns', turnCount: 2 })
+    expect(
+      emitted.some(
+        message =>
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === 'attachment' &&
+          'attachment' in message &&
+          typeof message.attachment === 'object' &&
+          message.attachment !== null &&
+          'type' in message.attachment &&
+          message.attachment.type === 'max_turns_reached',
+      ),
+    ).toBe(true)
+  })
+})
 
 describe('query autonomy/provider boundary', () => {
   test('provider api-error messages fail a consumed autonomy run instead of advancing the flow', async () => {

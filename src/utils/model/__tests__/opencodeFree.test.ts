@@ -305,19 +305,18 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     else process.env.HOME = prevHome
   })
 
-  test('gateway down: auto, advisor, oc, add-provider', async () => {
+  test('gateway down: default, switch, add, delete', async () => {
     stubGateway([], [])
     const list = await getProviderList()
     expect(list.map(o => o.value)).toEqual([
-      'auto',
-      'advisor',
-      'oc',
-      'ccb',
+      'default',
+      'switch',
       'add-provider',
+      'delete-provider',
     ])
   })
 
-  test('codex login adds openai after routing modes', async () => {
+  test('codex login shows codex models in default content', async () => {
     stubGateway([], [])
     mkdirSync(join(dir, '.codex'), { recursive: true })
     writeFileSync(
@@ -326,41 +325,33 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     )
     const list = await getProviderList()
     expect(list.map(o => o.value)).toEqual([
-      'auto',
-      'advisor',
-      'oc',
-      'openai',
-      'ccb',
+      'default',
+      'switch',
       'add-provider',
+      'delete-provider',
     ])
-    expect(list[3]).toMatchObject({ label: 'OpenAI' })
+    const content = await getProviderContent('default')
+    expect(content.kind).toBe('models')
+    expect(content.options.length).toBeGreaterThan(0)
   })
 
-  test('gateway combos add ccb with registry display name', async () => {
+  test('gateway content via switch shows providers', async () => {
     stubGateway([{ name: 'routeha' }], [])
     setLocalGatewayName('我的网关')
-    const list = await getProviderList()
-    const ccb = list.find(o => o.value === 'ccb')
-    expect(ccb).toBeDefined()
-    expect(ccb!.label).toBe('我的网关')
-    expect(ccb!.description).toContain('个供应商')
+    const content = await getProviderContent('switch')
+    expect(content.kind).toBe('subproviders')
+    expect(content.options.length).toBeGreaterThan(0)
   })
 
-  test('registry providers slot between ccb and add-provider', async () => {
+  test('switch provider shows registered providers', async () => {
     stubGateway([{ name: 'routeha' }], [])
     addRegisteredProvider({ providerId: 'kiro', name: 'Kiro' })
-    const list = await getProviderList()
-    expect(list.map(o => o.value)).toEqual([
-      'auto',
-      'advisor',
-      'oc',
-      'ccb',
-      'kiro',
-      'add-provider',
-    ])
+    const content = await getProviderContent('switch')
+    expect(content.kind).toBe('subproviders')
+    expect(content.options.some(o => o.value === 'kiro')).toBe(true)
   })
 
-  test('ccb content lists direct providers', async () => {
+  test('ccb content lists OmniRoute as the single gateway', async () => {
     stubGateway(
       [
         { name: 'routeha' },
@@ -372,7 +363,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     const content = await getProviderContent('ccb')
     expect(content.kind).toBe('subproviders')
     expect(content.options.length).toBeGreaterThan(0)
-    expect(content.options.map(o => o.value)).toContain('codebuddy-cn')
+    expect(content.options.map(o => o.value)).toEqual(['omniroute'])
   })
 
   test('ccb content: no combos falls back to subproviders', async () => {
@@ -390,7 +381,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     expect(content.options.length).toBeGreaterThan(0)
   })
 
-  test('registered provider content: models prefixed ccb/, combos excluded', async () => {
+  test('legacy direct providers are not exposed after OmniRoute cutover', async () => {
     stubGateway(
       [],
       [
@@ -400,7 +391,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     )
     const content = await getProviderContent('kimi')
     expect(content.kind).toBe('models')
-    expect(content.options.map(o => o.value)).toContain('ccb/kimi/kimi-k3')
+    expect(content.options).toEqual([])
   })
 
   test('auto content is a read-only info panel, not a model picker', async () => {
@@ -411,7 +402,5 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     expect(content.lines).toBeDefined()
     const lines = content.lines!
     expect(lines[0]).toContain('候选池')
-    expect(lines.join('\n')).toContain('deepseek-v4-flash-free')
-    expect(lines.join('\n')).toContain('评分')
   })
 })

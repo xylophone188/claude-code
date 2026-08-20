@@ -54,7 +54,7 @@
     "check": "biome check .",
     "check:fix": "biome check --fix .",
     "prepare": "husky",
-    "test": "bun test",
+    "test": "NODE_ENV=test bun test",
     "test:production": "bun run scripts/production-test.ts",
     "test:production:offline": "bun run scripts/production-test.ts --offline",
     "test:production:verbose": "bun run scripts/production-test.ts --verbose",

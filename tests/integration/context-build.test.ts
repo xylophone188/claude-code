@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   stripHtmlComments,
   isMemoryFilePath,
@@ -14,9 +14,16 @@ import {
 // ─── CLAUDE.md Integration with System Prompt ─────────────────────────
 
 describe('Context build: CLAUDE.md + system prompt integration', () => {
+  beforeEach(() => {
+    delete process.env.CCB_FORCE_ADVISOR_WORKFLOW
+  })
+
+  afterEach(() => {
+    delete process.env.CCB_FORCE_ADVISOR_WORKFLOW
+  })
   test('buildEffectiveSystemPrompt passes through default prompt', () => {
     const result = buildEffectiveSystemPrompt({
-      defaultSystemPrompt: 'You are Claude.',
+      defaultSystemPrompt: ['You are Claude.'],
     })
     // Result is an array of strings (may be split differently)
     const joined = Array.from(result).join('')
@@ -25,7 +32,7 @@ describe('Context build: CLAUDE.md + system prompt integration', () => {
 
   test('buildEffectiveSystemPrompt handles empty prompts', () => {
     const result = buildEffectiveSystemPrompt({
-      defaultSystemPrompt: '',
+      defaultSystemPrompt: [''],
     })
     const joined = Array.from(result).join('')
     expect(joined).toBe('')
@@ -33,7 +40,7 @@ describe('Context build: CLAUDE.md + system prompt integration', () => {
 
   test('buildEffectiveSystemPrompt with overrideSystemPrompt replaces everything', () => {
     const result = buildEffectiveSystemPrompt({
-      defaultSystemPrompt: 'Default',
+      defaultSystemPrompt: ['Default'],
       overrideSystemPrompt: 'Override',
     })
     const joined = Array.from(result).join('')
@@ -42,7 +49,7 @@ describe('Context build: CLAUDE.md + system prompt integration', () => {
 
   test('buildEffectiveSystemPrompt with customSystemPrompt replaces default', () => {
     const result = buildEffectiveSystemPrompt({
-      defaultSystemPrompt: 'Default',
+      defaultSystemPrompt: ['Default'],
       customSystemPrompt: 'Custom',
     })
     const joined = Array.from(result).join('')
@@ -51,7 +58,7 @@ describe('Context build: CLAUDE.md + system prompt integration', () => {
 
   test('buildEffectiveSystemPrompt with appendSystemPrompt includes both', () => {
     const result = buildEffectiveSystemPrompt({
-      defaultSystemPrompt: 'Main prompt',
+      defaultSystemPrompt: ['Main prompt'],
       appendSystemPrompt: 'Appended',
     })
     const joined = Array.from(result).join('')

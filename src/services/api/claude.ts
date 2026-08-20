@@ -208,7 +208,7 @@ import {
   normalizeModelStringForAPI,
   parseUserSpecifiedModel,
 } from '../../utils/model/model.js'
-import { resolveDirectRoutes } from '../ccbRouter/directRouter.js'
+import { resolveDirectRoutes } from '../omniroute/adapter.js'
 import {
   startSessionActivity,
   stopSessionActivity,

@@ -7,7 +7,7 @@ import {
   retryDirectProviderStream,
   retryOpencodeFreeStream,
 } from '../index.js'
-import type { DirectRoute } from '../../../ccbRouter/directRouter.js'
+import type { DirectRoute } from '../../../omniroute/adapter.js'
 
 function streamOf(
   ...events: ChatCompletionChunk[]
@@ -147,7 +147,7 @@ test('skips sibling accounts after a provider-wide failure', async () => {
   expect(calls).toEqual(['failed/one', 'next/one'])
 })
 
-test('cools down a failed provider for the next route chain', async () => {
+test('delegates cross-request cooldown to OmniRoute', async () => {
   const route = (providerId: string): DirectRoute => ({
     providerId,
     baseURL: 'https://example.test/v1',
@@ -181,7 +181,7 @@ test('cools down a failed provider for the next route chain', async () => {
       ),
     ),
   ).toHaveLength(1)
-  expect(calls).toEqual(['healthy'])
+  expect(calls).toEqual([failed.providerId])
 })
 
 test('accepts DSML tool calls without cooling down model', async () => {

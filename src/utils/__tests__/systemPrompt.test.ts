@@ -1,15 +1,5 @@
-import { describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { buildEffectiveSystemPrompt } from '../systemPrompt'
-
-mock.module('../../commands/caveman/cavemanMode.js', () => ({
-  getCavemanInstructions: () => undefined,
-}))
-mock.module('../../commands/ponytail/ponytailMode.js', () => ({
-  getPonytailInstructions: () => undefined,
-}))
-mock.module('../../commands/rtk/rtkMode.js', () => ({
-  getRtkInstructions: () => undefined,
-}))
 
 const defaultPrompt = ['You are a helpful assistant.', 'Follow instructions.']
 
@@ -23,6 +13,14 @@ function buildPrompt(overrides: Record<string, unknown> = {}) {
     ...overrides,
   })
 }
+
+beforeEach(() => {
+  delete process.env.CCB_FORCE_ADVISOR_WORKFLOW
+})
+
+afterEach(() => {
+  delete process.env.CCB_FORCE_ADVISOR_WORKFLOW
+})
 
 describe('buildEffectiveSystemPrompt', () => {
   test('returns default system prompt when no overrides', () => {

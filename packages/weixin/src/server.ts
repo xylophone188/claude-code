@@ -241,7 +241,7 @@ export function createWeixinMcpServer(version: string): Server {
  */
 export function isChannelActive(): boolean {
   const raw = process.env.CLAUDE_ACTIVE_CHANNELS
-  if (!raw) return true
+  if (raw === undefined) return true
   return raw
     .split(',')
     .map(name => name.trim())

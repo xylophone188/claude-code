@@ -1,7 +1,10 @@
 import OpenAI from 'openai'
 import { openaiAdapter } from 'src/services/providerUsage/adapters/openai.js'
 import { updateProviderBuckets } from 'src/services/providerUsage/store.js'
-import { updateAccountQuota } from '../../ccbRouter/accountPool.js'
+import {
+  parseOmniRouteReceipt,
+  updateAccountQuota,
+} from '../../omniroute/adapter.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
 
 /**
@@ -32,6 +35,7 @@ function wrapFetchForUsage(
   ): Promise<Response> => {
     const res = await base(...args)
     try {
+      parseOmniRouteReceipt(res.headers)
       const buckets = openaiAdapter.parseHeaders(res.headers)
       updateProviderBuckets(providerId ?? 'openai', buckets)
       if (providerId && accountId && buckets.length) {

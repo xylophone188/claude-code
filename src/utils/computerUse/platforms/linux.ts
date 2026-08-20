@@ -30,13 +30,25 @@ import type {
 
 function run(cmd: string[]): string {
   const result = Bun.spawnSync({ cmd, stdout: 'pipe', stderr: 'pipe' })
+  if (result.exitCode !== 0) {
+    const err = new TextDecoder().decode(result.stderr).trim()
+    throw new Error(
+      `Command failed (${result.exitCode}): ${cmd.join(' ')}${err ? ` — ${err}` : ''}`,
+    )
+  }
   return new TextDecoder().decode(result.stdout).trim()
 }
 
 async function runAsync(cmd: string[]): Promise<string> {
   const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' })
   const out = await new Response(proc.stdout).text()
-  await proc.exited
+  const err = await new Response(proc.stderr).text()
+  const exit = await proc.exited
+  if (exit !== 0) {
+    throw new Error(
+      `Command failed (${exit}): ${cmd.join(' ')}${err.trim() ? ` — ${err.trim()}` : ''}`,
+    )
+  }
   return out.trim()
 }
 
@@ -211,6 +223,14 @@ const input: InputPlatform = {
       x: xMatch ? Number(xMatch[1]) : 0,
       y: yMatch ? Number(yMatch[1]) : 0,
     }
+  },
+
+  async mouseDown() {
+    run(['xdotool', 'mousedown', '1'])
+  },
+
+  async mouseUp() {
+    run(['xdotool', 'mouseup', '1'])
   },
 
   // No window-bound input on Linux

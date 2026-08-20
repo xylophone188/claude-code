@@ -122,6 +122,7 @@ const ENV_KEYS = [
   'CCB_EMBED_ROUTE_FILE',
   'CLAUDE_CONFIG_DIR',
   'CCB_HEADROOM_TOKEN_BASE_URL',
+  'CCB_HEADROOM_CACHE_BASE_URL',
   'CCB_EMBED_PROVIDERS_FILE',
 ] as const
 
@@ -201,6 +202,7 @@ beforeEach(() => {
   // baseURL to 127.0.0.1:8787). Tests write to this temp file per-case.
   process.env.CCB_EMBED_PROVIDERS_FILE = join(directConfigDir, 'providers.json')
   delete process.env.CCB_HEADROOM_TOKEN_BASE_URL
+  delete process.env.CCB_HEADROOM_CACHE_BASE_URL
   const token = chatGPTTestToken()
   writeFileSync(
     join(directConfigDir, 'openai-chatgpt-auth.json'),
@@ -382,10 +384,10 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
     })
 
     expect(lastOpenAIClientOptions).toMatchObject({
-      baseURL: 'https://fallback.test/v1',
-      providerId: 'test-fallback',
+      baseURL: 'http://127.0.0.1:20131/v1',
+      providerId: 'omniroute',
     })
-    expect(lastChatCompletionsArgs?.model).toBe('glm-5.2')
+    expect(lastChatCompletionsArgs?.model).toBe('auto/smart')
     expect(result.content).toMatchObject([
       { type: 'tool_use', name: 'classify_result' },
     ])
@@ -473,76 +475,26 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
 
     expect(capturedFetch).toBeNull()
     expect(lastOpenAIClientOptions).toMatchObject({
-      baseURL: 'https://copilot.tencent.com/v2',
-      apiKey: 'test-key',
-      providerId: 'codebuddy-cn',
+      baseURL: 'http://127.0.0.1:20131/v1',
+      apiKey: '',
+      providerId: 'omniroute',
     })
-    expect(lastChatCompletionsArgs?.model).toBe('glm-5.2')
+    expect(lastChatCompletionsArgs?.model).toBe('codebuddy-cn/glm-5.2')
     expect('prompt_cache_key' in (lastChatCompletionsArgs ?? {})).toBe(false)
     expect(result.model).toBe('ccb/codebuddy-cn/glm-5.2')
   })
 
-  test('direct CCB side query falls back after a 200 gateway error', async () => {
-    writeFileSync(
-      join(directConfigDir!, 'providers.json'),
-      JSON.stringify([
-        {
-          id: 'test-fallback',
-          kind: 'openai-compat',
-          baseUrl: 'https://fallback.test/v1',
-          defaultModel: 'glm-5.2',
-          compatRule: 'permissive',
-          accounts: [
-            { id: 'first', apiKey: 'first-key', quotaRemaining: 100 },
-            { id: 'second', apiKey: 'second-key', quotaRemaining: 50 },
-          ],
-        },
-      ]),
-    )
-    const { _invalidateProviderCache } = await import(
-      '../../services/providerRegistry/loader.js'
-    )
-    _invalidateProviderCache()
+  test('direct CCB side query delegates account fallback to OmniRoute', async () => {
     const { resolveDirectRoutes } = await import(
-      '../../services/ccbRouter/directRouter.js'
+      '../../services/omniroute/adapter.js'
     )
-    expect(resolveDirectRoutes('ccb/test-fallback/glm-5.2')).toHaveLength(2)
-    let attempts = 0
-    chatCompletionsCreate = async args => {
-      attempts++
-      expect(args.model).toBe('glm-5.2')
-      if (attempts === 1) {
-        return {
-          id: 'blocked',
-          choices: [
-            {
-              finish_reason: 'stop',
-              message: {
-                content:
-                  '抱歉，系统检测到您当前输入的信息存在敏感内容，我无法响应您的请求，请检查后重新输入。',
-              },
-            },
-          ],
-          usage: chatCompletionsUsage,
-        }
-      }
-      return {
-        id: 'fallback',
-        choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
-        usage: chatCompletionsUsage,
-      }
-    }
-    const { sideQuery } = await import('../sideQuery.js')
-
-    const result = await sideQuery({
-      querySource: 'auto_mode',
-      model: 'ccb/test-fallback/glm-5.2',
-      messages: [{ role: 'user', content: 'hi' }],
-    })
-
-    expect(attempts).toBe(2)
-    expect(result.id).toBe('fallback')
-    expect(result.content).toMatchObject([{ type: 'text', text: 'ok' }])
+    expect(resolveDirectRoutes('ccb/test-fallback/glm-5.2')).toEqual([
+      expect.objectContaining({
+        providerId: 'omniroute',
+        baseURL: 'http://127.0.0.1:20131/v1',
+        model: 'test-fallback/glm-5.2',
+      }),
+    ])
   })
 
   test('ChatGPT OAuth request failure propagates for fail-closed classifiers', async () => {

@@ -77,7 +77,7 @@ describe('scorePoolSync', () => {
     else process.env.CCB_RACE_METRICS_FILE = previousMetricsFile
   })
 
-  it('uses recent race outcomes to break equal-score candidates', () => {
+  it('keeps configured order when race learning is delegated to OmniRoute', () => {
     process.env.CCB_RACE_METRICS_FILE = metricsFile()
     writeFileSync(
       metricsFile(),
@@ -100,7 +100,7 @@ describe('scorePoolSync', () => {
         .join('\n'),
     )
     expect(scorePoolSync(['slow/model', 'fast/model'])[0]?.candidate).toBe(
-      'fast/model',
+      'slow/model',
     )
   })
 })
@@ -178,9 +178,16 @@ describe('fetchCodeBuddyQuota', () => {
 
 describe('refreshAutoHealth', () => {
   const realFetch = globalThis.fetch
+  const routingMode = process.env.OMNIROUTE_SERVER_ROUTING
+
+  beforeEach(() => {
+    process.env.OMNIROUTE_SERVER_ROUTING = '0'
+  })
 
   afterEach(() => {
     globalThis.fetch = realFetch
+    if (routingMode === undefined) delete process.env.OMNIROUTE_SERVER_ROUTING
+    else process.env.OMNIROUTE_SERVER_ROUTING = routingMode
   })
 
   it('shares concurrent refreshes', async () => {

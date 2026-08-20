@@ -34,6 +34,9 @@ export async function runDaemonWorker(kind?: string): Promise<void> {
     case 'remoteControl':
       await runRemoteControlWorker()
       break
+    case 'autonomy':
+      await runAutonomyWorker()
+      break
     default:
       console.error(`Error: unknown daemon worker kind '${kind}'`)
       process.exitCode = EXIT_CODE_PERMANENT
@@ -54,6 +57,23 @@ export async function runDaemonWorker(kind?: string): Promise<void> {
  *   DAEMON_WORKER_TIMEOUT_MS   — session timeout in ms
  *   DAEMON_WORKER_CREATE_SESSION — '1' to pre-create session on start
  */
+async function runAutonomyWorker(): Promise<void> {
+  const { runAutonomyL5Worker } = await import('../utils/autonomyL5.js')
+  const controller = new AbortController()
+  const onSignal = () => controller.abort()
+  process.on('SIGTERM', onSignal)
+  process.on('SIGINT', onSignal)
+  try {
+    await runAutonomyL5Worker(controller.signal)
+  } catch (err) {
+    console.error(`[autonomy] transient error: ${errorMessage(err)}`)
+    process.exitCode = EXIT_CODE_TRANSIENT
+  } finally {
+    process.off('SIGTERM', onSignal)
+    process.off('SIGINT', onSignal)
+  }
+}
+
 async function runRemoteControlWorker(): Promise<void> {
   const dir = process.env.DAEMON_WORKER_DIR || resolve('.')
   const name = process.env.DAEMON_WORKER_NAME || undefined

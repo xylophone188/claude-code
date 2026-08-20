@@ -7,7 +7,7 @@ import {
   getLocalGatewayName,
   getRegisteredProviders,
 } from './providerRegistry.js'
-import { listDirectProviderModels } from '../../services/ccbRouter/directRouter.js'
+import { listDirectProviderModels } from '../../services/omniroute/adapter.js'
 import { getAutoCandidates } from '../../services/routing/autoScoring.js'
 
 /** Home directory, read at call time: `os.homedir()` caches its value at

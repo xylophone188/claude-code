@@ -105,9 +105,9 @@ export function _resetTmuxControlModeProbeForTesting(): void {
 }
 
 /**
- * Runtime env-var check only. Ants default to on (CLAUDE_CODE_NO_FLICKER=0
- * to opt out); external users default to off (CLAUDE_CODE_NO_FLICKER=1 to
- * opt in).
+ * Runtime env-var check only. Ants and CCB sessions default to on;
+ * external non-CCB users default to off. CLAUDE_CODE_NO_FLICKER=0 opts out,
+ * and CLAUDE_CODE_NO_FLICKER=1 opts in.
  */
 export function isFullscreenEnvEnabled(): boolean {
   // Explicit user opt-out always wins.
@@ -125,7 +125,7 @@ export function isFullscreenEnvEnabled(): boolean {
     }
     return false
   }
-  return process.env.USER_TYPE === 'ant'
+  return isEnvTruthy(process.env.CCB_ENV) || process.env.USER_TYPE === 'ant'
 }
 
 /**

@@ -168,6 +168,11 @@ function augmentScreenshot(
   raw: { base64: string; width: number; height: number },
   display: { width: number; height: number; displayId?: number },
 ): ScreenshotResult {
+  if (!raw.base64) {
+    throw new Error(
+      'Screenshot returned empty data — check display server and dependencies (xdotool, scrot, xrandr)',
+    )
+  }
   if (isBound()) {
     const accessibilityText = getAccessibilityText()
     return {
@@ -399,7 +404,6 @@ export function createCrossPlatformExecutor(_opts: {
           return
         }
       }
-      // Unbound: SendInput with MOUSEEVENTF_LEFTDOWN
       if (process.platform === 'win32') {
         Bun.spawnSync({
           cmd: [
@@ -418,6 +422,11 @@ $i = New-Object MDown+INPUT; $i.type=0; $i.mi.dwFlags=0x0002; [MDown]::SendInput
         })
         return
       }
+      await platform.input.mouseDown?.()
+      if (!platform.input.mouseDown)
+        throw new Error(
+          'Computer Use mouse down is not supported on this platform',
+        )
     },
 
     async mouseUp(): Promise<void> {
@@ -433,7 +442,6 @@ $i = New-Object MDown+INPUT; $i.type=0; $i.mi.dwFlags=0x0002; [MDown]::SendInput
           return
         }
       }
-      // Unbound: SendInput with MOUSEEVENTF_LEFTUP
       if (process.platform === 'win32') {
         Bun.spawnSync({
           cmd: [
@@ -451,6 +459,12 @@ $i = New-Object MUp+INPUT; $i.type=0; $i.mi.dwFlags=0x0004; [MUp]::SendInput(1, 
           ],
         })
         return
+      }
+      await platform.input.mouseUp?.()
+      if (!platform.input.mouseUp) {
+        throw new Error(
+          'Computer Use mouse up is not supported on this platform',
+        )
       }
     },
 
@@ -484,18 +498,15 @@ $i = New-Object MUp+INPUT; $i.type=0; $i.mi.dwFlags=0x0004; [MUp]::SendInput(1, 
           return
         }
       }
-      // Unbound: press at from, move to to, release
       if (from) {
         await platform.input.moveMouse(from.x, from.y)
         await sleep(16)
       }
-      // mouseDown
-      await (this as any).mouseDown()
+      await this.mouseDown()
       await sleep(50)
       await platform.input.moveMouse(to.x, to.y)
       await sleep(16)
-      // mouseUp
-      await (this as any).mouseUp()
+      await this.mouseUp()
     },
 
     async scroll(

@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'bun:test'
-import { getLastOmniRouteReceipt, parseOmniRouteReceipt } from './adapter.js'
+import {
+  getLastOmniRouteReceipt,
+  parseOmniRouteReceipt,
+  resetOmniRouteConfig,
+  resolveDirectRoutes,
+} from './adapter.js'
 
 describe('OmniRoute receipt', () => {
+  it('routes hermes-score through the OmniRoute gateway', () => {
+    const previous = process.env.OMNIROUTE_BASE_URL
+    process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20131/v1'
+    resetOmniRouteConfig()
+    const routes = resolveDirectRoutes('hermes-score')
+    expect(routes).toHaveLength(1)
+    expect(routes[0]).toMatchObject({
+      providerId: 'omniroute',
+      model: 'auto/smart',
+      kind: 'provider',
+    })
+    if (previous === undefined) delete process.env.OMNIROUTE_BASE_URL
+    else process.env.OMNIROUTE_BASE_URL = previous
+    resetOmniRouteConfig()
+  })
+
   it('parses routing and compression metadata without routing locally', () => {
     const receipt = parseOmniRouteReceipt(
       new Headers({

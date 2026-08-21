@@ -625,9 +625,8 @@ export function CcbSidePanel() {
 
   return (
     <Box flexDirection="column" width="100%" height="100%" paddingX={1} paddingY={1} overflow="hidden" flexShrink={0}>
-      <PanelHeader title="路由池" toggle={() => toggle('pool')} collapsed={collapsed.pool} />
-      {!collapsed.pool && <PoolPanel collapsed={false} meta={meta} />}
-      <RouteReceipt receipt={meta.receipt} />
+      <PanelHeader title="当前路由（OmniRoute）" toggle={() => toggle('pool')} collapsed={collapsed.pool} />
+      {!collapsed.pool && <RouteReceipt receipt={meta.receipt} />}
       <AgentTaskStats />
       <PanelHeader title="实时流" toggle={() => toggle('stream')} collapsed={collapsed.stream} />
       {!collapsed.stream && <StreamStats />}

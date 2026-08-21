@@ -25,14 +25,7 @@ import {
   renderDefaultModelSetting,
 } from '../../utils/model/model.js';
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
-import { resolveDirectRoutes } from '../../services/omniroute/adapter.js';
 import { validateModel } from '../../utils/model/validateModel.js';
-
-const CCB_MODEL_PATTERN = /^[a-z][a-z0-9:-]*\/[a-zA-Z0-9._/-]+$/;
-
-function isProviderPrefixedModel(model: string): boolean {
-  return CCB_MODEL_PATTERN.test(model.trim()) && model.split('/').length >= 2;
-}
 
 function ModelPickerWrapper({
   onDone,
@@ -165,13 +158,6 @@ function SetModelAndClose({
 
       // Validate and set custom model
       try {
-        if (isProviderPrefixedModel(model)) {
-          const routes = resolveDirectRoutes(model);
-          if (routes.length > 0) {
-            setModel(model);
-            return;
-          }
-        }
         // Don't use parseUserSpecifiedModel for non-aliases since it lowercases the input
         // and model names are case-sensitive
         const { valid, error } = await validateModel(model);

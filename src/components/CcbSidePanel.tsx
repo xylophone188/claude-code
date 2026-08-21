@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAppState } from '../state/AppState.js';
+import { isLocalWorkflowTask } from '../tasks/LocalWorkflowTask/LocalWorkflowTask.js';
 import { Box, Text } from '@anthropic/ink';
 import stripAnsi from 'strip-ansi';
 
@@ -524,6 +526,22 @@ function RouteReceipt({ receipt }: { receipt: RaceMeta['receipt'] }) {
   );
 }
 
+function AgentTaskStats() {
+  const tasks = useAppState(s => Object.values(s.tasks).filter(isLocalWorkflowTask));
+  const running = tasks.filter(task => task.status === 'running');
+  if (tasks.length === 0) return null;
+  return (
+    <Box flexDirection="column">
+      <Text dimColor>{`Agent任务 ${running.length}运行 / ${tasks.length}总计`}</Text>
+      {running.slice(0, 3).map(task => (
+        <Text key={task.id} dimColor>
+          {`· ${task.workflowName}${task.agentCount != null ? ` ×${task.agentCount}` : ''}`}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
 function StreamStats() {
   const [tick, setTick] = useState(0);
 
@@ -609,6 +627,7 @@ export function CcbSidePanel() {
       <PanelHeader title="路由池" toggle={() => toggle('pool')} collapsed={collapsed.pool} />
       {!collapsed.pool && <PoolPanel collapsed={false} meta={meta} />}
       <RouteReceipt receipt={meta.receipt} />
+      <AgentTaskStats />
       <PanelHeader title="实时流" toggle={() => toggle('stream')} collapsed={collapsed.stream} />
       {!collapsed.stream && <StreamStats />}
       <PanelHeader

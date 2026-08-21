@@ -75,7 +75,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$))/i.test(raw) ||
+    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|hermes-score$)/i.test(raw) ||
     (raw.includes('/') &&
       !/^(?:advisor|lite|full|ultra|review|smart|opus)$/i.test(raw))
   if (!isGatewayRoute) return []
@@ -95,10 +95,12 @@ function resolveViaOmniRoute(
   // Strip ccb/ prefix. Legacy CCB's bare auto/race aliases are client-side
   // concepts; map them to OmniRoute's server-side smart combo.
   const stripped = trimmed.replace(/^ccb\//i, '')
-  const modelSpec = /^(?:auto|race)$/i.test(stripped) ? 'auto/smart' : stripped
+  const modelSpec = /^(?:auto|race|hermes-score)$/i.test(stripped)
+    ? 'auto/smart'
+    : stripped
 
   // Handle auto/race specs
-  if (/^(?:auto|race)(?:\/|$)/i.test(modelSpec)) {
+  if (/^(?:auto|race|hermes-score)(?:\/|$)/i.test(modelSpec)) {
     if (config.serverSideRouting) {
       // OmniRoute handles routing server-side
       return [

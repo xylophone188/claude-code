@@ -527,7 +527,8 @@ function RouteReceipt({ receipt }: { receipt: RoutePanelMeta['receipt'] }) {
 }
 
 function AgentTaskStats() {
-  const tasks = useAppState(s => Object.values(s.tasks).filter(isLocalWorkflowTask));
+  const taskMap = useAppState(s => s.tasks);
+  const tasks = Object.values(taskMap).filter(isLocalWorkflowTask);
   const running = tasks.filter(task => task.status === 'running');
   if (tasks.length === 0) return null;
   return (

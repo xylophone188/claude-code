@@ -40,7 +40,7 @@ const inspectArgs = process.env.BUN_INSPECT
 
 const result = Bun.spawnSync(
   [
-    'bun',
+    process.execPath,
     ...inspectArgs,
     'run',
     ...defineArgs,

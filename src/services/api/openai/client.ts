@@ -3,6 +3,7 @@ import { openaiAdapter } from 'src/services/providerUsage/adapters/openai.js'
 import { updateProviderBuckets } from 'src/services/providerUsage/store.js'
 import {
   parseOmniRouteReceipt,
+  recordOmniRouteError,
   updateAccountQuota,
 } from '../../omniroute/adapter.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
@@ -33,7 +34,16 @@ function wrapFetchForUsage(
   const wrapped = async (
     ...args: Parameters<typeof fetch>
   ): Promise<Response> => {
-    const res = await base(...args)
+    let res: Response
+    try {
+      res = await base(...args)
+    } catch (error) {
+      recordOmniRouteError(error)
+      throw error
+    }
+    if (!res.ok) {
+      recordOmniRouteError(`${res.status} ${res.statusText}`)
+    }
     try {
       parseOmniRouteReceipt(res.headers)
       const buckets = openaiAdapter.parseHeaders(res.headers)

@@ -17,7 +17,12 @@ import {
   getTotalInputTokens,
   getTotalOutputTokens,
 } from '../bootstrap/state.js';
-import { getActiveCcbRoute, getLastOmniRouteReceipt, readFileTail } from '../services/omniroute/adapter.js';
+import {
+  getActiveCcbRoute,
+  getLastOmniRouteError,
+  getLastOmniRouteReceipt,
+  readFileTail,
+} from '../services/omniroute/adapter.js';
 import { formatTokens, truncateToWidth } from '../utils/format.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -319,6 +324,11 @@ function warnLevel(line: string): 'error' | 'warn' | null {
 function getWarningItems(): WarningItem[] {
   const items: WarningItem[] = [];
   const seen = new Set<string>();
+  const routeError = getLastOmniRouteError();
+  if (routeError) {
+    items.push({ level: 'error', text: routeError.slice(0, LOG_LINE_MAX) });
+    seen.add(routeError.slice(0, LOG_LINE_MAX));
+  }
 
   for (const path of WARN_LOGS) {
     try {

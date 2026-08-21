@@ -270,6 +270,18 @@ export interface OmniRouteReceipt {
 }
 
 let lastOmniRouteReceipt: OmniRouteReceipt | null = null
+let lastOmniRouteError: string | null = null
+
+export function recordOmniRouteError(error: unknown): void {
+  const text = error instanceof Error ? error.message : String(error)
+  lastOmniRouteError = text
+    .replace(/Bearer\s+\S+/gi, 'Bearer <redacted>')
+    .slice(0, 180)
+}
+
+export function getLastOmniRouteError(): string | null {
+  return lastOmniRouteError
+}
 
 export function parseOmniRouteReceipt(
   headers: Headers,

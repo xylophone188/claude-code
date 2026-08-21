@@ -59,11 +59,11 @@ const WARN_LOGS: string[] = process.env.CCB_WARN_LOGS?.split(':')
 
 const TEST_PROVIDERS = new Set(['race-test', 'race-delay']);
 
-interface RaceRow {
+interface RouteMetricRow {
   provider: string;
   model: string;
   outcome: string;
-  raceId?: string;
+  routeId?: string;
 }
 
 interface ModelStats {
@@ -90,7 +90,7 @@ interface PoolStats {
   tiers: TierStats[];
 }
 
-interface RaceMeta {
+interface RoutePanelMeta {
   stats: PoolStats[];
   active: { provider: string; model: string } | null;
   receipt: ReturnType<typeof getLastOmniRouteReceipt>;
@@ -109,11 +109,11 @@ function pctStr(won: number, total: number): string {
   return `${pct(won, total)}%`;
 }
 
-function parseRaceMetrics(): RaceRow[] {
+function parseRouteMetrics(): RouteMetricRow[] {
   try {
     if (!existsSync(ROUTE_METRICS_PATH)) return [];
     const content = readFileTail(ROUTE_METRICS_PATH);
-    const rows: RaceRow[] = [];
+    const rows: RouteMetricRow[] = [];
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
       try {
@@ -126,7 +126,7 @@ function parseRaceMetrics(): RaceRow[] {
             provider,
             model,
             outcome,
-            raceId: typeof m.raceId === 'string' ? m.raceId : undefined,
+            routeId: typeof m.routeId === 'string' ? m.routeId : typeof m.raceId === 'string' ? m.raceId : undefined,
           });
         }
       } catch {
@@ -213,7 +213,7 @@ function parseConversationTiers(): Record<TierKey, string[]> {
   }
 }
 
-function buildWindowStats(rows: RaceRow[]): PoolStats {
+function buildWindowStats(rows: RouteMetricRow[]): PoolStats {
   const tierKeys = new Map<string, Tier>();
   const candidates = parseAutoCandidates();
   for (const tier of TIER_ORDER) {
@@ -280,12 +280,12 @@ function buildWindowStats(rows: RaceRow[]): PoolStats {
   return { pool: 'window', tiers };
 }
 
-function useRaceStats(): RaceMeta {
-  const [meta, setMeta] = useState<RaceMeta>({ stats: [], active: null, receipt: null });
+function useRouteStats(): RoutePanelMeta {
+  const [meta, setMeta] = useState<RoutePanelMeta>({ stats: [], active: null, receipt: null });
 
   useEffect(() => {
     const load = () => {
-      const rows = parseRaceMetrics();
+      const rows = parseRouteMetrics();
       const windowStats = buildWindowStats(rows);
       const stats: PoolStats[] = [windowStats];
       let active = getActiveCcbRoute();
@@ -387,7 +387,7 @@ function usePoolConfig() {
   return config;
 }
 
-function PoolPanel({ collapsed, meta }: { collapsed: boolean; meta: RaceMeta }) {
+function PoolPanel({ collapsed, meta }: { collapsed: boolean; meta: RoutePanelMeta }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [poolOpen, setPoolOpen] = useState<Set<string>>(new Set(['window', 'conversation', 'advisor']));
   const config = usePoolConfig();
@@ -511,7 +511,7 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function RouteReceipt({ receipt }: { receipt: RaceMeta['receipt'] }) {
+function RouteReceipt({ receipt }: { receipt: RoutePanelMeta['receipt'] }) {
   if (!receipt) return null;
   return (
     <Box flexDirection="column">
@@ -620,7 +620,7 @@ export function CcbSidePanel() {
 
   const toggle = (key: Section) => setCollapsed(p => ({ ...p, [key]: !p[key] }));
   const warnings = useWarningItems();
-  const meta = useRaceStats();
+  const meta = useRouteStats();
 
   return (
     <Box flexDirection="column" width="100%" height="100%" paddingX={1} paddingY={1} overflow="hidden" flexShrink={0}>

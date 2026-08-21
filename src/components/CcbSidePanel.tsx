@@ -15,7 +15,7 @@ import {
   getTotalInputTokens,
   getTotalOutputTokens,
 } from '../bootstrap/state.js';
-import { getActiveCcbRoute, readFileTail } from '../services/omniroute/adapter.js';
+import { getActiveCcbRoute, getLastOmniRouteReceipt, readFileTail } from '../services/omniroute/adapter.js';
 import { formatTokens, truncateToWidth } from '../utils/format.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -89,6 +89,7 @@ interface PoolStats {
 interface RaceMeta {
   stats: PoolStats[];
   active: { provider: string; model: string } | null;
+  receipt: ReturnType<typeof getLastOmniRouteReceipt>;
 }
 
 interface WarningItem {
@@ -276,7 +277,7 @@ function buildWindowStats(rows: RaceRow[]): PoolStats {
 }
 
 function useRaceStats(): RaceMeta {
-  const [meta, setMeta] = useState<RaceMeta>({ stats: [], active: null });
+  const [meta, setMeta] = useState<RaceMeta>({ stats: [], active: null, receipt: null });
 
   useEffect(() => {
     const load = () => {
@@ -293,7 +294,7 @@ function useRaceStats(): RaceMeta {
           }
         }
       }
-      setMeta({ stats, active });
+      setMeta({ stats, active, receipt: getLastOmniRouteReceipt() });
     };
     load();
     const t = setInterval(load, RACE_POLL_MS);
@@ -506,6 +507,21 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function RouteReceipt({ receipt }: { receipt: RaceMeta['receipt'] }) {
+  if (!receipt) return null;
+  return (
+    <Box flexDirection="column">
+      {receipt.decision && <Text dimColor>{`决策 ${truncateToWidth(receipt.decision, MAX_POOL_LABEL)}`}</Text>}
+      {receipt.provider && receipt.model && (
+        <Text dimColor>{`路由 ${truncateToWidth(`${receipt.provider}/${receipt.model}`, MAX_POOL_LABEL)}`}</Text>
+      )}
+      {receipt.latencyMs != null && <Text dimColor>{`延迟 ${formatMs(receipt.latencyMs)}`}</Text>}
+      {receipt.fallbackAttempts != null && <Text dimColor>{`回退 ×${receipt.fallbackAttempts}`}</Text>}
+      {receipt.compression && <Text dimColor>{`压缩 ${receipt.compression}`}</Text>}
+    </Box>
+  );
+}
+
 function StreamStats() {
   const [tick, setTick] = useState(0);
 
@@ -590,6 +606,7 @@ export function CcbSidePanel() {
     <Box flexDirection="column" width="100%" height="100%" paddingX={1} paddingY={1} overflow="hidden" flexShrink={0}>
       <PanelHeader title="路由池" toggle={() => toggle('pool')} collapsed={collapsed.pool} />
       {!collapsed.pool && <PoolPanel collapsed={false} meta={meta} />}
+      <RouteReceipt receipt={meta.receipt} />
       <PanelHeader title="实时流" toggle={() => toggle('stream')} collapsed={collapsed.stream} />
       {!collapsed.stream && <StreamStats />}
       <PanelHeader

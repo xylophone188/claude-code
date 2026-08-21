@@ -27,9 +27,11 @@ type TierKey = Lowercase<Tier>;
 
 const TIER_ORDER: readonly Tier[] = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
 
-const RACE_METRICS_PATH =
-  process.env.CCB_RACE_METRICS_FILE ?? join(process.env.HOME ?? '', '.ccb-embed', 'race-metrics.jsonl');
-const RACE_POLL_MS = 3_000;
+const ROUTE_METRICS_PATH =
+  process.env.CCB_ROUTE_METRICS_FILE ??
+  process.env.CCB_RACE_METRICS_FILE ??
+  join(process.env.HOME ?? '', '.ccb-embed', 'route-metrics.jsonl');
+const ROUTE_POLL_MS = 3_000;
 const WARNINGS_POLL_MS = 5_000;
 const LOG_TAIL_BYTES = 64 * 1024;
 const WARNINGS_MAX = 10;
@@ -107,8 +109,8 @@ function pctStr(won: number, total: number): string {
 
 function parseRaceMetrics(): RaceRow[] {
   try {
-    if (!existsSync(RACE_METRICS_PATH)) return [];
-    const content = readFileTail(RACE_METRICS_PATH);
+    if (!existsSync(ROUTE_METRICS_PATH)) return [];
+    const content = readFileTail(ROUTE_METRICS_PATH);
     const rows: RaceRow[] = [];
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
@@ -297,7 +299,7 @@ function useRaceStats(): RaceMeta {
       setMeta({ stats, active, receipt: getLastOmniRouteReceipt() });
     };
     load();
-    const t = setInterval(load, RACE_POLL_MS);
+    const t = setInterval(load, ROUTE_POLL_MS);
     return () => clearInterval(t);
   }, []);
 
@@ -418,7 +420,7 @@ function PoolPanel({ collapsed, meta }: { collapsed: boolean; meta: RaceMeta }) 
       <Box flexDirection="column">
         <Box onClick={() => togglePool('window')}>
           <Text dimColor>{poolOpen.has('window') ? '  ' : '→'}</Text>
-          <Text>{` 窗口路由池`}</Text>
+          <Text>{` 窗口路由池（OmniRoute）`}</Text>
           <Box flexGrow={1} />
         </Box>
         {poolOpen.has('window') && windowStats && (
@@ -548,7 +550,7 @@ function StreamStats() {
     <Box flexDirection="column">
       <Box>
         <Text dimColor>{'消耗token'}</Text>
-        <Text color="ansi:yellow">{`（不含race）`}</Text>
+        <Text color="ansi:yellow">{`（OmniRoute 计量）`}</Text>
       </Box>
       <Box>
         <Text dimColor>{'输入 '}</Text>

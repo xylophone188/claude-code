@@ -30,7 +30,7 @@ export interface DirectRoute {
   timeoutMs?: number
   compatRule?: ProviderConfig['compatRule']
   accountId?: string
-  kind: 'opencode' | 'provider' | 'race'
+  kind: 'opencode' | 'provider' | 'race' | 'custom'
   race?: boolean
   tier?: 'l1' | 'l2' | 'l3' | 'l4' | 'l5' | 'l6'
   raceDelayMs?: number

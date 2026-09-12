@@ -11,11 +11,16 @@ const nativeIsModifierPressed = mock((modifier: string) => {
   return nativeReturnValue
 })
 
-mock.module('modifiers-napi', () => ({
-  prewarm: async () => {
+// Mock the local seam, NOT the `modifiers-napi` package specifier: the
+// modifiers-napi package's own tests import the same workspace module and a
+// process-global `mock.module('modifiers-napi')` here would hijack them.
+// `../modifiersNative.ts` resolves to the same file `modifiers.ts` imports,
+// so the stub applies to the wrapper without touching the package.
+mock.module('../modifiersNative.ts', () => ({
+  prewarmNative: async () => {
     nativePrewarmCalls++
   },
-  isModifierPressed: nativeIsModifierPressed,
+  isNativeModifierPressed: nativeIsModifierPressed,
 }))
 
 const originalPlatform = process.platform

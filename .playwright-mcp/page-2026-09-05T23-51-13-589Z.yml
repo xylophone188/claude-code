@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "Dashboard" [ref=e7]
+        - generic [ref=e11]: /
+        - generic [ref=e12]: session_6d21ca2f28df42fe8eabc9cdb247f377
+        - generic [ref=e13]: ACP
+      - generic [ref=e14]:
+        - button "Toggle theme" [ref=e15]
+        - button "No Token" [ref=e17]
+        - button "Identity" [ref=e22]
+  - generic [ref=e28]:
+    - heading "session_6d21ca2f28df42fe8eabc9cdb247f377" [level=1] [ref=e29]
+    - generic [ref=e31]:
+      - link "← Dashboard" [ref=e33] [cursor=pointer]:
+        - /url: /code/
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - heading "session_6d21ca2f28df42fe8eabc9cdb247f377" [level=2] [ref=e36]
+          - generic [ref=e37]:
+            - generic [ref=e38]: idle
+            - generic [ref=e39]: 2026/9/6 07:45:41
+        - generic [ref=e40]:
+          - button "Session info" [ref=e41]
+          - button "Tasks" [ref=e44]
+    - log [ref=e45]:
+      - generic [ref=e47]:
+        - generic [ref=e62]: 回复一个字:好
+        - generic [ref=e81]: 在吗?回复收到两个字即可
+    - generic [ref=e52]:
+      - generic [ref=e55]:
+        - textbox "输入消息..." [active] [ref=e56]
+        - button [ref=e57]
+      - generic [ref=e61]: Enter 发送，Shift+Enter 换行

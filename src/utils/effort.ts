@@ -234,6 +234,12 @@ export function getEffortSuffix(
   model: string,
   effortValue: EffortValue | undefined,
 ): string {
+  if (
+    process.env.CCB_ENV === '1' &&
+    process.env.OMNIROUTE_SERVER_ROUTING !== '0'
+  ) {
+    return ''
+  }
   if (effortValue === undefined) return ''
   const resolved = resolveAppliedEffort(model, effortValue)
   if (resolved === undefined) return ''

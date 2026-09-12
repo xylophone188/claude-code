@@ -500,7 +500,6 @@ import type { RemoteSessionConfig } from '../remote/RemoteSessionManager.js';
 import { REMOTE_SAFE_COMMANDS } from '../commands.js';
 import type { RemoteMessageContent } from '../utils/teleport/api.js';
 import { FullscreenLayout, useUnseenDivider, computeUnseenDivider } from '../components/FullscreenLayout.js';
-import { CcbSidePanel } from '../components/CcbSidePanel.js';
 import { isFullscreenEnvEnabled, maybeGetTmuxMouseHint, isMouseTrackingEnabled } from '../utils/fullscreen.js';
 import { AlternateScreen } from '@anthropic/ink';
 import { ScrollKeybindingHandler } from '../components/ScrollKeybindingHandler.js';
@@ -1845,7 +1844,6 @@ export function REPL({
   const IDLE_COMPACT_MAX_FAILURES = 3;
   const idleCompactFailuresRef = useRef(0);
   const idleCompactLastMsgCountRef = useRef(0);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: lastQueryCompletionTime drives the idle window; all mutable refs hold live values
   useEffect(() => {
     if (process.env.CCB_IDLE_COMPACT_ENABLED === '0') return;
     if (lastQueryCompletionTime === 0) return;
@@ -5886,7 +5884,7 @@ export function REPL({
         {transcriptScrollRef ? (
           <FullscreenLayout
             scrollRef={scrollRef}
-            sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel /> : undefined}
+            sidePanel={undefined}
             scrollable={
               <>
                 {transcriptMessagesElement}
@@ -6078,7 +6076,7 @@ export function REPL({
       <MCPConnectionManager key={remountKey} dynamicMcpConfig={dynamicMcpConfig} isStrictMcpConfig={strictMcpConfig}>
         <FullscreenLayout
           scrollRef={scrollRef}
-          sidePanel={isEnvTruthy(process.env.CCB_ENV) ? <CcbSidePanel /> : undefined}
+          sidePanel={undefined}
           overlay={toolPermissionOverlay}
           bottomFloat={
             feature('BUDDY') && companionVisible && !companionNarrow ? <CompanionFloatingBubble /> : undefined

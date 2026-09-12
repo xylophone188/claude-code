@@ -223,9 +223,20 @@ export async function isSessionMemoryEmpty(content: string): Promise<boolean> {
   return content.trim() === template.trim()
 }
 
+type PromptModelContext = {
+  getModel: () => string
+  getEffort: (model: string) => string
+}
+
+const defaultPromptModelContext: PromptModelContext = {
+  getModel: getMainLoopModel,
+  getEffort: model => getDisplayedEffortLevel(model, undefined),
+}
+
 export async function buildSessionMemoryUpdatePrompt(
   currentNotes: string,
   notesPath: string,
+  modelContext: PromptModelContext = defaultPromptModelContext,
 ): Promise<string> {
   const promptTemplate = await loadSessionMemoryPrompt()
 
@@ -235,11 +246,11 @@ export async function buildSessionMemoryUpdatePrompt(
   const sectionReminders = generateSectionReminders(sectionSizes, totalTokens)
 
   // Substitute variables in the prompt
-  const currentModel = getMainLoopModel()
+  const currentModel = modelContext.getModel()
   const variables = {
     currentNotes,
     notesPath,
-    CLAUDE_EFFORT: getDisplayedEffortLevel(currentModel, undefined),
+    CLAUDE_EFFORT: modelContext.getEffort(currentModel),
     CLAUDE_MODEL: currentModel,
     CLAUDE_CWD: process.cwd(),
   }

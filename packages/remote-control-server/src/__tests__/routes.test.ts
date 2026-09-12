@@ -31,6 +31,8 @@ import {
   storeCreateSession,
   storeCreateEnvironment,
   storeBindSession,
+  storeGetSession,
+  storeUpdateSession,
 } from '../store'
 import {
   removeEventBus,
@@ -693,7 +695,15 @@ describe('Web Session Routes', () => {
     expect(sessions).toHaveLength(1) // only user-1's session, not user-2's
   })
 
-  test('GET /web/sessions and /all — hides archived and inactive sessions', async () => {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+  test('GET /web/sessions and /all — hides archived but includes inactive sessions', async () => {
+=======
+  test('GET /web/sessions and /all — hides archived sessions only', async () => {
+>>>>>>> Stashed changes
+=======
+  test('GET /web/sessions and /all — hides archived sessions only', async () => {
+>>>>>>> Stashed changes
     const archived = storeCreateSession({})
     const inactive = storeCreateSession({})
     const open = storeCreateSession({})
@@ -712,16 +722,16 @@ describe('Web Session Routes', () => {
     const listRes = await app.request('/web/sessions?uuid=user-1')
     expect(listRes.status).toBe(200)
     const sessions = await resJson(listRes)
-    expect(sessions.map((session: { id: string }) => session.id)).toEqual([
-      open.id,
-    ])
+    expect(
+      sessions.map((session: { id: string }) => session.id).sort(),
+    ).toEqual([inactive.id, open.id].sort())
 
     const allRes = await app.request('/web/sessions/all?uuid=user-1')
     expect(allRes.status).toBe(200)
     const summaries = await resJson(allRes)
-    expect(summaries.map((session: { id: string }) => session.id)).toEqual([
-      open.id,
-    ])
+    expect(
+      summaries.map((session: { id: string }) => session.id).sort(),
+    ).toEqual([inactive.id, open.id].sort())
   })
 
   test('GET /web/sessions/:id — returns owned session', async () => {
@@ -1024,6 +1034,21 @@ describe('Web Control Routes', () => {
     expect(body.event).toBeTruthy()
   })
 
+  test('POST /web/sessions/:id/events — succeeds on inactive session (recoverable, not closed)', async () => {
+    storeUpdateSession(sessionId, { status: 'inactive' })
+    const res = await app.request(
+      `/web/sessions/${sessionId}/events?uuid=user-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'user', content: 'hello' }),
+      },
+    )
+    expect(res.status).toBe(200)
+    const body = await resJson(res)
+    expect(body.status).toBe('ok')
+  })
+
   test('POST /web/sessions/:id/events/control/interrupt — supports compat code session IDs', async () => {
     const rawSessionId = storeCreateSession({ idPrefix: 'cse_' }).id
     storeBindSession(rawSessionId, 'user-1')
@@ -1240,6 +1265,33 @@ describe('V1 Session Ingress Routes (HTTP)', () => {
     expect(body.status).toBe('ok')
   })
 
+  test('POST /v2/session_ingress/session/:sessionId/events — refreshes session updatedAt', async () => {
+    const sessRes = await app.request('/v1/sessions', {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const { id } = await resJson(sessRes)
+    const rec = storeGetSession(id)
+    expect(rec).toBeTruthy()
+    if (!rec) return
+    rec.updatedAt = new Date(Date.now() - 10 * 60 * 1000)
+    const previousUpdatedAt = rec.updatedAt.getTime()
+
+    const res = await app.request(`/v2/session_ingress/session/${id}/events`, {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        events: [{ type: 'assistant', content: 'response' }],
+      }),
+    })
+    expect(res.status).toBe(200)
+
+    const after = storeGetSession(id)
+    expect(after).toBeTruthy()
+    expect(after!.updatedAt.getTime()).toBeGreaterThan(previousUpdatedAt)
+  })
+
   test('POST /v2/session_ingress/session/:sessionId/events — rejects without auth', async () => {
     const res = await app.request('/v2/session_ingress/session/nope/events', {
       method: 'POST',
@@ -1347,6 +1399,91 @@ describe('V1 Session Ingress Routes (HTTP)', () => {
       })
 
       expect((event as { type?: string }).type).toBe('user')
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test('Web user POST is delivered to the child WebSocket (end-to-end)', async () => {
+    const sessRes = await app.request('/v1/sessions', {
+      method: 'POST',
+      headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const { id } = await resJson(sessRes)
+
+    const server = Bun.serve({
+      port: 0,
+      fetch: app.fetch,
+      websocket: {
+        ...sessionIngressWebsocket,
+        idleTimeout: 30,
+      },
+    })
+
+    try {
+      const message = await new Promise<Record<string, unknown>>(
+        (resolve, reject) => {
+          let ws: WebSocket | undefined
+          const timeout = setTimeout(() => {
+            ws?.close()
+            reject(
+              new Error(
+                'Timed out waiting for outbound user event on child WS',
+              ),
+            )
+          }, 2000)
+          ws = new WebSocket(
+            `ws://127.0.0.1:${server.port}/v2/session_ingress/ws/${id}`,
+            [encodeWebSocketAuthProtocol('test-api-key')],
+          )
+          ws.onopen = () => {
+            // Post a user message through the Web API — must reach the child WS
+            fetch(
+              `http://127.0.0.1:${server.port}/web/sessions/${id}/events?uuid=user-1`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'user',
+                  uuid: 'u-test-1',
+                  content: 'hello from web',
+                }),
+              },
+            )
+              .then(async res => {
+                if (res.status !== 200) {
+                  clearTimeout(timeout)
+                  reject(
+                    new Error(
+                      `Web POST failed: ${res.status} ${await res.text()}`,
+                    ),
+                  )
+                }
+              })
+              .catch(err => {
+                clearTimeout(timeout)
+                reject(err)
+              })
+          }
+          ws.onmessage = e => {
+            const msg = JSON.parse(String(e.data)) as Record<string, unknown>
+            if (msg.type === 'user' && msg.uuid === 'u-test-1') {
+              clearTimeout(timeout)
+              ws?.close()
+              resolve(msg)
+            }
+          }
+          ws.onerror = () => {
+            clearTimeout(timeout)
+            reject(new Error('Session ingress WebSocket connection failed'))
+          }
+        },
+      )
+
+      expect((message.message as { content?: string }).content).toBe(
+        'hello from web',
+      )
     } finally {
       await server.stop(true)
     }

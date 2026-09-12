@@ -2,6 +2,7 @@ import type { WSContext } from 'hono/ws'
 import { getEventBus } from './event-bus'
 import type { SessionEvent } from './event-bus'
 import { publishSessionEvent } from '../services/transport'
+import { touchSession } from '../services/session'
 import { log, error as logError } from '../logger'
 import { toClientPayload } from './client-payload'
 import { config } from '../config'
@@ -16,6 +17,30 @@ interface CleanupEntry {
 }
 const cleanupBySession = new Map<string, CleanupEntry>()
 
+/**
+ * Silence duration since the last client frame. Reads the mutable entry so
+ * frames received via handleWebSocketMessage actually reset the timer —
+ * a stale local snapshot at open time would close live connections.
+ */
+export function computeClientSilenceMs(
+  entry: CleanupEntry | undefined,
+  now = Date.now(),
+): number {
+  return now - (entry ? entry.lastClientActivity : now)
+}
+
+/**
+ * Whether a connection has been silent too long to keep alive. Reads the
+ * mutable entry (not a snapshot) so client frames reset the clock.
+ */
+export function isClientInactive(
+  entry: CleanupEntry | undefined,
+  now: number,
+  timeoutMs: number,
+): boolean {
+  return computeClientSilenceMs(entry, now) > timeoutMs
+}
+
 // Track all active WS connections for graceful shutdown
 const activeConnections = new Set<WSContext>()
 
@@ -23,9 +48,41 @@ const activeConnections = new Set<WSContext>()
 // Sends data frames to keep reverse proxies from closing idle connections.
 const SERVER_KEEPALIVE_INTERVAL_MS = (config.wsKeepaliveInterval || 20) * 1000
 
-// If no client data received within this threshold, the connection is
-// considered dead. Set to 3x keepalive to tolerate one missed interval.
-const CLIENT_ACTIVITY_TIMEOUT_MS = SERVER_KEEPALIVE_INTERVAL_MS * 3
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+// Client-data silence before the server force-closes an idle WS.
+// Independent of wsKeepaliveInterval — server keep_alive frames are
+// server→client only and prove nothing about client liveness.
+// Default 360s (3× the bridge client's 120s cadence) covers clients
+// without keep_alive echo; with the echo fix this timer never fires.
+const CLIENT_ACTIVITY_TIMEOUT_MS = (config.wsClientTimeout ?? 360) * 1000
+=======
+=======
+>>>>>>> Stashed changes
+// If no client data frame received within this threshold, the connection is
+// considered dead. Deliberately independent of SERVER_KEEPALIVE_INTERVAL_MS —
+// server keep_alive frames are server→client only and prove nothing about
+// client liveness. Default 360s covers the bridge client's 120s keepalive
+// cadence with margin; with the client echo fix this never fires anyway.
+const CLIENT_ACTIVITY_TIMEOUT_MS = (config.wsClientTimeout || 360) * 1000
+
+// Event types replayed on WS reconnect that the bridge child doesn't
+// understand and logs as noise ("Ignoring unknown message type").
+// Filtering by type (not direction) keeps inbound assistant history intact.
+// NOT in this set: permission_response / control_response / interrupt —
+// client-payload.ts converts them to real control messages the child
+// consumes, so a response published while the socket was down must replay.
+const REPLAY_IGNORED_TYPES = new Set([
+  'session_status',
+  'status',
+  'keep_alive',
+  'task_state',
+  'automation_state',
+])
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 
 /**
  * Convert internal EventBus event -> SDK message for bridge client.
@@ -41,6 +98,9 @@ export function handleWebSocketOpen(ws: WSContext, sessionId: string) {
   const openTime = Date.now()
   const lastClientActivity = Date.now()
   log(`[RC-DEBUG] [WS] Open session=${sessionId}`)
+  // A successful child connection is liveness evidence — reset the
+  // disconnect monitor timer so an online session isn't marked inactive.
+  touchSession(sessionId)
   activeConnections.add(ws)
 
   // If there's an existing connection for this session, clean it up first
@@ -56,10 +116,12 @@ export function handleWebSocketOpen(ws: WSContext, sessionId: string) {
 
   // Replay ALL events (inbound + outbound) so the bridge can reconstruct
   // the full conversation history — assistant replies are inbound events.
+  // Skip control/noise types the child doesn't understand.
   const missed = bus.getEventsSince(0)
   if (missed.length > 0) {
     log(`[WS] Replaying ${missed.length} missed event(s)`)
     for (const event of missed) {
+      if (REPLAY_IGNORED_TYPES.has(event.type)) continue
       if (ws.readyState !== 1) break
       try {
         ws.send(toSDKMessage(event))
@@ -88,9 +150,12 @@ export function handleWebSocketOpen(ws: WSContext, sessionId: string) {
       clearInterval(keepalive)
       return
     }
-    // Check if client is still alive — close if no data received for too long
-    const silenceMs = Date.now() - lastClientActivity
-    if (silenceMs > CLIENT_ACTIVITY_TIMEOUT_MS) {
+    // Read the mutable activity timestamp so client frames keep the
+    // connection alive (handleWebSocketMessage updates entry.lastClientActivity).
+    // Falls back to "now" when the entry is gone (close path clears the interval).
+    const entry = cleanupBySession.get(sessionId)
+    if (isClientInactive(entry, Date.now(), CLIENT_ACTIVITY_TIMEOUT_MS)) {
+      const silenceMs = computeClientSilenceMs(entry)
       log(
         `[WS] Client inactive for ${Math.round(silenceMs / 1000)}s on session=${sessionId}, closing dead connection`,
       )
@@ -130,6 +195,9 @@ export function handleWebSocketMessage(
   if (entry) {
     entry.lastClientActivity = Date.now()
   }
+  // Refresh session liveness per frame (not per line) so the disconnect
+  // monitor doesn't mark an actively-communicating session inactive.
+  touchSession(sessionId)
   const lines = data.split('\n').filter(l => l.trim())
   for (const line of lines) {
     try {
@@ -150,13 +218,19 @@ export function handleWebSocketClose(
   activeConnections.delete(ws)
 
   const entry = cleanupBySession.get(sessionId)
-  const duration = entry ? Math.round((Date.now() - entry.openTime) / 1000) : -1
+  // Only tear down if this socket is still the tracked connection. A delayed
+  // close from a superseded socket (replaced by a reconnect) must not strip
+  // the replacement's subscription/keepalive.
+  const isCurrent = entry !== undefined && entry.ws === ws
+  const duration = isCurrent
+    ? Math.round((Date.now() - entry.openTime) / 1000)
+    : -1
 
   log(
-    `[WS] Close session=${sessionId} code=${code ?? 'none'} reason=${reason || '(none)'} duration=${duration}s`,
+    `[WS] Close session=${sessionId} code=${code ?? 'none'} reason=${reason || '(none)'} duration=${duration}s${isCurrent ? '' : ' (superseded)'}`,
   )
 
-  if (entry) {
+  if (isCurrent) {
     entry.unsub()
     clearInterval(entry.keepalive)
     cleanupBySession.delete(sessionId)

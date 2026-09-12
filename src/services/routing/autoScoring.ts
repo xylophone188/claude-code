@@ -3,10 +3,21 @@
  *  against their upstream providers (GET {baseUrl}/models, the same probe
  *  9router uses) — no local gateway dependency. Factors without live
  *  telemetry take neutral values so scoring degrades gracefully. */
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { findProvider } from '../providerRegistry/loader.js'
+import {
+  type ProviderModelCatalog,
+  mergeCatalogWithStatic,
+  syncProviderModelCatalog,
+} from './catalogSync.js'
 import {
   chooseAccounts,
   getRaceMetricPreferences,
@@ -17,10 +28,6 @@ import { fetchCodeBuddyQuota } from './usage/codebuddy.js'
 /** CodeBuddy CN billing endpoint (mirrors 9router registry usage.url). */
 const CODEBUDDY_QUOTA_URL =
   'https://copilot.tencent.com/v2/billing/meter/get-user-resource'
-/** A pack whose cycle end and validity end differ by more than 2 days is a
- *  recurring refill pack, not a one-shot bonus (ported from 9router). */
-const CODEBUDDY_REFILL_GAP_MS = 2 * 24 * 60 * 60 * 1000
-const CODEBUDDY_QUOTA_TIMEOUT_MS = 5_000
 
 export interface ScoringWeights {
   quota: number
@@ -83,7 +90,7 @@ export const DEFAULT_AUTO_CANDIDATES = [
   'nvidia/nvidia/nemotron-3-super-120b-a12b',
 ]
 const DEFAULT_AUTO_L2_CANDIDATES = [
-  'sensenova/sensenova-6.7-flash-lite',
+  'sensenova/sensenova-6.8-flash-lite',
   'sensenova/deepseek-v4-flash',
   'sensenova/glm-5.2',
   'nvidia/z-ai/glm-5.2',
@@ -116,43 +123,65 @@ const DEFAULT_AUTO_L6_CANDIDATES = [
   'kimchi',
   'kilocode',
 ]
+// L7 is the permanent last resort: paid or local credentials with no time
+// window that the router is allowed to touch on its own. Local ollama is
+// preferred because it never burns a paid credit; the paid fallbacks are the
+// terminal step of the escalation chain.
+const DEFAULT_AUTO_L7_CANDIDATES = ['ollama/llama3.1', 'openai', 'github']
 
-/** A fresh process has no completion telemetry yet. Start with the local,
- * verified Gitee route instead of gambling a whole first turn on slower remote
- * fallbacks; live probe scores take over as soon as the snapshot is ready. */
-const COLD_START_PROVIDER_ORDER = [
-  'gitee',
-  'opencode',
-  'nvidia',
-  'codebuddy-cn',
-]
+/** A fresh process has no completion telemetry yet. Start with the cheapest
+ * verified generation routes instead of gambling a whole first turn on slower
+ * remote fallbacks; live probe scores take over once the snapshot is ready. */
+const COLD_START_PROVIDER_ORDER = ['opencode', 'nvidia', 'codebuddy-cn']
+<<<<<<< Updated upstream
+
+/** Home directory, read at call time: `os.homedir()` caches its value at
+ *  startup in Bun, so tests overriding process.env.HOME would be ignored
+ *  without this fallback. */
+const homeDir = (): string => process.env.HOME ?? homedir()
+=======
+>>>>>>> Stashed changes
 
 /** Candidate pool config file (ccb-owned, not 9router). Path overridable via
  *  CCB_AUTO_CANDIDATES_FILE. A JSON array of "provider/model" specs. Missing
  *  or invalid → null, so callers fall back to DEFAULT_AUTO_CANDIDATES. */
-const AUTO_CANDIDATES_FILE =
+const autoCandidatesFile = (): string =>
   process.env.CCB_AUTO_CANDIDATES_FILE ??
-  join(homedir(), '.ccb-embed', 'auto-candidates.json')
-const OPENCODE_MODELS_CACHE_FILE =
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+  join(homeDir(), '.ccb-embed', 'auto-candidates.json')
+const openCodeModelsCacheFile = (): string =>
   process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
-  join(homedir(), '.ccb-embed', 'opencode-free-models.json')
-const OPENCODE_MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+  join(homeDir(), '.ccb-embed', 'opencode-free-models.json')
+const OPENCODE_MODELS_CACHE_TTL_MS = 8 * 60 * 60 * 1000
+=======
+=======
+>>>>>>> Stashed changes
+  join(homedir(), '.ccb-embed', 'auto-candidates.json')
+const OPENCODE_MODELS_CACHE_TTL_MS = parsePositiveMs(
+  process.env.CCB_OPENCODE_MODELS_CACHE_TTL_MS,
+  8 * 60 * 60 * 1000,
+)
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 const OPENCODE_MODELS_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
-const FALLBACK_OPENCODE_MODEL = 'deepseek-v4-flash-free'
 
-type AutoCandidateTiers = {
+export type AutoCandidateTiers = {
   l1: string[]
   l2: string[]
   l3: string[]
   l4: string[]
   l5: string[]
   l6: string[]
+  l7: string[]
 }
 
 /** Telemetry/refresh window label per tier, used for logging and escalation
- *  order. L1 is the concurrent race; L2–L6 are time-windowed scoring pools.
- *  Functional per-window score snapshots are a future enhancement. */
+ *  order. L1 is the concurrent race; L2–L6 are time-windowed scoring pools;
+ *  L7 is the permanent, no-expiry last resort. */
 export const TIER_WINDOW: Record<keyof AutoCandidateTiers, string> = {
   l1: 'race',
   l2: '5h',
@@ -160,9 +189,66 @@ export const TIER_WINDOW: Record<keyof AutoCandidateTiers, string> = {
   l4: 'weekly',
   l5: 'monthly',
   l6: 'once',
+  l7: 'permanent',
 }
 
-type OpenCodeModelsCache = { updatedAt: string; models: string[] }
+export interface OpenCodeModelsCache {
+  updatedAt: string
+  models: string[]
+}
+
+/** Shared OpenCode free-tier cache file so OmniRoute, PC CCB and phone CCB
+ *  race the exact same model set. Contains model names only, never keys. */
+export function getOpenCodeModelsCacheFile(): string {
+  return (
+    process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
+    join(homedir(), '.ccb-embed', 'opencode-free-models.json')
+  )
+}
+
+function parsePositiveMs(raw: string | undefined, fallback: number): number {
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+/** True when the model id is a free text-generation model. */
+function isFreeTextModelId(model: string): boolean {
+  if (!model.endsWith('-free')) return false
+  return !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(model)
+}
+
+/** The OpenCode free tier is whatever `/models` reports as `-free` right now.
+ *  No hardcoded model names and no guessing fallback: an unknown state yields
+ *  no candidate instead of routing a turn to a model that may now be paid. */
+export function selectFreeOpenCodeModels(payload: unknown): string[] {
+  const data = (payload as { data?: unknown } | null | undefined)?.data
+  if (!Array.isArray(data)) return []
+  const seen = new Set<string>()
+  for (const item of data) {
+    const id = item && typeof item === 'object' ? item.id : undefined
+    if (typeof id !== 'string') continue
+    const model = id.trim()
+    if (!model || seen.has(model) || !isFreeTextModelId(model)) continue
+    seen.add(model)
+  }
+  return [...seen]
+}
+
+/** Atomically replace the shared cache file; readers never see partial JSON. */
+export function writeOpenCodeModelsCache(cache: OpenCodeModelsCache): void {
+  const temporary = `${getOpenCodeModelsCacheFile()}.tmp`
+  try {
+    writeFileSync(temporary, `${JSON.stringify(cache)}\n`, { mode: 0o600 })
+    renameSync(temporary, getOpenCodeModelsCacheFile())
+  } catch {
+    try {
+      unlinkSync(temporary)
+    } catch {
+      // The temp file may never have been created.
+    }
+    throw new Error(`Failed to write ${getOpenCodeModelsCacheFile()}`)
+  }
+}
 
 function candidateList(value: unknown): string[] {
   return Array.isArray(value)
@@ -176,13 +262,15 @@ function candidateList(value: unknown): string[] {
  *  file is absent, malformed, or empty so the built-in default still applies. */
 function readAutoCandidatesFile(): AutoCandidateTiers | null {
   try {
-    if (!existsSync(AUTO_CANDIDATES_FILE)) return null
+    if (!existsSync(autoCandidatesFile())) return null
     const parsed = JSON.parse(
-      readFileSync(AUTO_CANDIDATES_FILE, 'utf8'),
+      readFileSync(autoCandidatesFile(), 'utf8'),
     ) as unknown
     if (Array.isArray(parsed)) {
       const l1 = candidateList(parsed)
-      return l1.length ? { l1, l2: [], l3: [], l4: [], l5: [], l6: [] } : null
+      return l1.length
+        ? { l1, l2: [], l3: [], l4: [], l5: [], l6: [], l7: [] }
+        : null
     }
     if (!parsed || typeof parsed !== 'object') return null
     const record = parsed as Record<string, unknown>
@@ -192,13 +280,15 @@ function readAutoCandidatesFile(): AutoCandidateTiers | null {
     const l4 = candidateList(record.l4)
     const l5 = candidateList(record.l5)
     const l6 = candidateList(record.l6)
+    const l7 = candidateList(record.l7)
     return l1.length ||
       l2.length ||
       l3.length ||
       l4.length ||
       l5.length ||
-      l6.length
-      ? { l1, l2, l3, l4, l5, l6 }
+      l6.length ||
+      l7.length
+      ? { l1, l2, l3, l4, l5, l6, l7 }
       : null
   } catch (error) {
     routeError('probe', 'auto candidates file read failed', String(error))
@@ -209,7 +299,15 @@ function readAutoCandidatesFile(): AutoCandidateTiers | null {
 function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
   try {
     const parsed = JSON.parse(
-      readFileSync(OPENCODE_MODELS_CACHE_FILE, 'utf8'),
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+      readFileSync(openCodeModelsCacheFile(), 'utf8'),
+=======
+      readFileSync(getOpenCodeModelsCacheFile(), 'utf8'),
+>>>>>>> Stashed changes
+=======
+      readFileSync(getOpenCodeModelsCacheFile(), 'utf8'),
+>>>>>>> Stashed changes
     ) as unknown
     if (!parsed || typeof parsed !== 'object') return undefined
     const record = parsed as Record<string, unknown>
@@ -222,13 +320,103 @@ function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
   }
 }
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+/**
+ * Select the free text models from an OpenCode /models payload. Only ids
+ * ending in "-free" that are text-capable (no image/video/audio/tts/embed
+ * or transcription modalities) qualify; results are trimmed and deduped.
+ */
+export function selectFreeOpenCodeModels(payload: unknown): string[] {
+  const record = payload as { data?: unknown }
+  if (!Array.isArray(record.data)) return []
+  return [
+    ...new Set(
+      record.data
+        .map(item =>
+          item && typeof item === 'object' && typeof item.id === 'string'
+            ? item.id.trim()
+            : '',
+        )
+        .filter(
+          model =>
+            model.endsWith('-free') &&
+            !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(
+              model,
+            ),
+        )
+        .filter(Boolean),
+    ),
+  ]
+}
+
+/** True when the cache timestamp is valid and within the 8-hour TTL.
+ *  Rejects missing/invalid dates, future timestamps (clock skew) and
+ *  expired caches so stale data never serves. */
+function isCacheFresh(updatedAt: string): boolean {
+  const ts = Date.parse(updatedAt)
+  if (Number.isNaN(ts)) return false
+  if (ts > Date.now()) return false
+  return Date.now() - ts < OPENCODE_MODELS_CACHE_TTL_MS
+}
+
+/**
+ * Returns the current cached OpenCode free models for racing.
+ * If the cache is missing, corrupted, or expired (8-hour TTL), returns an
+ * empty array — no fallback to hardcoded models. Callers must handle the
+ * empty case (e.g., skip OpenCode in race pool).
+ */
+export function currentFreeOpenCodeModels(): string[] {
+  const cache = readOpenCodeModelsCache()
+  if (!cache || !isCacheFresh(cache.updatedAt)) return []
+  return cache.models
+}
+
+/** Atomically persist the shared OpenCode free-model cache (0600, model
+ *  names only — never credentials). */
+export function writeOpenCodeModelsCache(cache: {
+  updatedAt: string
+  models: string[]
+}): void {
+  const file = openCodeModelsCacheFile()
+  const tmp = `${file}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(cache)}\n`, { mode: 0o600 })
+  renameSync(tmp, file)
+=======
+=======
+>>>>>>> Stashed changes
+export function currentFreeOpenCodeModels(): string[] {
+  const cache = readOpenCodeModelsCache()
+  if (!cache) return []
+  const updatedAt = Date.parse(cache.updatedAt)
+  if (!Number.isFinite(updatedAt)) return []
+  if (
+    Date.now() - updatedAt < 0 ||
+    Date.now() - updatedAt >= OPENCODE_MODELS_CACHE_TTL_MS
+  )
+    return []
+  return cache.models.filter(isFreeTextModelId)
+}
+
 function cachedOpenCodeModels(): string[] {
-  return readOpenCodeModelsCache()?.models ?? [FALLBACK_OPENCODE_MODEL]
+  return currentFreeOpenCodeModels()
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 }
 
 export function invalidateOpenCodeModelsCache(): void {
   try {
-    unlinkSync(OPENCODE_MODELS_CACHE_FILE)
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    unlinkSync(openCodeModelsCacheFile())
+=======
+    unlinkSync(getOpenCodeModelsCacheFile())
+>>>>>>> Stashed changes
+=======
+    unlinkSync(getOpenCodeModelsCacheFile())
+>>>>>>> Stashed changes
   } catch {
     // No cache yet is already the desired state.
   }
@@ -244,12 +432,62 @@ function hasOpenCodeWildcard(): boolean {
   )
 }
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+// --- SenseNova catalog sync (TTL-cached live model list) ---
+
+let senseNovaCatalog: ProviderModelCatalog | undefined
+const SENSENOVA_PROVIDER_ID = 'sensenova'
+const senseNovaModelsUrl = (): string =>
+  process.env.CCB_SENSENOVA_MODELS_URL ?? 'https://sensenova.cn/v1/models'
+
+/** Refresh the SenseNova model catalog when stale. Results are merged
+ *  into candidate tiers via `mergeCatalogWithStatic` so renamed/retired
+ *  models surface as 404 instead of silently failing. The fetcher is
+ *  injectable so tests never open a socket. */
+export async function refreshSenseNovaCatalog(
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  const now = Date.now()
+  const current = senseNovaCatalog
+  const updated = await syncProviderModelCatalog({
+    providerId: SENSENOVA_PROVIDER_ID,
+    endpoint: senseNovaModelsUrl(),
+    current,
+    now,
+    ttlMs: 8 * 60 * 60 * 1000,
+    fetcher,
+  })
+  if (updated) senseNovaCatalog = updated
+}
+
+/** Test-only: drop the in-memory SenseNova snapshot so the next refresh
+ *  re-fetches instead of serving the previous catalog. */
+export function resetSenseNovaCatalogForTests(): void {
+  senseNovaCatalog = undefined
+}
+
 function expandOpenCodeModels(candidates: string[]): string[] {
   return candidates.flatMap(candidate =>
     candidate === 'opencode/*'
-      ? cachedOpenCodeModels().map(model => `opencode/${model}`)
+      ? currentFreeOpenCodeModels().map(model => `opencode/${model}`)
       : candidate,
   )
+=======
+=======
+>>>>>>> Stashed changes
+function expandGenerationCandidates(candidates: string[]): string[] {
+  return candidates
+    .filter(candidate => providerOf(candidate).toLowerCase() !== 'gitee')
+    .flatMap(candidate =>
+      candidate === 'opencode/*'
+        ? cachedOpenCodeModels().map(model => `opencode/${model}`)
+        : candidate,
+    )
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 }
 
 async function refreshOpenCodeModels(): Promise<void> {
@@ -264,38 +502,38 @@ async function refreshOpenCodeModels(): Promise<void> {
       candidate !== 'opencode/*' &&
       !cache?.models.includes(candidate.slice('opencode/'.length)),
   )
-  const cacheIsFresh =
-    cache &&
-    Date.now() - Date.parse(cache.updatedAt) < OPENCODE_MODELS_CACHE_TTL_MS
+  const cacheIsFresh = cache && isCacheFresh(cache.updatedAt)
   if (!hasOpenCodeWildcard() || (cacheIsFresh && !explicitlyMissing)) return
   try {
     const response = await fetch(`${OPENCODE_MODELS_URL}/models`, {
       headers: { 'x-opencode-client': 'desktop', Accept: 'application/json' },
     })
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
     const payload = (await response.json()) as { data?: unknown }
-    const models = Array.isArray(payload.data)
-      ? payload.data
-          .map(item =>
-            item && typeof item === 'object' && typeof item.id === 'string'
-              ? item.id.trim()
-              : '',
-          )
-          .filter(
-            model =>
-              model.endsWith('-free') &&
-              !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(
-                model,
-              ),
-          )
-          .filter(Boolean)
-      : []
+    const models = selectFreeOpenCodeModels(payload)
     if (!response.ok || !models.length)
       throw new Error(`OpenCode models returned HTTP ${response.status}`)
-    writeFileSync(
-      OPENCODE_MODELS_CACHE_FILE,
-      `${JSON.stringify({ updatedAt: new Date().toISOString(), models })}\n`,
-      { mode: 0o600 },
-    )
+    writeOpenCodeModelsCache({ updatedAt: new Date().toISOString(), models })
+=======
+    const payload = (await response.json()) as unknown
+    const models = selectFreeOpenCodeModels(payload)
+    if (!response.ok || !models.length)
+      throw new Error(`OpenCode models returned HTTP ${response.status}`)
+=======
+    const payload = (await response.json()) as unknown
+    const models = selectFreeOpenCodeModels(payload)
+    if (!response.ok || !models.length)
+      throw new Error(`OpenCode models returned HTTP ${response.status}`)
+>>>>>>> Stashed changes
+    writeOpenCodeModelsCache({
+      updatedAt: new Date().toISOString(),
+      models,
+    })
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
     routeLog('candidates', `OpenCode models refreshed (${models.length})`)
   } catch (error) {
     routeLog('probe', `OpenCode models refresh failed: ${String(error)}`)
@@ -319,18 +557,20 @@ export function getAutoCandidateTiers(): AutoCandidateTiers {
       l4: [],
       l5: [],
       l6: [],
+      l7: [],
     }
     if (!autoCandidatesLogged) {
       routeLog('candidates', 'candidates (env)', tiers.l1.join(','))
       autoCandidatesLogged = true
     }
     return {
-      l1: expandOpenCodeModels(tiers.l1),
-      l2: expandOpenCodeModels(tiers.l2),
-      l3: expandOpenCodeModels(tiers.l3),
-      l4: expandOpenCodeModels(tiers.l4),
-      l5: expandOpenCodeModels(tiers.l5),
-      l6: expandOpenCodeModels(tiers.l6),
+      l1: expandGenerationCandidates(tiers.l1),
+      l2: expandGenerationCandidates(tiers.l2),
+      l3: expandGenerationCandidates(tiers.l3),
+      l4: expandGenerationCandidates(tiers.l4),
+      l5: expandGenerationCandidates(tiers.l5),
+      l6: expandGenerationCandidates(tiers.l6),
+      l7: expandGenerationCandidates(tiers.l7),
     }
   }
   const fromFile = readAutoCandidatesFile()
@@ -339,32 +579,60 @@ export function getAutoCandidateTiers(): AutoCandidateTiers {
       routeLog(
         'candidates',
         'candidates (file)',
-        `l1=${fromFile.l1.join(',')} l2=${fromFile.l2.join(',')} l3=${fromFile.l3.join(',')} l4=${fromFile.l4.join(',')} l5=${fromFile.l5.join(',')} l6=${fromFile.l6.join(',')}`,
+        `l1=${fromFile.l1.join(',')} l2=${fromFile.l2.join(',')} l3=${fromFile.l3.join(',')} l4=${fromFile.l4.join(',')} l5=${fromFile.l5.join(',')} l6=${fromFile.l6.join(',')} l7=${(fromFile.l7 ?? []).join(',')}`,
       )
       autoCandidatesLogged = true
     }
     return {
-      l1: expandOpenCodeModels(fromFile.l1),
-      l2: expandOpenCodeModels(fromFile.l2),
-      l3: expandOpenCodeModels(fromFile.l3),
-      l4: expandOpenCodeModels(fromFile.l4),
-      l5: expandOpenCodeModels(fromFile.l5),
-      l6: expandOpenCodeModels(fromFile.l6),
+      l1: expandGenerationCandidates(fromFile.l1),
+      l2: expandGenerationCandidates(fromFile.l2),
+      l3: expandGenerationCandidates(fromFile.l3),
+      l4: expandGenerationCandidates(fromFile.l4),
+      l5: expandGenerationCandidates(fromFile.l5),
+      l6: expandGenerationCandidates(fromFile.l6),
+      l7: expandGenerationCandidates(fromFile.l7 ?? []),
     }
   }
+  const l2SenseNova = mergeCatalogWithStatic(
+    senseNovaCatalog,
+    DEFAULT_AUTO_L2_CANDIDATES.filter(candidate =>
+      candidate.startsWith('sensenova/'),
+    ).map(candidate => candidate.slice('sensenova/'.length)),
+  ).map(model => `sensenova/${model}`)
   return {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
     l1: DEFAULT_AUTO_CANDIDATES,
-    l2: DEFAULT_AUTO_L2_CANDIDATES,
+    l2: [
+      ...l2SenseNova,
+      ...DEFAULT_AUTO_L2_CANDIDATES.filter(
+        candidate => !candidate.startsWith('sensenova/'),
+      ),
+    ],
     l3: DEFAULT_AUTO_L3_CANDIDATES,
     l4: DEFAULT_AUTO_L4_CANDIDATES,
     l5: DEFAULT_AUTO_L5_CANDIDATES,
     l6: DEFAULT_AUTO_L6_CANDIDATES,
+=======
+=======
+>>>>>>> Stashed changes
+    l1: expandGenerationCandidates(DEFAULT_AUTO_CANDIDATES),
+    l2: expandGenerationCandidates(DEFAULT_AUTO_L2_CANDIDATES),
+    l3: expandGenerationCandidates(DEFAULT_AUTO_L3_CANDIDATES),
+    l4: expandGenerationCandidates(DEFAULT_AUTO_L4_CANDIDATES),
+    l5: expandGenerationCandidates(DEFAULT_AUTO_L5_CANDIDATES),
+    l6: expandGenerationCandidates(DEFAULT_AUTO_L6_CANDIDATES),
+    l7: expandGenerationCandidates(DEFAULT_AUTO_L7_CANDIDATES),
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   }
 }
 
 export function getAutoCandidates(): string[] {
-  const { l1, l2, l3, l4, l5, l6 } = getAutoCandidateTiers()
-  return [...l1, ...l2, ...l3, ...l4, ...l5, ...l6]
+  const { l1, l2, l3, l4, l5, l6, l7 } = getAutoCandidateTiers()
+  return [...l1, ...l2, ...l3, ...l4, ...l5, ...l6, ...l7]
 }
 
 export function isAutoCandidate(model: string): boolean {
@@ -465,6 +733,7 @@ export function scorePoolSync(
   )
   const maxLatency = latencies.length ? Math.max(...latencies) : 0
   const ranked = candidates
+    .filter(candidate => providerOf(candidate).toLowerCase() !== 'gitee')
     .map(candidate => {
       const provider = providerOf(candidate)
       const providerLatency = latency.get(provider)
@@ -612,6 +881,7 @@ async function refreshAutoHealthOnce(): Promise<void> {
     return
   }
   await refreshOpenCodeModels()
+  await refreshSenseNovaCatalog()
   const probes = await buildProbes(getAutoCandidates())
   if (!probes.length) {
     routeLog('probe', 'refresh skipped (no probes resolvable)')

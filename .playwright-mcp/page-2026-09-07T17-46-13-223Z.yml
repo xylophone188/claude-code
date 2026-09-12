@@ -1,0 +1,8 @@
+- generic [active]:
+  - link "Skip to content" [ref=f1e1] [cursor=pointer]:
+    - /url: "#main-content"
+  - status [ref=f1e2]:
+    - status "正在加载..." [ref=f1e3]:
+      - generic [aria-hidden] [ref=f1e5]: progress_activity
+    - paragraph [ref=f1e6]: Loading OmniRoute...
+  - alert [ref=f1e7]

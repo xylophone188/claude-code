@@ -35,12 +35,14 @@ import {
 } from '../../../utils/model/chatgptModels.js'
 import { getOpenAIClient } from './client.js'
 import {
+  getOmniRouteConfig,
   resolveDirectRoutes,
   type DirectRoute,
 } from '../../omniroute/adapter.js'
 import {
   clearAccountFailure,
   clearModelFailure,
+  isGatewayUnavailable,
   isProviderFailure,
   isModelFailure,
   markAccountFailure,
@@ -49,19 +51,49 @@ import {
   waitForProviderRequestSlot,
 } from '../../omniroute/adapter.js'
 import {
+  beginCcbRoute,
   classifyErrorStatus,
   recordRaceMetric,
   setActiveCcbRoute,
 } from '../../omniroute/adapter.js'
-import { classifyError } from '../../omniroute/adapter.js'
+import { classifyError, isGatewayUnavailable } from '../../omniroute/adapter.js'
 import { fuseAnswers, type PanelAnswer } from '../../routing/fusion.js'
 import {
   invalidateOpenCodeModelsCache,
   refreshAutoHealth,
+  currentFreeOpenCodeModels,
 } from '../../routing/autoScoring.js'
 import { applyCompatRule } from '../../providerRegistry/providerCompatMatrix.js'
-import { findProvider } from '../../providerRegistry/loader.js'
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+import { buildDirectRacePool } from '../../routing/directRacePool.js'
+>>>>>>> Stashed changes
+=======
+import { buildDirectRacePool } from '../../routing/directRacePool.js'
+>>>>>>> Stashed changes
 import { routeError, routeLog } from '../../routing/stageLog.js'
+import {
+  isJunkContent,
+  isFakeSuccessBody,
+} from '../../routing/responseQuality.js'
+import {
+  validateVisionResponse,
+  containsVisionInput,
+} from '../../routing/visionQuality.js'
+import {
+  isCircuitOpen,
+  recordCircuitFailure,
+  recordCircuitSuccess,
+} from '../../routing/circuitBreaker.js'
+import {
+  isAccountAdmitted,
+  isModelAdmitted,
+  isProviderAdmitted,
+  recordAccountNotAdmitted,
+  recordModelNotAdmitted,
+  recordProviderNotAdmitted,
+} from '../../routing/admission.js'
 import {
   formatOpenAIPromptCacheKey,
   getOfficialOpenAIPromptCacheKey,
@@ -166,6 +198,28 @@ function waitForRaceDelay(delayMs: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+export function waitForBackoff(
+  delayMs: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!delayMs) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, delayMs)
+    function done(): void {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+      resolve()
+    }
+    function abort(): void {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+      reject(new APIUserAbortError())
+    }
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+  })
+}
+
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
 ): ResponsesReasoningEffort | undefined {
@@ -225,9 +279,21 @@ function prependDeferredToolListIfNeeded(
 
 const OPENCODE_FREE_BASE_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
-const OPENCODE_FREE_MODEL = 'deepseek-v4-flash-free'
 const OPENCODE_FREE_RETRIES = 11 // 1 initial + 10 immediate retries
 const DIRECT_ROUTE_RETRIES = 11 // 1 initial + 10 retries for transient upstream failures
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+const OMNIROUTE_RETRIES = 6 // 1 initial + 5 retries
+const OMNIROUTE_INITIAL_BACKOFF_MS = 1_000
+const OMNIROUTE_MAX_BACKOFF_MS = 16_000
+=======
+const CUSTOM_ROUTE_RETRIES = 3 // Safe: events are buffered until the stream completes.
+const GATEWAY_RETRIES = 6 // 1 initial + 5 slow retries (~31s) for gateway-wide outages
+>>>>>>> Stashed changes
+=======
+const CUSTOM_ROUTE_RETRIES = 3 // Safe: events are buffered until the stream completes.
+const GATEWAY_RETRIES = 6 // 1 initial + 5 slow retries (~31s) for gateway-wide outages
+>>>>>>> Stashed changes
 const ADVISOR_AUTO_MAX_TOKENS = 8_192
 const AUTO_TIER_TTFS_TIMEOUT_MS = [
   4_000, 8_000, 12_000, 16_000, 20_000, 24_000,
@@ -245,20 +311,20 @@ const AUTO_L1_RACE_TIMEOUT_MS =
   Number(process.env.CCB_AUTO_L1_RACE_TIMEOUT_MS) ||
   AUTO_TIER_TTFS_TIMEOUT_MS[0]
 /**
- * How many L1 contenders must return a meaningful first response before the
- * race decides. Once the quorum is met we stop the rest immediately and pick
- * the best of the quorum by a responsiveness + early-signal score. Lower = more
- * latency-sensitive (closest to first-wins); higher = more candidates to judge.
+ * L1 race quorum: at least half (rounded up, minimum 1) of the raced routes
+ * must produce a complete, valid result before the race picks a winner. The
+ * winner is chosen from complete results only — a stream is not a candidate
+ * until it ends with real content or a well-formed tool call, so empty,
+ * whitespace-only, fake-200, or truncated tool-call streams never win.
  */
-const RACE_QUORUM = Number(process.env.CCB_RACE_QUORUM) || 3
-const RACE_ALL_OF: 'best' | 'vote' | 'concat' | false = (() => {
+function raceAllOfMode(): 'best' | 'vote' | 'concat' | false {
   const raw = process.env.CCB_RACE_ALL_OF
   if (!raw) return false
   if (raw === '1' || raw === 'best') return 'best'
   if (raw === 'vote') return 'vote'
   if (raw === 'concat') return 'concat'
   return false
-})()
+}
 
 function isMeaningfulOpenAIEvent(event: ChatCompletionChunk): boolean {
   const choice = event.choices[0]
@@ -269,6 +335,18 @@ function isMeaningfulOpenAIEvent(event: ChatCompletionChunk): boolean {
     (delta as { reasoning_content?: string }).reasoning_content ?? ''
   ).trim()
   return Boolean(content || reasoning || delta.tool_calls?.length)
+}
+
+/** Race gate: reasoning-only deltas do not count. Reasoning-first models can
+ *  emit their first thinking chunk in <1s but leave the user staring at a
+ *  blank pane for 10s+ before any visible content — a race won on a
+ *  reasoning delta is a race won by the wrong leg. */
+function isContentfulOpenAIEvent(event: ChatCompletionChunk): boolean {
+  const choice = event.choices[0]
+  if (!choice) return false
+  const delta = choice.delta
+  const content = typeof delta.content === 'string' ? delta.content.trim() : ''
+  return Boolean(content || delta.tool_calls?.length)
 }
 
 function eventText(event: ChatCompletionChunk): string {
@@ -312,36 +390,6 @@ function throwIfUpstreamBlocked(
   acc.text += chunk
   const blocked = matchUpstreamCustomError(acc.text)
   if (blocked) throw new UpstreamBlockedError(blocked)
-}
-
-/** Provider junk must fail before it reaches the transcript. Deliberately do
- * not treat a human language as junk: users may request Japanese or Korean. */
-function hasMeaningfulContent(text: string): boolean {
-  const compact = text.trim()
-  if (compact.length < 30) return false
-  if (isInvalidProviderText(compact)) return false
-  if (
-    /(^|[.`-]\s|\n)#{1,6}\s|^\s*(?:[-*+]\s|\d+[.)]\s)|https?:\/\/|\/[A-Za-z_]/.test(
-      compact,
-    )
-  )
-    return true
-  if (/[^\n]\?|[^\n]!|[^\n]\.|[^\n]，|[^\n]。|[^\n]？/.test(compact))
-    return true
-  return compact.length > 200
-}
-
-function isInvalidProviderText(text: string): boolean {
-  if (
-    text.includes('\ufffd') ||
-    [...text].some(char => {
-      const code = char.charCodeAt(0)
-      return code < 32 && ![9, 10, 13].includes(code)
-    })
-  )
-    return true
-  const compact = text.replace(/\s+/g, '')
-  return compact.length >= 80 && /^(.{1,8})\1{9,}$/s.test(compact)
 }
 
 /** Convert DeepSeek's textual DSML tool call into standard OpenAI tool_calls. */
@@ -407,7 +455,12 @@ export async function* retryOpencodeFreeStream(
         throwIfUpstreamBlocked(event, streamText)
       }
       if (!meaningful) throw new Error('opencode-free returned an empty stream')
-      if (isInvalidProviderText(streamText.text)) {
+      if (isFakeSuccessBody(streamText.text)) {
+        throw new ProviderOutputError(
+          'opencode-free returned a fake-success body',
+        )
+      }
+      if (isJunkContent(streamText.text)) {
         throw new ProviderOutputError(
           'opencode-free returned invalid provider text',
         )
@@ -432,6 +485,46 @@ function routeFailureScope(error: unknown): 'provider' | 'model' | 'account' {
   return scope
 }
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+function isOmniRouteTransientError(error: unknown): boolean {
+  if (error instanceof ProviderOutputError) return false
+  const status = (error as { status?: number } | undefined)?.status
+  if (status !== undefined && status < 500) return false
+  if (status === 502 || isGatewayUnavailable(error)) return true
+  const errorDetails = [
+    (error as { code?: string } | undefined)?.code,
+    (error as { message?: string } | undefined)?.message,
+  ].join(' ')
+  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENETUNREACH/i.test(
+    errorDetails,
+  )
+}
+
+function omniRouteBackoffMs(error: unknown, attempt: number): number {
+  const fallback = Math.min(
+    OMNIROUTE_MAX_BACKOFF_MS,
+    OMNIROUTE_INITIAL_BACKOFF_MS * 2 ** (attempt - 1),
+  )
+  const headers = (error as { headers?: unknown } | undefined)?.headers
+  const retryAfter =
+    headers && typeof (headers as { get?: unknown }).get === 'function'
+      ? (headers as { get(name: string): string | null }).get('retry-after')
+      : undefined
+  const retryAfterMs =
+    retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter)
+      ? Number(retryAfter) * 1_000
+      : undefined
+  const delay = Math.min(retryAfterMs ?? fallback, OMNIROUTE_MAX_BACKOFF_MS)
+  return Math.floor(delay * (0.75 + Math.random() * 0.5))
+}
+=======
+type RetryBackoff = (delayMs: number, signal: AbortSignal) => Promise<void>
+>>>>>>> Stashed changes
+=======
+type RetryBackoff = (delayMs: number, signal: AbortSignal) => Promise<void>
+>>>>>>> Stashed changes
+
 export async function* retryDirectProviderStream(
   routes: DirectRoute[],
   createStream: (
@@ -439,6 +532,15 @@ export async function* retryDirectProviderStream(
   ) => Promise<AsyncIterable<ChatCompletionChunk>>,
   signal: AbortSignal,
   onFirstMeaningful?: () => void,
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+  isVisionRequest = false,
+=======
+  waitForBackoff: RetryBackoff = waitForRaceDelay,
+>>>>>>> Stashed changes
+=======
+  waitForBackoff: RetryBackoff = waitForRaceDelay,
+>>>>>>> Stashed changes
 ): AsyncGenerator<ChatCompletionChunk, void> {
   let lastError: unknown
   const skippedProviders = new Set<string>()
@@ -449,6 +551,24 @@ export async function* retryDirectProviderStream(
     const accountKey = route.accountId
       ? `${route.providerId}/${route.accountId}`
       : undefined
+    // Circuit-breaker check: skip routes whose provider/model/account
+    // circuit is currently open (ported from routing/circuitBreaker).
+    if (
+      isCircuitOpen('provider', route.providerId) ||
+      isCircuitOpen('model', route.providerId, route.model) ||
+      (accountKey !== undefined &&
+        isCircuitOpen('account', route.providerId, undefined, route.accountId))
+    )
+      continue
+    // Admission check: 401/403/404 rejections are permanent within their
+    // window, so skip the route before spending a request slot on it.
+    if (
+      !isProviderAdmitted(route.providerId) ||
+      !isModelAdmitted(route.providerId, route.model) ||
+      (route.accountId !== undefined &&
+        !isAccountAdmitted(route.providerId, route.accountId))
+    )
+      continue
     if (
       skippedProviders.has(route.providerId) ||
       isProviderFailure(route.providerId) ||
@@ -466,27 +586,79 @@ export async function* retryDirectProviderStream(
       model: route.model,
       ...(route.accountId ? { account: route.accountId } : {}),
     })
-    const attempts = route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : 1
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    const isOmniRoute = route.providerId === 'omniroute'
+    const attempts =
+      route.kind === 'opencode'
+        ? DIRECT_ROUTE_RETRIES
+        : isOmniRoute
+          ? OMNIROUTE_RETRIES
+          : 1
+    let meaningful = false
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
         const events: ChatCompletionChunk[] = []
-        let meaningful = false
+        meaningful = false
+        let hasToolCalls = false
+=======
+    const attempts =
+      route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : CUSTOM_ROUTE_RETRIES
+    // The loop bound must allow the gateway retry cap; each branch keeps its
+    // own upper bound below, so the loop length alone never widens retries.
+    const loopAttempts =
+      route.kind === 'opencode'
+        ? attempts
+        : Math.max(CUSTOM_ROUTE_RETRIES, GATEWAY_RETRIES)
+    for (let attempt = 1; attempt <= loopAttempts; attempt++) {
+      let streamMeaningful = false
+      try {
+        const events: ChatCompletionChunk[] = []
+>>>>>>> Stashed changes
+=======
+    const attempts =
+      route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : CUSTOM_ROUTE_RETRIES
+    // The loop bound must allow the gateway retry cap; each branch keeps its
+    // own upper bound below, so the loop length alone never widens retries.
+    const loopAttempts =
+      route.kind === 'opencode'
+        ? attempts
+        : Math.max(CUSTOM_ROUTE_RETRIES, GATEWAY_RETRIES)
+    for (let attempt = 1; attempt <= loopAttempts; attempt++) {
+      let streamMeaningful = false
+      try {
+        const events: ChatCompletionChunk[] = []
+>>>>>>> Stashed changes
         const streamText = { text: '' }
         for await (const event of await createStream(route)) {
           events.push(event)
+          hasToolCalls ||= eventToolCalls(event) > 0
           const eventMeaningful = isMeaningfulOpenAIEvent(event)
-          if (!meaningful && eventMeaningful) {
-            meaningful = true
+          if (!streamMeaningful && eventMeaningful) {
+            streamMeaningful = true
             setActiveCcbRoute(route.providerId, route.model)
             onFirstMeaningful?.()
           }
           throwIfUpstreamBlocked(event, streamText)
         }
-        if (!meaningful)
+        if (!streamMeaningful)
           throw new ProviderOutputError(
             `${route.providerId} returned an empty stream`,
           )
-        if (isInvalidProviderText(streamText.text)) {
+        if (isFakeSuccessBody(streamText.text)) {
+          throw new ProviderOutputError(
+            `${route.providerId} returned a fake-success body`,
+          )
+        }
+        if (
+          isVisionRequest &&
+          validateVisionResponse(streamText.text).verdict === 'reject'
+        ) {
+          throw new ProviderOutputError(
+            `${route.providerId} returned a vision fake-success body`,
+          )
+        }
+        if (!hasToolCalls && isJunkContent(streamText.text)) {
           throw new ProviderOutputError(
             `${route.providerId} returned invalid provider text`,
           )
@@ -494,6 +666,14 @@ export async function* retryDirectProviderStream(
         if (route.accountId)
           clearAccountFailure(route.providerId, route.accountId)
         clearModelFailure(route.providerId, route.model)
+        recordCircuitSuccess('model', route.providerId, route.model)
+        if (accountKey)
+          recordCircuitSuccess(
+            'account',
+            route.providerId,
+            undefined,
+            route.accountId,
+          )
         routeLog('request', 'direct response complete', {
           provider: route.providerId,
           model: route.model,
@@ -504,22 +684,79 @@ export async function* retryDirectProviderStream(
         return
       } catch (error) {
         if (signal.aborted) throw new APIUserAbortError()
+        if (meaningful) throw error
         const status = (error as { status?: number } | undefined)?.status
         if (route.kind === 'opencode' && status === 404) {
           invalidateOpenCodeModelsCache()
           void refreshAutoHealth()
         }
+        // A stream that already produced meaningful output must never be
+        // replayed: any retry would regenerate the whole assistant turn and
+        // its tool side effects instead of resuming the failed stream.
+        if (streamMeaningful) throw error
         // OpenCode free endpoint is volatile: retry every failed attempt
         // (non-2xx, empty stream, blocked/custom error, invalid output).
-        if (route.kind === 'opencode' && status !== 404 && attempt < attempts) {
+        if (
+          route.kind === 'opencode' &&
+          status !== 404 &&
+          attempt < attempts &&
+          !meaningful &&
+          !isGatewayUnavailable(error)
+        ) {
           routeLog('retry', `${route.providerId}/${route.model} retry`, {
             attempt,
             maxAttempts: attempts,
             status,
           })
-          await new Promise(resolve =>
-            setTimeout(resolve, Math.min(1000, 100 * attempt)),
+          await waitForBackoff(Math.min(1000, 100 * attempt), signal)
+          continue
+        }
+        // A `gateway_unavailable` 502 means the whole local gateway account
+        // pool is down; it self-recovers once the backends restart. Give it a
+        // longer bounded window than generic transient errors.
+        if (isGatewayUnavailable(error) && attempt < GATEWAY_RETRIES) {
+          const delayMs = 1000 * 2 ** (attempt - 1)
+          routeLog('retry', `${route.providerId}/${route.model} retry`, {
+            attempt,
+            maxAttempts: GATEWAY_RETRIES,
+            delayMs,
+            status,
+            reason: 'gateway_unavailable',
+          })
+          await waitForBackoff(delayMs, signal)
+          continue
+        }
+        const transient =
+          status == null || status === 408 || status === 425 || status >= 500
+        if (route.kind !== 'opencode' && transient && attempt < attempts) {
+          const delayMs = 250 * 2 ** (attempt - 1)
+          routeLog('retry', `${route.providerId}/${route.model} retry`, {
+            attempt,
+            maxAttempts: attempts,
+            delayMs,
+            status,
+          })
+          await waitForBackoff(delayMs, signal)
+<<<<<<< Updated upstream
+          continue
+        }
+        if (
+          isOmniRoute &&
+          attempt < attempts &&
+          isOmniRouteTransientError(error)
+        ) {
+          routeLog(
+            'retry',
+            `${route.providerId}/${route.model} gateway retry`,
+            {
+              attempt,
+              maxAttempts: attempts,
+              status,
+            },
           )
+          await waitForBackoff(omniRouteBackoffMs(error, attempt), signal)
+=======
+>>>>>>> Stashed changes
           continue
         }
         const scope = routeFailureScope(error)
@@ -532,6 +769,8 @@ export async function* retryDirectProviderStream(
         if (scope === 'provider') {
           skippedProviders.add(route.providerId)
           markProviderFailure(route.providerId)
+          recordCircuitFailure('provider', route.providerId)
+          if (status === 404) recordProviderNotAdmitted(route.providerId, 404)
           routeError(
             `${route.providerId} unavailable; skipping its remaining routes`,
             {
@@ -541,12 +780,23 @@ export async function* retryDirectProviderStream(
         } else if (scope === 'model') {
           skippedModels.add(modelKey)
           markModelFailure(route.providerId, route.model)
+          if (status === 404)
+            recordModelNotAdmitted(route.providerId, route.model, 404)
+          recordCircuitFailure('model', route.providerId, route.model)
           routeError(`${modelKey} invalid; skipping its remaining accounts`, {
             status,
           })
         } else if (scope === 'account' && accountKey) {
           skippedAccounts.add(accountKey)
           markAccountFailure(route.providerId, route.accountId!)
+          recordCircuitFailure(
+            'account',
+            route.providerId,
+            undefined,
+            route.accountId!,
+          )
+          if (status === 401 || status === 403)
+            recordAccountNotAdmitted(route.providerId, route.accountId!, status)
           routeError(
             `${accountKey} unavailable; skipping its remaining routes`,
             {
@@ -575,6 +825,7 @@ export async function* retryTierDirectProviderStream(
 ): AsyncGenerator<ChatCompletionChunk, void> {
   let lastError: unknown
   for (const route of routes) {
+    let streamMeaningful = false
     const attemptController = new AbortController()
     const abortAttempt = () => attemptController.abort()
     signal.addEventListener('abort', abortAttempt, { once: true })
@@ -584,11 +835,17 @@ export async function* retryTierDirectProviderStream(
         [route],
         current => createStream(current, attemptController.signal),
         attemptController.signal,
-        () => clearTimeout(timeout),
+        () => {
+          streamMeaningful = true
+          clearTimeout(timeout)
+        },
       )
       return
     } catch (error) {
       if (signal.aborted) throw error
+      // Never replay: once this route produced meaningful output, falling
+      // through to the next route would regenerate the whole assistant turn.
+      if (streamMeaningful) throw error
       lastError = error
     } finally {
       clearTimeout(timeout)
@@ -610,7 +867,6 @@ export async function* raceDirectProviderStream(
 ): AsyncGenerator<ChatCompletionChunk, void> {
   type Contender = {
     route: DirectRoute
-    iterator: AsyncIterator<ChatCompletionChunk>
     events: ChatCompletionChunk[]
     elapsedMs: number
     text: string
@@ -630,38 +886,52 @@ export async function* raceDirectProviderStream(
     try {
       await waitForRaceDelay(route.raceDelayMs ?? 0, requestSignal)
       const stream = await createStream(route, requestSignal)
-      const iterator = stream[Symbol.asyncIterator]()
       const events: ChatCompletionChunk[] = []
       const streamText = { text: '' }
       let toolCalls = 0
       let dsml = false
-      for (;;) {
-        const next = await iterator.next()
-        if (next.done) {
-          throw new ProviderOutputError(
-            `${route.model} returned an empty stream`,
-          )
-        }
-        const event = next.value
+      for await (const event of stream) {
         events.push(event)
         toolCalls += eventToolCalls(event)
         throwIfUpstreamBlocked(event, streamText)
         dsml ||= isDsmlStart(streamText.text)
-        if (
-          (dsml && isDsmlComplete(streamText.text)) ||
-          (!dsml && isMeaningfulOpenAIEvent(event))
-        ) {
-          return {
-            route,
-            iterator,
-            events: dsml
-              ? normalizeDsmlEvents(events, streamText.text)
-              : events,
-            elapsedMs: Date.now() - started,
-            text: streamText.text,
-            toolCalls,
-          }
-        }
+      }
+      if (events.length === 0) {
+        throw new ProviderOutputError(`${route.model} returned an empty stream`)
+      }
+      if (isInvalidProviderText(streamText.text)) {
+        throw new ProviderOutputError(
+          `${route.model} returned invalid provider text`,
+        )
+      }
+      const finalEvents = dsml
+        ? normalizeDsmlEvents(events, streamText.text)
+        : events
+      if (
+        !dsml &&
+        !events.some(event => isContentfulOpenAIEvent(event)) &&
+        !events.some(event => eventToolCalls(event) > 0)
+      ) {
+        throw new ProviderOutputError(
+          `${route.model} returned no valid completion`,
+        )
+      }
+      if (dsml && !isDsmlComplete(streamText.text)) {
+        throw new ProviderOutputError(
+          `${route.model} returned an incomplete tool call`,
+        )
+      }
+      if (finalEvents.length === 0) {
+        throw new ProviderOutputError(
+          `${route.model} returned no valid completion`,
+        )
+      }
+      return {
+        route,
+        events: finalEvents,
+        elapsedMs: Date.now() - started,
+        text: streamText.text,
+        toolCalls,
       }
     } catch (error) {
       const status = (error as { status?: number } | undefined)?.status
@@ -678,7 +948,11 @@ export async function* raceDirectProviderStream(
         outcome: requestSignal.aborted ? 'cancelled' : 'failed',
         elapsedMs: Date.now() - started,
         ...(status === undefined ? {} : { status }),
-        errorCategory: classifyErrorStatus(status, requestSignal.aborted),
+        errorCategory: classifyErrorStatus(
+          status,
+          requestSignal.aborted,
+          error instanceof Error ? error.message : String(error),
+        ),
       })
       throw error
     }
@@ -689,11 +963,11 @@ export async function* raceDirectProviderStream(
       `start (${routes.length})`,
       routes.map(route => `${route.accountId ?? 'default'}:${route.model}`),
     )
-    // Race until a quorum of contenders returns a meaningful first response,
+    // Race until a quorum of contenders returns a complete, valid result,
     // then pick the best and stop the rest immediately. If fewer than the
     // quorum ever respond, decide as soon as every attempt settles so we still
     // return the best available (or fail through to L2 when none respond).
-    const quorum = Math.min(RACE_QUORUM, routes.length)
+    const quorum = Math.max(1, Math.ceil(routes.length / 2))
     const collected: Contender[] = []
     let settled = 0
     let decided = false
@@ -765,14 +1039,6 @@ export async function* raceDirectProviderStream(
       },
     )
     yield* winner.events
-    for (;;) {
-      const next = await winner.iterator.next()
-      if (next.done) break
-      winner.text += eventText(next.value)
-      winner.toolCalls += eventToolCalls(next.value)
-      winner.events.push(next.value)
-      yield next.value
-    }
     recordRaceMetric({
       at: new Date().toISOString(),
       raceId,
@@ -916,8 +1182,11 @@ async function createRouteStream(
       throw err
     }
   }
-  const doCreate = (strip: boolean) =>
-    getOpenAIClient({
+  const doCreate = (strip: boolean) => {
+    if (route.routeId) {
+      beginCcbRoute(route.routeId, route.model, route.receiptPolicy ?? 'none')
+    }
+    return getOpenAIClient({
       maxRetries: 0,
       baseURL: route.baseURL,
       apiKey: resolvedApiKey,
@@ -925,9 +1194,11 @@ async function createRouteStream(
       timeoutMs: route.timeoutMs,
       providerId: route.providerId,
       accountId: route.accountId,
+      receiptPolicy: route.receiptPolicy,
       fetchOverride: params.fetchOverride,
       source: params.source,
     }).chat.completions.create(buildBody(strip), { signal })
+  }
   if (!params.allowReasoningStrip) return doCreate(false)
   const sentReasoning = Boolean(
     params.reasoningEffort || params.reasoningSummary,
@@ -956,11 +1227,11 @@ async function* allOfRaceStream(
   signal: AbortSignal,
   onSelected?: () => void,
 ): AsyncGenerator<ChatCompletionChunk, void> {
-  if (!RACE_ALL_OF || routes.length < 2) {
-    yield* raceDirectProviderStream(routes, createStream, signal)
+  const mode = raceAllOfMode()
+  if (!mode || routes.length < 2) {
+    yield* raceDirectProviderStream(routes, createStream, signal, onSelected)
     return
   }
-  const quorum = Math.min(RACE_QUORUM, routes.length)
   const started = Date.now()
   const controllers = new Map(
     routes.map(route => [route, new AbortController()] as const),
@@ -996,13 +1267,18 @@ async function* allOfRaceStream(
         (r): r is PromiseFulfilledResult<Completed> => r.status === 'fulfilled',
       )
       .map(r => r.value)
-      .filter(
-        c => c.fullText.trim().length > 0 && !isInvalidProviderText(c.fullText),
-      )
+      .filter(c => c.fullText.trim().length > 0 && !isJunkContent(c.fullText))
     if (completed.length < 2) {
       if (completed.length === 1) {
         const stream = await createStream(completed[0].route, signal)
-        yield* stream
+        let streamMeaningful = false
+        for await (const event of stream) {
+          if (!streamMeaningful && isMeaningfulOpenAIEvent(event)) {
+            streamMeaningful = true
+            onSelected?.()
+          }
+          yield event
+        }
         return
       }
       throw new ProviderOutputError('allOf: no quorum completed')
@@ -1011,17 +1287,21 @@ async function* allOfRaceStream(
       model: c.route.model,
       text: c.fullText,
     }))
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
     const fused = fuseAnswers(answers, RACE_ALL_OF)
+    if (!fused || isJunkContent(fused))
+=======
+=======
+>>>>>>> Stashed changes
+    const fused = fuseAnswers(answers, mode)
     if (!fused || !hasMeaningfulContent(fused))
+>>>>>>> Stashed changes
       throw new ProviderOutputError('allOf: fusion returned low-quality output')
     onSelected?.()
-    routeLog(
-      'race',
-      `allOf fused ${completed.length} responses -> ${RACE_ALL_OF}`,
-      {
-        models: completed.map(c => c.route.model).join(', '),
-      },
-    )
+    routeLog('race', `allOf fused ${completed.length} responses -> ${mode}`, {
+      models: completed.map(c => c.route.model).join(', '),
+    })
     recordRaceMetric({
       at: new Date().toISOString(),
       provider: answers[0].model.split('/')[0] || 'fused',
@@ -1029,7 +1309,7 @@ async function* allOfRaceStream(
       account: 'allOf',
       outcome: 'selected',
       elapsedMs: Date.now() - started,
-      responseValid: hasMeaningfulContent(fused),
+      responseValid: !isJunkContent(fused),
     })
     const baseChunk = {
       id: `allOf-${Date.now()}`,
@@ -1045,23 +1325,29 @@ async function* allOfRaceStream(
   }
 }
 
-async function* raceThenFallbackStream(
+export async function* raceThenFallbackStream(
   tierGroups: DirectRoute[][],
   createStream: (
     route: DirectRoute,
     signal: AbortSignal,
   ) => Promise<AsyncIterable<ChatCompletionChunk>>,
   signal: AbortSignal,
+  isVisionRequest = false,
 ): AsyncGenerator<ChatCompletionChunk, void> {
   const [l1Group, ...fallbackGroups] = tierGroups
   const l1Controller = new AbortController()
   const abortL1 = () => l1Controller.abort()
   signal.addEventListener('abort', abortL1, { once: true })
   let l1TimedOut = false
+  let streamMeaningful = false
   const timeout = setTimeout(() => {
     l1TimedOut = true
     abortL1()
   }, AUTO_L1_RACE_TIMEOUT_MS)
+  const markStreamMeaningful = () => {
+    streamMeaningful = true
+    clearTimeout(timeout)
+  }
   const raceRoutes = (l1Group ?? []).filter(
     route => route.race || route.kind === 'race',
   )
@@ -1074,32 +1360,56 @@ async function* raceThenFallbackStream(
         raceRoutes,
         createStream,
         l1Controller.signal,
-        () => clearTimeout(timeout),
+        markStreamMeaningful,
       )
     else if (downgradeRoutes.length)
       yield* retryDirectProviderStream(
         downgradeRoutes,
         route => createStream(route, l1Controller.signal),
         l1Controller.signal,
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+        undefined,
+        isVisionRequest,
+=======
+        markStreamMeaningful,
+>>>>>>> Stashed changes
+=======
+        markStreamMeaningful,
+>>>>>>> Stashed changes
       )
   } catch (error) {
-    if (signal.aborted) throw error
+    if (signal.aborted || streamMeaningful) throw error
     if (l1TimedOut)
       routeError('auto L1 race budget exhausted; entering fallback tiers', {
         l1: (l1Group ?? []).length,
         fallback: fallbackGroups.reduce((n, g) => n + g.length, 0),
         timeoutMs: AUTO_L1_RACE_TIMEOUT_MS,
       })
+    // Surface the error from the route whose retry budget was most recently
+    // exhausted, not the stale L1 failure captured at the start of escalation.
+    let lastError = error
     if (!l1Controller.signal.aborted && downgradeRoutes.length) {
       try {
         yield* retryDirectProviderStream(
           downgradeRoutes,
           route => createStream(route, l1Controller.signal),
           l1Controller.signal,
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+          undefined,
+          isVisionRequest,
+=======
+          markStreamMeaningful,
+>>>>>>> Stashed changes
+=======
+          markStreamMeaningful,
+>>>>>>> Stashed changes
         )
         return
       } catch (downgradeError) {
-        if (signal.aborted) throw downgradeError
+        if (signal.aborted || streamMeaningful) throw downgradeError
+        lastError = downgradeError
       }
     }
     // Escalate through L2..L6 (and any further tiers) in order.
@@ -1121,14 +1431,25 @@ async function* raceThenFallbackStream(
           group,
           route => createStream(route, signal),
           signal,
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+          undefined,
+          isVisionRequest,
+=======
+          markStreamMeaningful,
+>>>>>>> Stashed changes
+=======
+          markStreamMeaningful,
+>>>>>>> Stashed changes
         )
         return
       } catch (tierError) {
-        if (signal.aborted) throw tierError
+        if (signal.aborted || streamMeaningful) throw tierError
+        lastError = tierError
         level++
       }
     }
-    throw error
+    throw lastError
   } finally {
     clearTimeout(timeout)
     signal.removeEventListener('abort', abortL1)
@@ -1253,7 +1574,7 @@ export async function* queryModelOpenAI(
     const advisorFallbackRoutes = explicitRoutes.filter(
       route => route.providerId !== LOCAL_CODEX_ADVISOR,
     )
-    const directRoutes: DirectRoute[] =
+    const originalDirectRoutes: DirectRoute[] =
       advisorFallbackRoutes.length > 0
         ? advisorFallbackRoutes
         : getAPIProvider() === 'opencode-free'
@@ -1262,7 +1583,7 @@ export async function* queryModelOpenAI(
                 providerId: 'opencode',
                 baseURL: OPENCODE_FREE_BASE_URL,
                 model:
-                  process.env.OPENCODE_FREE_MODEL ??
+                  currentFreeOpenCodeModels()[0] ??
                   getOpencodeModelName(options.model),
                 apiKey: 'public',
                 headers: {
@@ -1273,14 +1594,25 @@ export async function* queryModelOpenAI(
               },
             ]
           : []
-    const directRoute: DirectRoute | undefined = directRoutes[0]
+    // Policy snapshot: the resolved routes as-is (virtual-model, Codex advisor,
+    // server-side routing decisions). The race pool below must not leak into
+    // these reads — dispatch uses effectiveDirectRoutes instead.
+    const originalDirectRoute: DirectRoute | undefined = originalDirectRoutes[0]
+    const isOmniRouteServerRouting =
+      originalDirectRoute?.providerId === 'omniroute' &&
+      getOmniRouteConfig()?.serverSideRouting === true
+
+    // L1 direct race pool: OpenCode free + NVIDIA models race concurrently
+    // in front of the resolved routes; the OmniRoute gateway drops to L2
+    // fallback. An empty pool leaves the routes untouched.
+    const effectiveDirectRoutes = buildDirectRacePool(originalDirectRoutes)
 
     // Provider-prefixed models use CCB's direct transport; ChatGPT Responses
     // must not receive those ids.
     const isOpencodeRoute =
       isOpencodeModel(options.model) ||
       getAPIProvider() === 'opencode-free' ||
-      (directRoute !== undefined && !isLocalCodexAdvisor)
+      (originalDirectRoute !== undefined && !isLocalCodexAdvisor)
 
     // 1. Resolve model name. Provider ids pass through direct routing; opencode/*
     //    ids get the prefix stripped for re-prefixing below; ccb/* ids get
@@ -1290,8 +1622,8 @@ export async function* queryModelOpenAI(
     // advisor combo, so no OmniRoute/gateway is part of this path.
     const openaiModel = isLocalCodexAdvisor
       ? CHATGPT_CODEX_DEFAULT_MODEL
-      : directRoute
-        ? directRoute.model
+      : originalDirectRoute
+        ? originalDirectRoute.model
         : isOpencodeRoute
           ? getOpencodeModelName(options.model)
           : isCCBRoutingModel(options.model)
@@ -1375,15 +1707,22 @@ export async function* queryModelOpenAI(
       systemPrompt,
       { enableThinking },
     )
+    // Vision requests need their stream text passed through the vision
+    // semantic gate: some gateways return an image/data URL instead of an
+    // explanation, and that must be treated as a failed route, not success.
+    const isVisionRequest = openaiMessages.some(message =>
+      containsVisionInput(message),
+    )
     const openaiTools = anthropicToolsToOpenAI(standardTools)
     const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
-    const reasoningEffort = getChatGPTResponsesReasoningEffort(
-      options.effortValue,
-    )
+    const reasoningEffort = isOmniRouteServerRouting
+      ? undefined
+      : getChatGPTResponsesReasoningEffort(options.effortValue)
     // Direct routes need their concrete effort value. Provider-specific
     // sanitizers below reduce unsupported levels before sending.
     const appliedEffort =
-      isOpencodeRoute || directRoutes.length > 0
+      !isOmniRouteServerRouting &&
+      (isOpencodeRoute || effectiveDirectRoutes.length > 0)
         ? resolveAppliedEffort(options.model, options.effortValue)
         : undefined
     const reasoningEffortParam =
@@ -1438,8 +1777,8 @@ export async function* queryModelOpenAI(
     // opencode/* ids gain the provider prefix expected by the direct endpoint.
     const requestModel = isLocalCodexAdvisor
       ? openaiModel
-      : directRoute
-        ? directRoute.model
+      : originalDirectRoute
+        ? originalDirectRoute.model
         : isOpencodeModel(options.model)
           ? `opencode/${openaiModel}`
           : isCCBModel(options.model)
@@ -1474,39 +1813,50 @@ export async function* queryModelOpenAI(
         enableThinking,
         maxTokens,
         reasoningEffort: clampReasoningEffort(
-          directRoute?.providerId ?? (isOpencodeRoute ? 'opencode' : undefined),
+          originalDirectRoute?.providerId ??
+            (isOpencodeRoute ? 'opencode' : undefined),
           reasoningEffortParam,
         ),
         reasoningSummary:
-          directRoute?.providerId === 'codebuddy-cn' ? 'auto' : undefined,
+          originalDirectRoute?.providerId === 'codebuddy-cn'
+            ? 'auto'
+            : undefined,
         temperatureOverride: options.temperatureOverride,
       })
-      const compatibleBody = directRoute?.compatRule
+      const compatibleBody = originalDirectRoute?.compatRule
         ? applyCompatRule(
             body as unknown as Record<string, unknown>,
-            directRoute.compatRule,
+            originalDirectRoute.compatRule,
           )
         : body
       const sanitizedBody =
-        directRoute?.providerId === 'codebuddy-cn'
+        originalDirectRoute?.providerId === 'codebuddy-cn'
           ? sanitizeCodeBuddyRequestBody(
               compatibleBody as unknown as Record<string, unknown>,
             )
           : compatibleBody
       const requestBody =
-        directRoute?.providerId === 'nvidia'
+        originalDirectRoute?.providerId === 'nvidia'
           ? sanitizeNvidiaRequestBody(
               sanitizedBody as unknown as Record<string, unknown>,
             )
           : sanitizedBody
+      if (originalDirectRoute?.routeId) {
+        beginCcbRoute(
+          originalDirectRoute.routeId,
+          originalDirectRoute.model,
+          originalDirectRoute.receiptPolicy ?? 'none',
+        )
+      }
       return getOpenAIClient({
         maxRetries: 0,
-        baseURL: directRoute?.baseURL ?? OPENCODE_FREE_BASE_URL,
-        apiKey: directRoute?.apiKey ?? 'opencode-free-local',
-        defaultHeaders: directRoute?.headers,
-        timeoutMs: directRoute?.timeoutMs,
-        providerId: directRoute?.providerId,
-        accountId: directRoute?.accountId,
+        baseURL: originalDirectRoute?.baseURL ?? OPENCODE_FREE_BASE_URL,
+        apiKey: originalDirectRoute?.apiKey ?? 'opencode-free-local',
+        defaultHeaders: originalDirectRoute?.headers,
+        timeoutMs: originalDirectRoute?.timeoutMs,
+        providerId: originalDirectRoute?.providerId,
+        accountId: originalDirectRoute?.accountId,
+        receiptPolicy: originalDirectRoute?.receiptPolicy,
         fetchOverride: options.fetchOverride as unknown as typeof fetch,
         source: options.querySource,
       }).chat.completions.create(
@@ -1517,6 +1867,7 @@ export async function* queryModelOpenAI(
 
     const runDirectFallback = (
       routes: DirectRoute[],
+      isVisionRequest = false,
     ): AsyncIterable<ChatCompletionChunk> =>
       retryDirectProviderStream(
         routes,
@@ -1536,6 +1887,8 @@ export async function* queryModelOpenAI(
             allowReasoningStrip: true,
           }),
         signal,
+        undefined,
+        isVisionRequest,
       )
 
     // When the ChatGPT Codex account pool is exhausted or unavailable, fall
@@ -1548,20 +1901,21 @@ export async function* queryModelOpenAI(
     const codexFallbackRoutes = (): DirectRoute[] => {
       if (codexFallbackCache) return codexFallbackCache
       codexFallbackCache =
-        directRoutes.length > 0
-          ? directRoutes
+        effectiveDirectRoutes.length > 0
+          ? effectiveDirectRoutes
           : useChatGPTResponses
             ? resolveDirectRoutes('auto', advisorPrompt)
             : []
       return codexFallbackCache
     }
-    const useCodexFallback = useChatGPTResponses || directRoutes.length > 0
+    const useCodexFallback =
+      useChatGPTResponses || effectiveDirectRoutes.length > 0
 
     const rawStream:
       | AsyncIterable<ChatCompletionChunk>
       | AsyncIterable<Record<string, unknown>> = useChatGPTResponses
       ? await (async () => {
-          return await createChatGPTResponsesStream({
+          return createChatGPTResponsesStream({
             request: buildResponsesRequest({
               model: requestModel,
               messages: openaiMessages,
@@ -1576,23 +1930,25 @@ export async function* queryModelOpenAI(
               ? {
                   onAccountExhausted: () =>
                     chatCompletionsToResponses(
-                      runDirectFallback(codexFallbackRoutes()),
+                      runDirectFallback(codexFallbackRoutes(), isVisionRequest),
                     ),
                   onAccountUnavailable: () =>
                     chatCompletionsToResponses(
-                      runDirectFallback(codexFallbackRoutes()),
+                      runDirectFallback(codexFallbackRoutes(), isVisionRequest),
                     ),
                 }
               : {}),
           })
         })()
-      : await (directRoutes.some(route => route.kind === 'race' || route.race)
+      : await (effectiveDirectRoutes.some(
+          route => route.kind === 'race' || route.race,
+        )
           ? raceThenFallbackStream(
               (() => {
                 const tierOrder = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6'] as const
                 const byTier = new Map<string, DirectRoute[]>()
                 for (const t of tierOrder) byTier.set(t, [])
-                for (const r of directRoutes) {
+                for (const r of effectiveDirectRoutes) {
                   const t = r.tier && tierOrder.includes(r.tier) ? r.tier : 'l1'
                   byTier.get(t)!.push(r)
                 }
@@ -1615,10 +1971,11 @@ export async function* queryModelOpenAI(
                   allowReasoningStrip: true,
                 }),
               signal,
+              isVisionRequest,
             )
-          : directRoutes.length > 0
+          : effectiveDirectRoutes.length > 0
             ? retryDirectProviderStream(
-                directRoutes,
+                effectiveDirectRoutes,
                 route =>
                   createRouteStream(route, signal, {
                     messages: openaiMessages,
@@ -1634,6 +1991,8 @@ export async function* queryModelOpenAI(
                     allowReasoningStrip: true,
                   }),
                 signal,
+                undefined,
+                isVisionRequest,
               )
             : isOpencodeFree
               ? retryOpencodeFreeStream(() => createDirectRequest(), signal)

@@ -28,6 +28,7 @@ import {
   updateSessionTitle,
   updateSessionStatus,
   archiveSession,
+  isSessionClosedStatus,
   incrementEpoch,
   listSessions,
   listSessionSummaries,
@@ -136,6 +137,16 @@ describe('Session Service', () => {
       archiveSession(s.id)
       expect(getSession(s.id)?.status).toBe('archived')
       expect(getAllEventBuses().has(s.id)).toBe(false)
+    })
+  })
+
+  describe('isSessionClosedStatus', () => {
+    test('treats inactive as recoverable', () => {
+      expect(isSessionClosedStatus('inactive')).toBe(false)
+    })
+
+    test('treats archived as terminal', () => {
+      expect(isSessionClosedStatus('archived')).toBe(true)
     })
   })
 

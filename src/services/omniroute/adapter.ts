@@ -2,18 +2,30 @@
  * OmniRoute adapter — replaces the legacy ccbRouter runtime path.
  *
  * Direct-route resolution and account management go through the OmniRoute
- * OpenAI-compatible gateway. CCB enters through Headroom; Headroom forwards to
- * OmniRoute. Configuration priority is CCB_HEADROOM_BASE_URL, OMNIRUTE_URL,
- * OMNIROUTE_BASE_URL, OPENAI_BASE_URL, then local Headroom on port 8787.
+ * OpenAI-compatible gateway. Configuration priority is CCB_HEADROOM_BASE_URL,
+ * OMNIRUTE_URL, OMNIROUTE_BASE_URL, OPENAI_BASE_URL, then the canonical APISIX
+ * ingress on port 20128. APISIX owns the CCB-to-OmniRoute hop.
  */
 
+import { existsSync, readFileSync, statSync } from 'fs'
+import { basename, dirname, join, resolve } from 'path'
+import {
+  getOriginalCwd,
+  getProjectRoot,
+  getSessionId,
+} from '../../bootstrap/state.js'
+import { getGoal } from '../goal/goalState.js'
+import { findProvider, loadProviders } from '../providerRegistry/loader.js'
 import type { ProviderConfig } from '../providerRegistry/types.js'
+import { parseGitRemote } from '../../utils/detectRepository.js'
 
 export interface DirectRoute {
   providerId: string
   baseURL: string
   model: string
   apiKey: string
+  routeId?: 'omniroute/ccb-chat' | 'omniroute/9router' | '9router/direct'
+  receiptPolicy?: 'omniroute' | 'omniroute-9router' | 'none'
   headers?: Record<string, string>
   timeoutMs?: number
   compatRule?: ProviderConfig['compatRule']
@@ -23,6 +35,265 @@ export interface DirectRoute {
   tier?: 'l1' | 'l2' | 'l3' | 'l4' | 'l5' | 'l6'
   raceDelayMs?: number
   headroomMode?: 'token' | 'cache'
+}
+
+/**
+ * Identity CCB can safely provide to OmniRoute. Project and context-provider
+ * choice deliberately do not belong here: OmniRoute owns both decisions.
+ */
+export interface OmniRouteRequestMetadata {
+  workspace?: string
+  gitRemote?: string
+  gitRevision?: string
+  repo?: string
+  mission?: string
+  sessionId?: string
+}
+
+const gitRemoteCache = new Map<string, string | null>()
+const HEADER_CONTROL_CHARS = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`,
+  'g',
+)
+
+function headerValue(
+  value: string | undefined,
+  maxLength = 1024,
+): string | undefined {
+  if (!value) return undefined
+  const sanitized = value
+    .normalize('NFC')
+    .replace(HEADER_CONTROL_CHARS, ' ')
+    .trim()
+    .slice(0, maxLength)
+  return sanitized || undefined
+}
+
+function redactGitRemote(remote: string | undefined): string | undefined {
+  const value = headerValue(remote)
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return headerValue(url.toString().replace(/\/$/, ''))
+  } catch {
+    // SCP-style Git URLs have no URL parser support. They contain no password
+    // field, so keep their repository identity after normal header sanitizing.
+    return value
+  }
+}
+
+function remoteUrlFromConfig(configPath: string): string | undefined {
+  try {
+    const lines = readFileSync(configPath, 'utf8').split(/\r?\n/)
+    let currentRemote: string | undefined
+    let firstRemoteUrl: string | undefined
+    for (const line of lines) {
+      const section = line.match(/^\s*\[remote\s+"([^"]+)"\]\s*$/i)
+      if (section) {
+        currentRemote = section[1]
+        continue
+      }
+      if (/^\s*\[/.test(line)) {
+        currentRemote = undefined
+        continue
+      }
+      const url = line.match(/^\s*url\s*=\s*(.+?)\s*$/i)?.[1]
+      if (!currentRemote || !url) continue
+      if (currentRemote === 'origin') return url
+      firstRemoteUrl ??= url
+    }
+    return firstRemoteUrl
+  } catch {
+    return undefined
+  }
+}
+
+function gitDirectoryForWorkspace(workspace: string): string | undefined {
+  const dotGit = join(workspace, '.git')
+  try {
+    const stat = statSync(dotGit)
+    if (stat.isDirectory()) return dotGit
+    if (!stat.isFile()) return undefined
+    const gitFile = readFileSync(dotGit, 'utf8').trim()
+    const gitDir = gitFile.match(/^gitdir:\s*(.+)$/im)?.[1]
+    return gitDir ? resolve(dirname(dotGit), gitDir.trim()) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function gitCommonDirectory(gitDirectory: string): string | undefined {
+  try {
+    const commonDir = join(gitDirectory, 'commondir')
+    if (existsSync(commonDir)) {
+      const relativeCommonDir = readFileSync(commonDir, 'utf8').trim()
+      if (relativeCommonDir) {
+        return resolve(gitDirectory, relativeCommonDir)
+      }
+    }
+  } catch {
+    // A regular repository has no commondir file.
+  }
+  return undefined
+}
+
+function gitConfigPaths(workspace: string): string[] {
+  const gitDirectory = gitDirectoryForWorkspace(workspace)
+  if (!gitDirectory) return []
+  const commonDirectory = gitCommonDirectory(gitDirectory)
+  return [gitDirectory, commonDirectory]
+    .filter((value): value is string => Boolean(value))
+    .map(directory => join(directory, 'config'))
+}
+
+function normalizeGitRevision(value: string | undefined): string | undefined {
+  const revision = headerValue(value, 64)?.toLowerCase()
+  return revision && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(revision)
+    ? revision
+    : undefined
+}
+
+function isSafeGitRef(ref: string): boolean {
+  return (
+    /^refs\/[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ref) &&
+    !ref.includes('..') &&
+    !ref.includes('//') &&
+    !ref.endsWith('/')
+  )
+}
+
+function readGitRef(gitDirectory: string, ref: string): string | undefined {
+  try {
+    return normalizeGitRevision(
+      readFileSync(join(gitDirectory, ref), 'utf8').trim(),
+    )
+  } catch {
+    return undefined
+  }
+}
+
+function readPackedGitRef(
+  gitDirectory: string,
+  ref: string,
+): string | undefined {
+  try {
+    for (const line of readFileSync(
+      join(gitDirectory, 'packed-refs'),
+      'utf8',
+    ).split(/\r?\n/)) {
+      const match = line.match(/^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})\s+(.+)$/)
+      if (match?.[2] === ref) return normalizeGitRevision(match[1])
+    }
+  } catch {
+    // Loose refs cover usual active branches; packed refs are optional.
+  }
+  return undefined
+}
+
+function getGitRevisionForWorkspace(workspace: string): string | undefined {
+  const gitDirectory = gitDirectoryForWorkspace(workspace)
+  if (!gitDirectory) return undefined
+  try {
+    const head = readFileSync(join(gitDirectory, 'HEAD'), 'utf8').trim()
+    const detachedRevision = normalizeGitRevision(head)
+    if (detachedRevision) return detachedRevision
+    const ref = head.match(/^ref:\s*(.+)$/)?.[1]?.trim()
+    if (!ref || !isSafeGitRef(ref)) return undefined
+    const directories = [gitDirectory, gitCommonDirectory(gitDirectory)].filter(
+      (value): value is string => Boolean(value),
+    )
+    for (const directory of directories) {
+      const looseRevision = readGitRef(directory, ref)
+      if (looseRevision) return looseRevision
+      const packedRevision = readPackedGitRef(directory, ref)
+      if (packedRevision) return packedRevision
+    }
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+function getGitRemoteForWorkspace(workspace: string): string | undefined {
+  const cached = gitRemoteCache.get(workspace)
+  if (cached !== undefined) return cached ?? undefined
+  const remote = gitConfigPaths(workspace)
+    .map(remoteUrlFromConfig)
+    .find((value): value is string => Boolean(value))
+  gitRemoteCache.set(workspace, remote ?? null)
+  return remote
+}
+
+/** Collect request-scoped identity without resolving a Context project. */
+export function getOmniRouteRequestMetadata(): OmniRouteRequestMetadata {
+  let workspace: string | undefined
+  let sessionId: string | undefined
+  let mission: string | undefined
+  try {
+    workspace = headerValue(getProjectRoot() || getOriginalCwd())
+    sessionId = headerValue(getSessionId())
+    mission = headerValue(
+      getGoal()?.objective ?? process.env.OMNIROUTE_MISSION,
+      512,
+    )
+  } catch {
+    workspace = headerValue(process.cwd())
+  }
+  const gitRemote = workspace
+    ? redactGitRemote(getGitRemoteForWorkspace(workspace))
+    : undefined
+  const gitRevision = workspace
+    ? getGitRevisionForWorkspace(workspace)
+    : undefined
+  const parsedRemote = gitRemote ? parseGitRemote(gitRemote) : null
+  return {
+    workspace,
+    gitRemote,
+    gitRevision,
+    repo: headerValue(
+      parsedRemote?.name ?? (workspace ? basename(workspace) : undefined),
+    ),
+    mission,
+    sessionId,
+  }
+}
+
+function encodeMissionHeader(value: string | undefined): string | undefined {
+  const mission = headerValue(value, 2048)
+  return mission ? `uri:${encodeURIComponent(mission)}` : undefined
+}
+
+function encodeHeaderValue(value: string | undefined): string | undefined {
+  const sanitized = headerValue(value)
+  return sanitized ? `uri:${encodeURIComponent(sanitized)}` : undefined
+}
+
+/**
+ * Headers for the CCB-to-OmniRoute hop. They describe local request identity
+ * only; no `project`, context source, model, or MCP provider is sent by CCB.
+ */
+export function buildOmniRouteRequestHeaders(
+  metadata: OmniRouteRequestMetadata = getOmniRouteRequestMetadata(),
+): Record<string, string> {
+  // Client identity is descriptive only. OmniRoute owns pool, model, Context,
+  // and provider selection.
+  const headers: Record<string, string> = { 'X-OmniRoute-Client': 'ccb' }
+  const values: Array<[string, string | undefined]> = [
+    ['X-OmniRoute-Workspace', encodeHeaderValue(metadata.workspace)],
+    ['X-OmniRoute-Git-Remote', redactGitRemote(metadata.gitRemote)],
+    ['X-OmniRoute-Git-Revision', normalizeGitRevision(metadata.gitRevision)],
+    ['X-OmniRoute-Repo', headerValue(metadata.repo)],
+    ['X-OmniRoute-Mission', encodeMissionHeader(metadata.mission)],
+    ['X-OmniRoute-Session-Id', headerValue(metadata.sessionId)],
+  ]
+  for (const [name, value] of values) {
+    if (value) headers[name] = value
+  }
+  return headers
 }
 
 // ── Configuration ──────────────────────────────────────────────────
@@ -43,9 +314,14 @@ export function getOmniRouteConfig(): OmniRouteConfig | null {
     process.env.OMNIRUTE_URL ??
     process.env.OMNIROUTE_BASE_URL ??
     process.env.OPENAI_BASE_URL ??
-    'http://127.0.0.1:8787/v1'
+    'http://127.0.0.1:20128/v1'
   const apiKey =
-    process.env.OMNIRUTE_API_KEY ?? process.env.OMNIROUTE_API_KEY ?? ''
+    process.env.OMNIRUTE_API_KEY ??
+    process.env.OMNIROUTE_API_KEY ??
+    // OpenAI's SDK rejects an empty key before issuing the request. The local
+    // APISIX ingress is the authenticated boundary; this placeholder only
+    // enables its compatible transport when no caller credential is required.
+    'omniroute-local'
   cachedConfig = {
     baseUrl: baseUrl.replace(/\/+$/, ''),
     apiKey,
@@ -77,11 +353,207 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|ccb-main$)/i.test(raw) ||
+    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|hermes-score$|advisor$|review$|ultra$|smart$|opus$)/i.test(
+      raw,
+    ) ||
+    /^(?:ccb\/|ccb-main$)/i.test(raw) ||
     (raw.includes('/') &&
       !/^(?:advisor|lite|full|ultra|review|smart|opus)$/i.test(raw))
   if (!isGatewayRoute) return []
   return resolveViaOmniRoute(spec, prompt, config)
+}
+
+function resolveOmniRoute9RouterRoute(config: OmniRouteConfig): DirectRoute {
+  const model = process.env.OMNIROUTE_9ROUTER_MODEL?.trim()
+  if (!model || !/^9router\/[^/]+\/.+/.test(model)) {
+    throw new Error(
+      'Route omniroute/9router requires OMNIROUTE_9ROUTER_MODEL matching 9router/<provider>/<model>.',
+    )
+  }
+  return {
+    providerId: 'omniroute-9router',
+    baseURL: config.baseUrl,
+    model,
+    apiKey: config.apiKey,
+    routeId: 'omniroute/9router',
+    receiptPolicy: 'omniroute-9router',
+    headers: buildOmniRouteRequestHeaders(),
+    kind: 'provider',
+  }
+}
+
+function resolveDirect9RouterRoute(config: OmniRouteConfig): DirectRoute {
+  const baseURL = process.env.NINEROUTER_BASE_URL?.trim()
+  const model = process.env.NINEROUTER_MODEL?.trim()
+  const apiKey = process.env.NINEROUTER_API_KEY?.trim() || '9router-local'
+  if (!baseURL) {
+    throw new Error('Route 9router/direct requires NINEROUTER_BASE_URL.')
+  }
+  if (!model) {
+    throw new Error('Route 9router/direct requires NINEROUTER_MODEL.')
+  }
+  if (!apiKey) {
+    throw new Error('Route 9router/direct requires NINEROUTER_API_KEY.')
+  }
+  if (hasSameIngress(baseURL, config.baseUrl)) {
+    throw new Error(
+      'Route 9router/direct requires NINEROUTER_BASE_URL to differ from the OmniRoute ingress.',
+    )
+  }
+  return {
+    providerId: '9router',
+    baseURL: baseURL.replace(/\/+$/, ''),
+    model,
+    apiKey,
+    routeId: '9router/direct',
+    receiptPolicy: 'none',
+    kind: 'provider',
+  }
+}
+
+function hasSameIngress(left: string, right: string): boolean {
+  try {
+    const leftUrl = new URL(left)
+    const rightUrl = new URL(right)
+    return (
+      leftUrl.origin === rightUrl.origin &&
+      leftUrl.pathname.replace(/\/+$/, '') ===
+        rightUrl.pathname.replace(/\/+$/, '')
+    )
+  } catch {
+    return left.replace(/\/+$/, '') === right.replace(/\/+$/, '')
+  }
+}
+
+// ── Explicit Provider Route Resolution ─────────────────────────────
+//
+// `opencode/<model>` and `provider/model` specs bypass the broad OmniRoute
+// slash passthrough and resolve to a direct upstream route. Credentials come
+// from the local provider registry only — nothing here is ever sent to the
+// OmniRoute gateway.
+
+/** Hard-excluded provider id. */
+const BLOCKED_PROVIDER_ID = 'gitee'
+
+/** Non-secret placeholder for `noAuth` providers so they stay routable. */
+const NO_AUTH_PLACEHOLDER = 'ccb-public'
+
+const DEFAULT_OPENCODE_ZEN_BASE_URL = 'https://opencode.ai/zen/v1'
+
+function isBlockedProvider(providerId: string): boolean {
+  return providerId.toLowerCase() === BLOCKED_PROVIDER_ID
+}
+
+/** Resolve a provider-level credential: apiKey, then apiKeyEnv env value. */
+function resolveProviderKey(provider: ProviderConfig): string {
+  const direct = provider.apiKey?.trim()
+  if (direct) return direct
+  const fromEnv = provider.apiKeyEnv
+    ? (process.env[provider.apiKeyEnv]?.trim() ?? '')
+    : ''
+  return fromEnv
+}
+
+/** Resolve an account-level credential, falling back to the provider key. */
+function resolveAccountKey(
+  account: NonNullable<ProviderConfig['accounts']>[number],
+  providerKey: string,
+): string {
+  const direct = account.apiKey?.trim()
+  if (direct) return direct
+  const fromEnv = account.apiKeyEnv
+    ? (process.env[account.apiKeyEnv]?.trim() ?? '')
+    : ''
+  return fromEnv || providerKey
+}
+
+/**
+ * Choose accounts for a provider: every enabled account with a usable
+ * credential. Account-level `model` overrides are preserved. When a provider
+ * has no accounts array, a single provider-level account is returned if the
+ * provider itself is usable. `gitee` is hard-excluded; `noAuth` providers get
+ * a non-secret placeholder credential.
+ */
+export function chooseAccounts(
+  provider: ProviderConfig,
+): Array<{ id: string; apiKey: string; model?: string }> {
+  if (isBlockedProvider(provider.id)) return []
+  const providerKey = resolveProviderKey(provider)
+  const usableProviderKey =
+    providerKey || (provider.noAuth ? NO_AUTH_PLACEHOLDER : '')
+  if (provider.accounts === undefined) {
+    if (!usableProviderKey) return []
+    return [
+      {
+        id: 'provider-default',
+        apiKey: usableProviderKey,
+        model: provider.defaultModel,
+      },
+    ]
+  }
+  const accounts: Array<{ id: string; apiKey: string; model?: string }> = []
+  for (const account of provider.accounts) {
+    if (account.enabled === false) continue
+    if (account.quotaRemaining === 0) continue
+    const apiKey = resolveAccountKey(account, usableProviderKey)
+    if (!apiKey) continue
+    accounts.push({
+      id: account.id,
+      apiKey,
+      ...(account.model ? { model: account.model } : {}),
+    })
+  }
+  return accounts
+}
+
+function resolveOpenCodeRoute(model: string): DirectRoute {
+  return {
+    providerId: 'opencode',
+    baseURL: (
+      process.env.OPENCODE_ZEN_BASE_URL ?? DEFAULT_OPENCODE_ZEN_BASE_URL
+    ).replace(/\/+$/, ''),
+    model,
+    apiKey: 'public',
+    headers: {
+      'x-opencode-client': 'desktop',
+      Accept: 'text/event-stream',
+    },
+    receiptPolicy: 'none',
+    kind: 'opencode',
+  }
+}
+
+function resolveExplicitProviderRoutes(stripped: string): DirectRoute[] | null {
+  // `opencode/<model>` bypasses OmniRoute entirely and talks to Zen directly.
+  const openCode = /^opencode\/(.+)$/i.exec(stripped)
+  if (openCode?.[1]?.trim()) {
+    return [resolveOpenCodeRoute(openCode[1].trim())]
+  }
+  // Longest known provider id wins, so namespaced ids like `nvidia/z-ai/glm-5.2`
+  // match `nvidia` — not a shorter prefix like `n`.
+  const providers = loadProviders()
+  const providerId = providers
+    .map(p => p.id)
+    .filter(id => stripped.toLowerCase().startsWith(`${id.toLowerCase()}/`))
+    .sort((a, b) => b.length - a.length)[0]
+  if (!providerId) return null
+  if (isBlockedProvider(providerId)) return []
+  const model = stripped.slice(providerId.length + 1).trim()
+  if (!model) return null
+  const provider = findProvider(providerId, providers)
+  if (!provider) return null
+  return chooseAccounts(provider).map(account => ({
+    providerId,
+    baseURL: provider.baseUrl.replace(/\/+$/, ''),
+    model: account.model ?? model,
+    apiKey: account.apiKey,
+    accountId: account.id,
+    headers: provider.headers,
+    timeoutMs: provider.timeoutMs,
+    compatRule: provider.compatRule,
+    receiptPolicy: 'none' as const,
+    kind: 'provider' as const,
+  }))
 }
 
 function resolveViaOmniRoute(
@@ -94,9 +566,18 @@ function resolveViaOmniRoute(
   const trimmed = spec.trim()
   if (!trimmed) return []
 
-  // Strip ccb/ prefix. Legacy CCB's bare auto/race aliases are client-side
-  // concepts; map them to OmniRoute's server-side smart combo.
+  // CCB has one routing policy. Do not let legacy auto/race aliases enter paid
+  // auto combos; explicit provider/model specs remain passthrough diagnostics.
+  //
+  // `ccb/<provider>/<model>` is gateway-exclusive: CCB sends it to the APISIX
+  // ingress and OmniRoute owns account fallback. Stripping the prefix first and
+  // letting explicit-provider resolution match would hand the request straight
+  // to the upstream, bypassing the ingress this file is named for. Bare
+  // `provider/model` (no `ccb/` prefix) still resolves directly.
+  const isCcbPrefixed = /^ccb\//i.test(trimmed)
   const stripped = trimmed.replace(/^ccb\//i, '')
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const modelSpec = /^(?:auto|race|ccb-main)$/i.test(stripped)
     ? 'auto/smart'
     : stripped
@@ -140,13 +621,111 @@ function resolveViaOmniRoute(
       kind: 'provider',
     },
   ]
+=======
+  if (/^omniroute\/9router$/i.test(trimmed)) {
+    return [resolveOmniRoute9RouterRoute(config)]
+  }
+  if (/^9router\/direct$/i.test(trimmed)) {
+    return [resolveDirect9RouterRoute(config)]
+  }
+  if (!isCcbPrefixed) {
+    const explicitRoutes = resolveExplicitProviderRoutes(stripped)
+    if (explicitRoutes) return explicitRoutes
+  }
+  const modelSpec = /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
+    ? 'ccb-plan'
+    : /^(?:review)$/i.test(stripped)
+      ? 'ccb-review'
+      : /^(?:work)$/i.test(stripped)
+        ? 'ccb-coding'
+        : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
+          ? 'ccb-chat'
+          : stripped
+
+  const route: DirectRoute = {
+    providerId: 'omniroute',
+    baseURL: config.baseUrl,
+    model: modelSpec,
+    apiKey: config.apiKey,
+    routeId: 'omniroute/ccb-chat',
+    receiptPolicy: 'omniroute',
+    headers: buildOmniRouteRequestHeaders(),
+    kind: 'provider',
+  }
+
+  // Handle auto/race specs
+  if (
+    /^ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score)$/i.test(
+      modelSpec,
+    )
+  ) {
+    if (config.serverSideRouting) {
+      // OmniRoute handles routing server-side
+      return [route]
+    }
+    // Client-side: return the spec as-is and let the caller iterate
+    return [route]
+  }
+
+  // Regular provider/model — pass through to OmniRoute
+  return [route]
+>>>>>>> Stashed changes
+=======
+  if (/^omniroute\/9router$/i.test(trimmed)) {
+    return [resolveOmniRoute9RouterRoute(config)]
+  }
+  if (/^9router\/direct$/i.test(trimmed)) {
+    return [resolveDirect9RouterRoute(config)]
+  }
+  if (!isCcbPrefixed) {
+    const explicitRoutes = resolveExplicitProviderRoutes(stripped)
+    if (explicitRoutes) return explicitRoutes
+  }
+  const modelSpec = /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
+    ? 'ccb-plan'
+    : /^(?:review)$/i.test(stripped)
+      ? 'ccb-review'
+      : /^(?:work)$/i.test(stripped)
+        ? 'ccb-coding'
+        : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
+          ? 'ccb-chat'
+          : stripped
+
+  const route: DirectRoute = {
+    providerId: 'omniroute',
+    baseURL: config.baseUrl,
+    model: modelSpec,
+    apiKey: config.apiKey,
+    routeId: 'omniroute/ccb-chat',
+    receiptPolicy: 'omniroute',
+    headers: buildOmniRouteRequestHeaders(),
+    kind: 'provider',
+  }
+
+  // Handle auto/race specs
+  if (
+    /^ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score)$/i.test(
+      modelSpec,
+    )
+  ) {
+    if (config.serverSideRouting) {
+      // OmniRoute handles routing server-side
+      return [route]
+    }
+    // Client-side: return the spec as-is and let the caller iterate
+    return [route]
+  }
+
+  // Regular provider/model — pass through to OmniRoute
+  return [route]
+>>>>>>> Stashed changes
 }
 
 // ── Provider Model Listing ─────────────────────────────────────────
 
 /**
- * List available provider models. When OmniRoute is configured,
- * queries the OmniRoute gateway; otherwise returns empty.
+ * List configured generation providers and their models (excluding gitee),
+ * plus the omniroute gateway's `auto` entry. No credentials are exposed.
  */
 export function listDirectProviderModels(): Array<{
   providerId: string
@@ -154,30 +733,17 @@ export function listDirectProviderModels(): Array<{
 }> {
   const config = getOmniRouteConfig()
   if (!config) return []
-  // OmniRoute is a single gateway — report it as a single provider
-  return [{ providerId: 'omniroute', models: ['auto'] }]
+  const providers = loadProviders()
+    .filter(p => !isBlockedProvider(p.id))
+    .map(p => ({
+      providerId: p.id,
+      models: p.models ?? (p.defaultModel ? [p.defaultModel] : []),
+    }))
+    .filter(entry => entry.models.length > 0)
+  return [...providers, { providerId: 'omniroute', models: ['auto'] }]
 }
 
 // ── Account Pool ───────────────────────────────────────────────────
-
-/**
- * Choose accounts for a provider. When OmniRoute is configured,
- * the gateway manages accounts server-side; return a single
- * synthetic account so callers don't skip the provider.
- */
-export function chooseAccounts(
-  provider: ProviderConfig,
-): Array<{ id: string; apiKey: string; model?: string }> {
-  const config = getOmniRouteConfig()
-  if (!config) return []
-  return [
-    {
-      id: 'omniroute-default',
-      apiKey: config.apiKey,
-      model: provider.defaultModel,
-    },
-  ]
-}
 
 /**
  * Wait for a provider request slot. OmniRoute handles rate limiting
@@ -270,9 +836,17 @@ export function classifyErrorStatus(
   return 'unknown'
 }
 
+export type CcbRouteId = NonNullable<DirectRoute['routeId']>
+
+export type CcbRouteProof = 'pending' | 'verified' | 'unverified' | 'direct'
+
 export interface ActiveCcbRoute {
   provider: string
   model: string
+  selectedRouteId?: CcbRouteId
+  requestedRouteId?: CcbRouteId
+  requestedModel?: string
+  proof?: CcbRouteProof
 }
 
 export interface OmniRouteReceipt {
@@ -283,10 +857,33 @@ export interface OmniRouteReceipt {
   fallbackAttempts?: number
   compression?: string
   decision?: string
+  cognitiveTask?: string
   cognitivePool?: string
+  cognitiveContext?: string
   cognitiveEffort?: string
+  cache?: string
+  cacheHit?: boolean
   contextProject?: string
+  contextProjectSource?: string
   contextSources?: string
+  contextCache?: string
+  contextBundle?: string
+  contextTokens?: number
+  contextFingerprint?: string
+  contextCacheHit?: boolean
+  routingReason?: string
+  cacheDebug?: OmniRouteCacheDebug
+}
+
+/** Header-safe cache observability emitted by OmniRoute. */
+export interface OmniRouteCacheDebug {
+  client?: string
+  routePool?: string
+  sessionId?: string
+  conversationFingerprint?: string
+  contextHash?: string
+  cacheKey?: string
+  missReason?: string | null
 }
 
 let lastOmniRouteReceipt: OmniRouteReceipt | null = null
@@ -306,11 +903,19 @@ export function getLastOmniRouteError(): string | null {
 export function parseOmniRouteReceipt(
   headers: Headers,
 ): OmniRouteReceipt | null {
-  const value = (name: string) => headers.get(name) ?? undefined
+  const value = (name: string, maxLength = 1024) =>
+    headerValue(headers.get(name) ?? undefined, maxLength)
   const number = (name: string) => {
     const n = Number(value(name))
     return Number.isFinite(n) ? n : undefined
   }
+  const boolean = (name: string) => {
+    const raw = value(name)?.toLowerCase()
+    return raw === 'true' ? true : raw === 'false' ? false : undefined
+  }
+  const cacheDebug = parseOmniRouteCacheDebug(
+    value('x-omniroute-cache-debug', 16_384),
+  )
   const receipt: OmniRouteReceipt = {
     requestId: value('x-omniroute-request-id'),
     provider: value('x-omniroute-provider'),
@@ -319,14 +924,63 @@ export function parseOmniRouteReceipt(
     fallbackAttempts: number('x-omniroute-fallback-attempts'),
     compression: value('x-omniroute-compression'),
     decision: value('x-omniroute-decision'),
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    cognitiveTask: value('x-omniroute-cognitive-task'),
     cognitivePool: value('x-omniroute-cognitive-pool'),
+    cognitiveContext: value('x-omniroute-cognitive-context'),
     cognitiveEffort: value('x-omniroute-cognitive-effort'),
+    cache: value('x-omniroute-cache'),
+    cacheHit: boolean('x-omniroute-cache-hit'),
     contextProject: value('x-omniroute-context-project'),
+    contextProjectSource: value('x-omniroute-context-project-source'),
     contextSources: value('x-omniroute-context-sources'),
+    contextCache: value('x-omniroute-context-cache'),
+    contextBundle: value('x-omniroute-context-bundle', 16_384),
+    contextTokens: number('x-omniroute-context-tokens'),
+    contextFingerprint: value('x-omniroute-context-fingerprint'),
+    contextCacheHit: boolean('x-omniroute-context-cache-hit'),
+    routingReason: value('x-omniroute-routing-reason'),
+    cacheDebug,
   }
   if (!Object.values(receipt).some(v => v !== undefined)) return null
   lastOmniRouteReceipt = receipt
+  if (receipt.provider && receipt.model) {
+    setActiveCcbRoute(receipt.provider, receipt.model)
+  }
   return receipt
+}
+
+function parseOmniRouteCacheDebug(
+  raw: string | undefined,
+): OmniRouteCacheDebug | undefined {
+  if (!raw) return undefined
+  try {
+    const value = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined
+    }
+    const result: OmniRouteCacheDebug = {}
+    for (const field of [
+      'client',
+      'routePool',
+      'sessionId',
+      'conversationFingerprint',
+      'contextHash',
+      'cacheKey',
+    ] as const) {
+      const entry = value[field]
+      if (typeof entry === 'string') result[field] = headerValue(entry, 128)
+    }
+    if (typeof value.missReason === 'string') {
+      result.missReason = headerValue(value.missReason, 256)
+    } else if (value.missReason === null) {
+      result.missReason = null
+    }
+    return Object.keys(result).length ? result : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function getLastOmniRouteReceipt(): OmniRouteReceipt | null {
@@ -341,6 +995,57 @@ export function setActiveCcbRoute(provider: string, model: string): void {
 
 export function getActiveCcbRoute(): ActiveCcbRoute | null {
   return activeCcbRoute
+}
+
+export function beginCcbRoute(
+  routeId: CcbRouteId,
+  model: string,
+  receiptPolicy: DirectRoute['receiptPolicy'],
+): void {
+  const proof: CcbRouteProof = receiptPolicy === 'none' ? 'direct' : 'pending'
+  activeCcbRoute = {
+    provider: '',
+    model: '',
+    selectedRouteId: routeId,
+    requestedRouteId: routeId,
+    requestedModel: model,
+    proof,
+  }
+  // Clear any stale receipt/error for new request
+  lastOmniRouteReceipt = null
+  lastOmniRouteError = null
+}
+
+export function clearCcbRoute(): void {
+  activeCcbRoute = null
+  lastOmniRouteReceipt = null
+  lastOmniRouteError = null
+}
+
+export function updateCcbRouteFromReceipt(
+  receipt: OmniRouteReceipt,
+  receiptPolicy: DirectRoute['receiptPolicy'],
+): void {
+  if (!activeCcbRoute) return
+  if (receiptPolicy === 'none') {
+    // Route C (9router/direct) does not parse receipts
+    activeCcbRoute.proof = 'direct'
+    return
+  }
+  // For A (omniroute/hermes-score) and B (omniroute/9router)
+  if (receipt.provider && receipt.model) {
+    // Verify if receipt contains explicit 9router evidence for route B
+    const has9routerEvidence =
+      receiptPolicy === 'omniroute-9router' &&
+      (receipt.decision?.includes('9router') ||
+        receipt.routingReason?.includes('9router') ||
+        receipt.cognitivePool?.includes('9router') ||
+        receipt.provider?.includes('9router') ||
+        receipt.requestId?.includes('9router'))
+    activeCcbRoute.provider = receipt.provider
+    activeCcbRoute.model = receipt.model
+    activeCcbRoute.proof = has9routerEvidence ? 'verified' : 'unverified'
+  }
 }
 
 export function getRaceMetricPreferences(): ReadonlyMap<string, number> {
@@ -428,6 +1133,21 @@ export function classifyError(error: unknown): ErrorClassification {
   if (/econnrefused|enetunreach|eai_again|socket hang up/i.test(message))
     return { reason: 'network', retryable: true, scope: 'provider' }
   return { reason: 'unknown', retryable: true, scope: 'provider' }
+}
+
+/**
+ * OmniRoute's hermes-score-front emits a 502 with code `gateway_unavailable`
+ * once every model/port fallback is exhausted — the whole local account pool
+ * is down. The pool recovers on its own once the backends restart, so CCB
+ * treats this as a longer-retryable failure instead of a fatal provider error.
+ */
+export function isGatewayUnavailable(error: unknown): boolean {
+  const status = (error as { status?: number } | undefined)?.status
+  if (status !== 502) return false
+  const message = String(
+    (error as { message?: string } | undefined)?.message ?? '',
+  )
+  return /all gateway backends unavailable|gateway_unavailable/i.test(message)
 }
 
 export function isRetryable(error: unknown): boolean {

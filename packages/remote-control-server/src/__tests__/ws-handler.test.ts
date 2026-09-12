@@ -13,6 +13,7 @@ const mockConfig = {
   webCorsOrigins: [],
   wsIdleTimeout: 30,
   wsKeepaliveInterval: 20,
+  wsClientTimeout: 360,
 }
 
 mock.module('../config', () => ({
@@ -20,7 +21,12 @@ mock.module('../config', () => ({
   getBaseUrl: () => 'http://localhost:3000',
 }))
 
-import { storeReset } from '../store'
+import {
+  storeReset,
+  storeCreateSession,
+  storeGetSession,
+  storeUpdateSession,
+} from '../store'
 import {
   getEventBus,
   removeEventBus,
@@ -32,6 +38,8 @@ import {
   handleWebSocketMessage,
   handleWebSocketClose,
   closeAllConnections,
+  computeClientSilenceMs,
+  isClientInactive,
 } from '../transport/ws-handler'
 
 // Minimal WSContext mock
@@ -583,6 +591,205 @@ describe('ws-handler', () => {
       const lastMsg = JSON.parse(sent[sent.length - 1])
       expect(lastMsg.type).toBe('control_request')
       expect(lastMsg.request_id).toBe('req10')
+    })
+  })
+
+  describe('session liveness touch', () => {
+    test('refreshes session updatedAt on WebSocket open', () => {
+      const session = storeCreateSession({})
+      storeUpdateSession(session.id, { status: 'running' })
+      const rec = storeGetSession(session.id)
+      expect(rec).toBeTruthy()
+      if (!rec) return
+      rec.updatedAt = new Date(Date.now() - 10 * 60 * 1000)
+      const previousUpdatedAt = rec.updatedAt.getTime()
+
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, session.id)
+
+      const after = storeGetSession(session.id)
+      expect(after).toBeTruthy()
+      expect(after!.updatedAt.getTime()).toBeGreaterThan(previousUpdatedAt)
+    })
+
+    test('refreshes session updatedAt on incoming frames', () => {
+      const session = storeCreateSession({})
+      const rec = storeGetSession(session.id)
+      expect(rec).toBeTruthy()
+      if (!rec) return
+      rec.updatedAt = new Date(Date.now() - 10 * 60 * 1000)
+
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, session.id)
+      const rec2 = storeGetSession(session.id)
+      if (!rec2) return
+      rec2.updatedAt = new Date(Date.now() - 10 * 60 * 1000)
+      const previousUpdatedAt = rec2.updatedAt.getTime()
+
+      handleWebSocketMessage(
+        ws,
+        session.id,
+        JSON.stringify({ type: 'keep_alive' }) + '\n',
+      )
+
+      const after = storeGetSession(session.id)
+      expect(after).toBeTruthy()
+      expect(after!.updatedAt.getTime()).toBeGreaterThan(previousUpdatedAt)
+    })
+
+    test('does not replay control/noise types to the bridge', () => {
+      const bus = getEventBus('s1')
+      bus.publish({
+        id: 'e1',
+        sessionId: 's1',
+        type: 'user',
+        payload: { content: 'hello' },
+        direction: 'outbound',
+      })
+      bus.publish({
+        id: 'e2',
+        sessionId: 's1',
+        type: 'session_status',
+        payload: { status: 'inactive' },
+        direction: 'inbound',
+      })
+      bus.publish({
+        id: 'e3',
+        sessionId: 's1',
+        type: 'assistant',
+        payload: { content: 'hi' },
+        direction: 'inbound',
+      })
+
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, 's1')
+
+      const types = ws
+        .getSentData()
+        .map((d: string) => (JSON.parse(d) as { type: string }).type)
+      expect(types).toContain('user')
+      expect(types).toContain('assistant')
+      expect(types).not.toContain('session_status')
+    })
+
+    test('client frames reset the silence window (stale closure regression)', () => {
+      const session = storeCreateSession({})
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, session.id)
+
+      // Entry exists with activity at open time; simulate 61s passing with no
+      // frames — the connection would be considered dead.
+      const oldSilence = computeClientSilenceMs({
+        lastClientActivity: Date.now() - 61_000,
+      } as any)
+      expect(oldSilence).toBeGreaterThan(60_000)
+
+      // After a client frame, the entry activity refreshes — the same silence
+      // computation must now read the new value (not the open-time snapshot).
+      handleWebSocketMessage(
+        ws,
+        session.id,
+        JSON.stringify({ type: 'keep_alive' }) + '\n',
+      )
+      const rec = storeGetSession(session.id)
+      expect(rec).toBeTruthy()
+      if (!rec) return
+      // Frames also touch the session, so updatedAt moves forward
+      const freshSilence = computeClientSilenceMs({
+        lastClientActivity: Date.now(),
+      } as any)
+      expect(freshSilence).toBeLessThan(1_000)
+    })
+
+    test('silence computation falls back to now when entry is gone', () => {
+      expect(computeClientSilenceMs(undefined)).toBe(0)
+    })
+
+    test('uses the configured client timeout independently of keepalive interval', () => {
+      const now = 1_000_000
+      const entry = { lastClientActivity: now - 360_000 } as any
+      expect(isClientInactive(entry, now, 360_000)).toBe(false)
+      expect(isClientInactive(entry, now + 1, 360_000)).toBe(true)
+    })
+
+    test('does not treat a recent client frame as inactive', () => {
+      const now = 1_000_000
+      const entry = { lastClientActivity: now - 120_000 } as any
+      expect(isClientInactive(entry, now, 360_000)).toBe(false)
+    })
+
+    test('keeps control responses and interrupts in replay', () => {
+      const bus = getEventBus('replay-control')
+      bus.publish({
+        id: 'permission-1',
+        sessionId: 'replay-control',
+        type: 'permission_response',
+        payload: { approved: true, request_id: 'req-1' },
+        direction: 'outbound',
+      })
+      bus.publish({
+        id: 'control-1',
+        sessionId: 'replay-control',
+        type: 'control_response',
+        payload: { response: { subtype: 'success' } },
+        direction: 'outbound',
+      })
+      bus.publish({
+        id: 'interrupt-1',
+        sessionId: 'replay-control',
+        type: 'interrupt',
+        payload: {},
+        direction: 'outbound',
+      })
+
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, 'replay-control')
+      const types = ws
+        .getSentData()
+        .map((data: string) => (JSON.parse(data) as { type: string }).type)
+      expect(types).toEqual([
+        'control_response',
+        'control_response',
+        'control_request',
+      ])
+    })
+
+    test('delayed close of a replaced connection does not remove replacement', () => {
+      const ws1 = createMockWs()
+      const ws2 = createMockWs()
+      handleWebSocketOpen(ws1, 'close-race')
+      handleWebSocketOpen(ws2, 'close-race')
+
+      handleWebSocketClose(ws1, 'close-race', 1006, 'late close')
+      const bus = getEventBus('close-race')
+      bus.publish({
+        id: 'race-1',
+        sessionId: 'close-race',
+        type: 'user',
+        payload: { content: 'still connected' },
+        direction: 'outbound',
+      })
+
+      expect(ws2.getSentData().length).toBe(1)
+    })
+
+    test('open and message activity use the mutable connection timestamp', () => {
+      const session = storeCreateSession({})
+      const ws = createMockWs()
+      handleWebSocketOpen(ws, session.id)
+      handleWebSocketMessage(
+        ws,
+        session.id,
+        JSON.stringify({ type: 'keep_alive' }) + '\\n',
+      )
+      const now = Date.now()
+      expect(
+        isClientInactive(
+          { lastClientActivity: now - 1000 } as any,
+          now,
+          360_000,
+        ),
+      ).toBe(false)
     })
   })
 

@@ -1,0 +1,176 @@
+- generic [active] [ref=f11e1]:
+  - link "Skip to content" [ref=f11e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f11e4]:
+    - navigation [ref=f11e5]:
+      - generic [ref=f11e6]:
+        - button "导航至主页" [ref=f11e7] [cursor=pointer]:
+          - heading "OmniRoute" [level=2] [ref=f11e21]
+        - generic [ref=f11e22]:
+          - link "特点" [ref=f11e23] [cursor=pointer]:
+            - /url: "#features"
+          - link "OmniRoute 工作原理" [ref=f11e24] [cursor=pointer]:
+            - /url: "#how-it-works"
+          - link "文档" [ref=f11e25] [cursor=pointer]:
+            - /url: /docs
+          - link "GitHub" [ref=f11e26] [cursor=pointer]:
+            - /url: https://github.com/diegosouzapw/OmniRoute
+            - text: GitHub
+            - generic [aria-hidden] [ref=f11e27]: open_in_new
+        - button "开始使用" [ref=f11e29]
+    - main [ref=f11e30]:
+      - generic [ref=f11e31]:
+        - generic [ref=f11e33]:
+          - generic [ref=f11e34]: v1.0 现已上线
+          - heading "一个端点 所有 AI 提供商" [level=1] [ref=f11e36]
+          - paragraph [ref=f11e37]: 带 Web 仪表板的 AI 端点代理，是 CLIProxyAPI 的 JavaScript 版本。可与 Claude Code、OpenAI Codex、Cline、RooCode 等 CLI 工具无缝配合。
+          - generic [ref=f11e38]:
+            - button "开始使用" [ref=f11e39]:
+              - generic [aria-hidden]: rocket_launch
+              - text: 开始使用
+            - link "在 GitHub 上查看" [ref=f11e40] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute
+              - generic [aria-hidden] [ref=f11e41]: code
+              - text: 在 GitHub 上查看
+        - generic [ref=f11e44]:
+          - generic [ref=f11e45] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f11e46]: hub
+            - generic [ref=f11e47]: OmniRoute
+          - generic [ref=f11e49]:
+            - img "claude" [ref=f11e53]
+            - img "codex" [ref=f11e57]
+            - img "cline" [ref=f11e61]
+            - img "cursor" [ref=f11e65]
+          - generic [ref=f11e66]:
+            - generic "OpenAI" [ref=f11e67]
+            - generic "Anthropic" [ref=f11e68]
+            - generic "Gemini" [ref=f11e69]
+            - generic "GitHub Copilot" [ref=f11e70]
+      - generic [ref=f11e73]:
+        - generic [ref=f11e74]:
+          - heading "30 秒内开始" [level=2] [ref=f11e75]
+          - paragraph [ref=f11e76]: 安装 OmniRoute，通过 Web 仪表板配置你的提供商，然后开始路由 AI 请求。
+          - generic [ref=f11e77]:
+            - generic [ref=f11e78]:
+              - generic [ref=f11e79]: "1"
+              - generic [ref=f11e80]:
+                - heading "安装 OmniRoute" [level=4] [ref=f11e81]
+                - paragraph [ref=f11e82]: 运行 npx 命令立即启动服务器
+            - generic [ref=f11e83]:
+              - generic [ref=f11e84]: "2"
+              - generic [ref=f11e85]:
+                - heading "打开仪表板" [level=4] [ref=f11e86]
+                - paragraph [ref=f11e87]: 通过 Web 界面配置提供商和 API 密钥
+            - generic [ref=f11e88]:
+              - generic [ref=f11e89]: "3"
+              - generic [ref=f11e90]:
+                - heading "路由请求" [level=4] [ref=f11e91]
+                - paragraph [ref=f11e92]: 将您的 CLI 工具指向 http://localhost:20128
+        - generic [ref=f11e94]:
+          - generic [ref=f11e95]: 终端
+          - generic [ref=f11e100]:
+            - generic [ref=f11e101] [cursor=pointer]:
+              - generic [ref=f11e102]: $
+              - generic [ref=f11e103]: npx omniroute
+              - generic [ref=f11e104]: 复制
+            - generic [ref=f11e105]: "> 正在启动 OmniRoute...> 服务器运行于 http://localhost:20128> 仪表板: http://localhost:20128/dashboard> 已准备好开始路由！ ✓"
+            - generic [ref=f11e106]: 📝 在仪表板中配置提供商或使用环境变量
+            - generic [ref=f11e107]: 数据位置：macOS/Linux： ~/.omniroute/db.jsonWindows： %APPDATA%/omniroute/db.json
+      - generic [ref=f11e109]:
+        - generic [ref=f11e110]:
+          - heading "OmniRoute 工作原理" [level=2] [ref=f11e111]
+          - paragraph [ref=f11e112]: 数据从您的应用程序通过我们的智能路由层无缝流向最适合该工作的提供商。
+        - generic [ref=f11e113]:
+          - generic [ref=f11e115]:
+            - generic [aria-hidden] [ref=f11e117]: terminal
+            - generic [ref=f11e118]:
+              - heading "1. CLI 和 SDK" [level=3] [ref=f11e119]
+              - paragraph [ref=f11e120]: 您的请求从您最喜欢的工具或我们的统一 SDK 开始。只需更改基本 URL 即可。
+          - generic [ref=f11e121]:
+            - generic [aria-hidden] [ref=f11e123]: hub
+            - generic [ref=f11e124]:
+              - heading "2. OmniRoute 中枢" [level=3] [ref=f11e125]
+              - paragraph [ref=f11e126]: 我们的引擎分析提示、检查提供商的运行状况以及最低延迟或成本的路线。
+          - generic [ref=f11e134]:
+            - heading "3. AI 提供商" [level=3] [ref=f11e135]
+            - paragraph [ref=f11e136]: 请求会被立即转发给 OpenAI、Anthropic、Gemini 或其他提供商完成处理。
+      - generic [ref=f11e138]:
+        - generic [ref=f11e139]:
+          - heading "强大的功能" [level=2] [ref=f11e140]
+          - paragraph [ref=f11e141]: 在一个地方管理 AI 基础设施所需的一切，专为规模化而构建。
+        - generic [ref=f11e142]:
+          - generic [ref=f11e143]:
+            - generic [aria-hidden] [ref=f11e145]: link
+            - heading "统一端点" [level=3] [ref=f11e146]
+            - paragraph [ref=f11e147]: 通过单一标准 API URL 访问所有提供商。
+          - generic [ref=f11e148]:
+            - generic [aria-hidden] [ref=f11e150]: bolt
+            - heading "轻松设置" [level=3] [ref=f11e151]
+            - paragraph [ref=f11e152]: 使用 npx 命令在几分钟内启动并运行。
+          - generic [ref=f11e153]:
+            - generic [aria-hidden] [ref=f11e155]: shield_with_heart
+            - heading "模型回退" [level=3] [ref=f11e156]
+            - paragraph [ref=f11e157]: 发生故障或高延迟时自动切换提供商。
+          - generic [ref=f11e158]:
+            - generic [aria-hidden] [ref=f11e160]: monitoring
+            - heading "使用情况追踪" [level=3] [ref=f11e161]
+            - paragraph [ref=f11e162]: 所有模型的详细分析和成本监控。
+          - generic [ref=f11e163]:
+            - generic [aria-hidden] [ref=f11e165]: key
+            - heading "OAuth 与 API 密钥" [level=3] [ref=f11e166]
+            - paragraph [ref=f11e167]: 在一个保管库中安全地管理凭据。
+          - generic [ref=f11e168]:
+            - generic [aria-hidden] [ref=f11e170]: cloud_sync
+            - heading "云同步" [level=3] [ref=f11e171]
+            - paragraph [ref=f11e172]: 立即跨设备同步您的配置。
+          - generic [ref=f11e173]:
+            - generic [aria-hidden] [ref=f11e175]: terminal
+            - heading "CLI 支持" [level=3] [ref=f11e176]
+            - paragraph [ref=f11e177]: 适用于 Claude Code、Codex、Cline、Cursor 等工具。
+          - generic [ref=f11e178]:
+            - generic [aria-hidden] [ref=f11e180]: dashboard
+            - heading "仪表板" [level=3] [ref=f11e181]
+            - paragraph [ref=f11e182]: 用于实时流量分析的可视化仪表板。
+      - generic [ref=f11e184]:
+        - heading "准备好简化你的 AI 基础设施了吗？" [level=2] [ref=f11e185]
+        - paragraph [ref=f11e186]: 加入更多开发者，一起用 OmniRoute 简化 AI 集成流程。开源且可免费开始使用。
+        - generic [ref=f11e187]:
+          - button "免费开始" [ref=f11e188]
+          - button "阅读文档" [ref=f11e189]
+    - contentinfo [ref=f11e190]:
+      - generic [ref=f11e191]:
+        - generic [ref=f11e192]:
+          - generic [ref=f11e193]:
+            - heading "OmniRoute" [level=3] [ref=f11e208]
+            - paragraph [ref=f11e209]: AI 生成的统一端点。轻松连接、路由和管理您的 AI 提供商。
+            - link [ref=f11e211] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute
+              - generic [aria-hidden] [ref=f11e212]: code
+          - generic [ref=f11e213]:
+            - heading "产品" [level=4] [ref=f11e214]
+            - link "特点" [ref=f11e215] [cursor=pointer]:
+              - /url: "#features"
+            - link "仪表板" [ref=f11e216] [cursor=pointer]:
+              - /url: /dashboard
+            - link "变更日志" [ref=f11e217] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute/releases
+          - generic [ref=f11e218]:
+            - heading "资源" [level=4] [ref=f11e219]
+            - link "文档" [ref=f11e220] [cursor=pointer]:
+              - /url: /docs
+            - link "GitHub" [ref=f11e221] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute
+            - link "npm" [ref=f11e222] [cursor=pointer]:
+              - /url: https://www.npmjs.com/package/omniroute
+          - generic [ref=f11e223]:
+            - heading "法律" [level=4] [ref=f11e224]
+            - link "MIT 许可证" [ref=f11e225] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute/blob/main/LICENSE
+        - generic [ref=f11e226]:
+          - paragraph [ref=f11e227]: © 2026 OmniRoute。保留所有权利。
+          - generic [ref=f11e228]:
+            - link "GitHub" [ref=f11e229] [cursor=pointer]:
+              - /url: https://github.com/diegosouzapw/OmniRoute
+            - link "npm" [ref=f11e230] [cursor=pointer]:
+              - /url: https://www.npmjs.com/package/omniroute
+  - alert [ref=f11e231]

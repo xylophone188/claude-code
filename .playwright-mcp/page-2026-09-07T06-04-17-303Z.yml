@@ -1,0 +1,40 @@
+- generic [ref=f27e1]:
+  - link "Skip to content" [ref=f27e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f27e4]:
+    - generic [ref=f27e6]:
+      - generic [ref=f27e7]:
+        - generic [ref=f27e8]:
+          - generic [ref=f27e9]: hub
+          - generic [ref=f27e11]: OmniRoute
+        - heading "登录" [level=1] [ref=f27e12]
+        - paragraph [ref=f27e13]: 输入您的密码以继续
+      - generic [ref=f27e14]:
+        - generic [ref=f27e15]:
+          - text: 密码
+          - textbox "输入您的密码以继续" [active] [ref=f27e18]
+          - paragraph [ref=f27e19]: 默认密码：CHANGEME（除非已设置 INITIAL_PASSWORD）
+        - button "继续" [ref=f27e20] [cursor=pointer]
+      - link "忘记密码？" [ref=f27e22] [cursor=pointer]:
+        - /url: /forgot-password
+    - generic [ref=f27e25]:
+      - generic [ref=f27e26]:
+        - heading "统一 AI API 代理" [level=2] [ref=f27e27]
+        - paragraph [ref=f27e28]: 通过单个端点将请求路由到多个 AI 提供商。内置负载均衡、故障转移和使用情况跟踪。
+      - generic [ref=f27e29]:
+        - generic [ref=f27e30]:
+          - generic [ref=f27e31]: swap_horiz
+          - generic [ref=f27e33]:
+            - heading "多提供商" [level=3] [ref=f27e34]
+            - paragraph [ref=f27e35]: OpenAI、Anthropic、Google 等
+        - generic [ref=f27e36]:
+          - generic [ref=f27e37]: speed
+          - generic [ref=f27e39]:
+            - heading "负载均衡" [level=3] [ref=f27e40]
+            - paragraph [ref=f27e41]: 智能分配请求
+        - generic [ref=f27e42]:
+          - generic [ref=f27e43]: analytics
+          - generic [ref=f27e45]:
+            - heading "使用情况追踪" [level=3] [ref=f27e46]
+            - paragraph [ref=f27e47]: 监控成本和 Tokens
+  - alert [ref=f27e48]

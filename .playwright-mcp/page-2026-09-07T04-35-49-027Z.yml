@@ -1,0 +1,361 @@
+- generic [active] [ref=f11e1]:
+  - link "Skip to content" [ref=f11e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f11e3]:
+    - complementary [ref=f11e5]:
+      - link "跳到内容" [ref=f11e6] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=f11e11]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.48" [ref=f11e13] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f11e27]:
+          - heading "OmniRoute" [level=1] [ref=f11e28]
+          - generic [ref=f11e29]: v3.8.48
+      - generic [ref=f11e32]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "搜索" [ref=f11e33]
+      - navigation "Main navigation" [ref=f11e34]:
+        - link "home 首页 仪表盘概览" [ref=f11e36] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f11e37]: home
+          - generic [ref=f11e38]:
+            - generic [ref=f11e39]: 首页
+            - generic [ref=f11e40]: 仪表盘概览
+        - generic [ref=f11e41]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f11e42] [cursor=pointer]:
+            - generic [ref=f11e43]: OmniProxy
+            - button "push_pin" [ref=f11e44]
+            - generic: expand_more
+          - generic [ref=f11e45]:
+            - link "api 端点 您的 AI 连接 URL" [ref=f11e46] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f11e47]: api
+              - generic [ref=f11e48]:
+                - generic [ref=f11e49]: 端点
+                - generic [ref=f11e50]: 您的 AI 连接 URL
+            - link "vpn_key API 管理 管理 API 密钥和访问" [ref=f11e51] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f11e52]: vpn_key
+              - generic [ref=f11e53]:
+                - generic [ref=f11e54]: API 管理
+                - generic [ref=f11e55]: 管理 API 密钥和访问
+            - link "dns 提供商 管理 AI 提供商" [ref=f11e56] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f11e57]: dns
+              - generic [ref=f11e58]:
+                - generic [ref=f11e59]: 提供商
+                - generic [ref=f11e60]: 管理 AI 提供商
+            - link "deployed_code 内嵌服务 管理本地代理服务" [ref=f11e61] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f11e62]: deployed_code
+              - generic [ref=f11e63]:
+                - generic [ref=f11e64]: 内嵌服务
+                - generic [ref=f11e65]: 管理本地代理服务
+            - link "layers 组合 用于故障转移的组提供程序" [ref=f11e66] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f11e67]: layers
+              - generic [ref=f11e68]:
+                - generic [ref=f11e69]: 组合
+                - generic [ref=f11e70]: 用于故障转移的组提供程序
+            - link "account_tree Combo Studio Live routing cascade" [ref=f11e71] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f11e72]: account_tree
+              - generic [ref=f11e73]:
+                - generic [ref=f11e74]: Combo Studio
+                - generic [ref=f11e75]: Live routing cascade
+            - link "tune 提供商配额 跟踪提供商使用限制" [ref=f11e76] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f11e77]: tune
+              - generic [ref=f11e78]:
+                - generic [ref=f11e79]: 提供商配额
+                - generic [ref=f11e80]: 跟踪提供商使用限制
+            - link "pie_chart 配额共享 跨密钥共享提供商配额" [ref=f11e81] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f11e82]: pie_chart
+              - generic [ref=f11e83]:
+                - generic [ref=f11e84]: 配额共享
+                - generic [ref=f11e85]: 跨密钥共享提供商配额
+            - generic [ref=f11e86]:
+              - generic [ref=f11e87]: 压缩上下文
+              - link "settings Compression Settings Global defaults" [ref=f11e90] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f11e91]: settings
+                - generic [ref=f11e92]:
+                  - generic [ref=f11e93]: Compression Settings
+                  - generic [ref=f11e94]: Global defaults
+              - link "hub 引擎组合 组合压缩引擎" [ref=f11e95] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f11e96]: hub
+                - generic [ref=f11e97]:
+                  - generic [ref=f11e98]: 引擎组合
+                  - generic [ref=f11e99]: 组合压缩引擎
+              - link "compress Caveman 迅速压缩" [ref=f11e100] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f11e101]: compress
+                - generic [ref=f11e102]:
+                  - generic [ref=f11e103]: Caveman
+                  - generic [ref=f11e104]: 迅速压缩
+              - link "filter_alt RTK 输出滤波" [ref=f11e105] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f11e106]: filter_alt
+                - generic [ref=f11e107]:
+                  - generic [ref=f11e108]: RTK
+                  - generic [ref=f11e109]: 输出滤波
+              - link "table_rows Headroom Tabular compaction" [ref=f11e110] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f11e111]: table_rows
+                - generic [ref=f11e112]:
+                  - generic [ref=f11e113]: Headroom
+                  - generic [ref=f11e114]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn dedup" [ref=f11e115] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f11e116]: content_copy
+                - generic [ref=f11e117]:
+                  - generic [ref=f11e118]: Session Dedup
+                  - generic [ref=f11e119]: Cross-turn dedup
+              - link "archive CCR Retrieve markers" [ref=f11e120] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f11e121]: archive
+                - generic [ref=f11e122]:
+                  - generic [ref=f11e123]: CCR
+                  - generic [ref=f11e124]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f11e125] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f11e126]: psychology
+                - generic [ref=f11e127]:
+                  - generic [ref=f11e128]: LLMLingua
+                  - generic [ref=f11e129]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f11e130] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f11e131]: compress
+                - generic [ref=f11e132]:
+                  - generic [ref=f11e133]: Lite
+                  - generic [ref=f11e134]: Fast whitespace cleanup
+              - link "speed Aggressive Summary + aging" [ref=f11e135] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f11e136]: speed
+                - generic [ref=f11e137]:
+                  - generic [ref=f11e138]: Aggressive
+                  - generic [ref=f11e139]: Summary + aging
+              - link "bolt Ultra Heuristic pruning" [ref=f11e140] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f11e141]: bolt
+                - generic [ref=f11e142]:
+                  - generic [ref=f11e143]: Ultra
+                  - generic [ref=f11e144]: Heuristic pruning
+              - link "grain OmniGlyph Context-as-image" [ref=f11e145] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f11e146]: grain
+                - generic [ref=f11e147]:
+                  - generic [ref=f11e148]: OmniGlyph
+                  - generic [ref=f11e149]: Context-as-image
+              - link "monitoring Compression Studio Live engine cascade" [ref=f11e150] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f11e151]: monitoring
+                - generic [ref=f11e152]:
+                  - generic [ref=f11e153]: Compression Studio
+                  - generic [ref=f11e154]: Live engine cascade
+            - generic [ref=f11e155]:
+              - generic [ref=f11e156]: 工具
+              - link "terminal CLI 代码的 指向 OmniRoute 的代码工具" [ref=f11e159] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f11e160]: terminal
+                - generic [ref=f11e161]:
+                  - generic [ref=f11e162]: CLI 代码的
+                  - generic [ref=f11e163]: 指向 OmniRoute 的代码工具
+              - link "smart_toy CLI 代理 自主 CLI 代理" [ref=f11e164] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f11e165]: smart_toy
+                - generic [ref=f11e166]:
+                  - generic [ref=f11e167]: CLI 代理
+                  - generic [ref=f11e168]: 自主 CLI 代理
+              - link "device_hub ACP 代理 由 OmniRoute 生成的 CLI" [ref=f11e169] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f11e170]: device_hub
+                - generic [ref=f11e171]:
+                  - generic [ref=f11e172]: ACP 代理
+                  - generic [ref=f11e173]: 由 OmniRoute 生成的 CLI
+              - link "cloud 云代理 管理基于云的代理" [ref=f11e174] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f11e175]: cloud
+                - generic [ref=f11e176]:
+                  - generic [ref=f11e177]: 云代理
+                  - generic [ref=f11e178]: 管理基于云的代理
+              - link "link 代理桥接 拦截 IDE 代理流量" [ref=f11e179] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f11e180]: link
+                - generic [ref=f11e181]:
+                  - generic [ref=f11e182]: 代理桥接
+                  - generic [ref=f11e183]: 拦截 IDE 代理流量
+              - link "network_check 流量检查器 监控 LLM 调用 + 调试任何 HTTPS 流量" [ref=f11e184] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f11e185]: network_check
+                - generic [ref=f11e186]:
+                  - generic [ref=f11e187]: 流量检查器
+                  - generic [ref=f11e188]: 监控 LLM 调用 + 调试任何 HTTPS 流量
+              - link "travel_explore Discovery Scan providers for free access" [ref=f11e189] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f11e190]: travel_explore
+                - generic [ref=f11e191]:
+                  - generic [ref=f11e192]: Discovery
+                  - generic [ref=f11e193]: Scan providers for free access
+            - generic [ref=f11e194]:
+              - generic [ref=f11e195]: 集成
+              - link "api API 端点 暴露自定义端点" [ref=f11e198] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f11e199]: api
+                - generic [ref=f11e200]:
+                  - generic [ref=f11e201]: API 端点
+                  - generic [ref=f11e202]: 暴露自定义端点
+              - link "webhook Webhook 获取事件通知" [ref=f11e203] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f11e204]: webhook
+                - generic [ref=f11e205]:
+                  - generic [ref=f11e206]: Webhook
+                  - generic [ref=f11e207]: 获取事件通知
+            - link "dns 代理 HTTP 代理设置" [ref=f11e208] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f11e209]: dns
+              - generic [ref=f11e210]:
+                - generic [ref=f11e211]: 代理
+                - generic [ref=f11e212]: HTTP 代理设置
+        - button "分析 push_pin expand_more" [ref=f11e214] [cursor=pointer]:
+          - generic [ref=f11e215]: 分析
+          - button "push_pin" [ref=f11e216]
+          - generic: expand_more
+        - button "成本 push_pin expand_more" [ref=f11e218] [cursor=pointer]:
+          - generic [ref=f11e219]: 成本
+          - button "push_pin" [ref=f11e220]
+          - generic: expand_more
+        - button "监控 push_pin expand_more" [ref=f11e222] [cursor=pointer]:
+          - generic [ref=f11e223]: 监控
+          - button "push_pin" [ref=f11e224]
+          - generic: expand_more
+        - button "代理功能 push_pin expand_more" [ref=f11e226] [cursor=pointer]:
+          - generic [ref=f11e227]: 代理功能
+          - button "push_pin" [ref=f11e228]
+          - generic: expand_more
+        - button "其他功能 push_pin expand_more" [ref=f11e230] [cursor=pointer]:
+          - generic [ref=f11e231]: 其他功能
+          - button "push_pin" [ref=f11e232]
+          - generic: expand_more
+        - button "配置 push_pin expand_more" [ref=f11e234] [cursor=pointer]:
+          - generic [ref=f11e235]: 配置
+          - button "push_pin" [ref=f11e236]
+          - generic: expand_more
+        - button "帮助 push_pin expand_more" [ref=f11e238] [cursor=pointer]:
+          - generic [ref=f11e239]: 帮助
+          - button "push_pin" [ref=f11e240]
+          - generic: expand_more
+      - generic [ref=f11e241]:
+        - button "restart_alt 重启服务" [ref=f11e242]:
+          - generic: restart_alt
+          - generic [ref=f11e243]: 重启服务
+        - button "power_settings_new 停止服务" [ref=f11e244]:
+          - generic: power_settings_new
+          - generic [ref=f11e245]: 停止服务
+    - main [ref=f11e246]:
+      - generic [ref=f11e247]:
+        - generic [ref=f11e248]:
+          - generic [ref=f11e249]: description
+          - generic [ref=f11e251]:
+            - heading "日志" [level=1] [ref=f11e252]
+            - paragraph [ref=f11e253]: 实时请求日志、错误追踪和流式事件检查器
+        - generic [ref=f11e254]:
+          - button "Open quick navigation" [ref=f11e255]:
+            - generic: search
+            - generic [ref=f11e256]: Quick nav
+            - generic [ref=f11e257]: Ctrl+K
+          - button "中文 (简体) ZH-CN expand_more" [ref=f11e259]:
+            - img "中文 (简体)" [ref=f11e260]
+            - generic [ref=f11e261]: ZH-CN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=f11e262]:
+            - generic: dark_mode
+          - button "logout" [ref=f11e263]
+      - generic [ref=f11e265]:
+        - navigation "Breadcrumb" [ref=f11e266]:
+          - link "Dashboard" [ref=f11e268] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=f11e269]:
+            - generic [aria-hidden] [ref=f11e270]: ›
+            - generic [ref=f11e271]: Logs
+        - generic [ref=f11e273]:
+          - generic [ref=f11e274]:
+            - heading "请求日志" [level=2] [ref=f11e275]
+            - generic [ref=f11e276]:
+              - button "Clean history" [ref=f11e277]
+              - button "导出" [ref=f11e281]
+          - generic [ref=f11e285]:
+            - generic [ref=f11e286]:
+              - button "正在录制" [ref=f11e287]
+              - button "管道日志关闭" [ref=f11e289]
+              - generic [ref=f11e291]:
+                - generic [ref=f11e292]: search
+                - textbox "搜索模型、提供商、账户、API密钥、组合..." [ref=f11e293]
+              - generic [ref=f11e294]:
+                - generic [ref=f11e295]: tag
+                - textbox "Correlation ID" [ref=f11e296]
+              - button "unfold_more All" [ref=f11e297]:
+                - generic: unfold_more
+                - text: All
+              - combobox [ref=f11e298] [cursor=pointer]:
+                - option "所有提供商" [selected]
+              - combobox [ref=f11e299] [cursor=pointer]:
+                - option "所有模型" [selected]
+              - combobox [ref=f11e300] [cursor=pointer]:
+                - option "所有账户" [selected]
+              - combobox [ref=f11e301] [cursor=pointer]:
+                - option "所有API密钥" [selected]
+              - generic [ref=f11e302]:
+                - generic [ref=f11e303]: 0 总计
+                - generic [ref=f11e304]: 0 成功
+                - generic [ref=f11e305]: 0 显示
+              - combobox "日志排序" [ref=f11e306] [cursor=pointer]:
+                - option "最新" [selected]
+                - option "最早"
+                - option "令牌 ↓"
+                - option "令牌 ↑"
+                - option "时长 ↓"
+                - option "时长 ↑"
+                - option "状态 ↓"
+                - option "状态 ↑"
+                - option "模型 A-Z"
+                - option "模型 Z-A"
+              - generic [ref=f11e307]:
+                - button "−" [ref=f11e308]
+                - spinbutton "Auto-refresh interval in seconds" [ref=f11e309]: "10"
+                - button "+" [ref=f11e310]
+                - generic [ref=f11e311]: s
+              - button "refresh" [ref=f11e312]
+            - generic [ref=f11e313]:
+              - button "全部" [ref=f11e314]
+              - button "error 错误" [ref=f11e315]:
+                - generic: error
+                - text: 错误
+              - button "check_circle 成功" [ref=f11e316]:
+                - generic: check_circle
+                - text: 成功
+              - button "hub 组合" [ref=f11e317]:
+                - generic: hub
+                - text: 组合
+            - generic [ref=f11e318]:
+              - generic [ref=f11e319]: 列
+              - button "状态" [ref=f11e320]
+              - button "缓存来源" [ref=f11e321]
+              - button "模型" [ref=f11e322]
+              - button "请求" [ref=f11e323]
+              - button "提供商" [ref=f11e324]
+              - button "请求协议" [ref=f11e325]
+              - button "账户" [ref=f11e326]
+              - button "API密钥" [ref=f11e327]
+              - button "组合" [ref=f11e328]
+              - button "Tokens" [ref=f11e329]
+              - button "TPS" [ref=f11e330]
+              - button "时长" [ref=f11e331]
+              - button "时间" [ref=f11e332]
+            - generic [ref=f11e333]: 正在加载日志...
+            - generic [ref=f11e336]: "调用日志也保存为JSON文件到{DATA_DIR}/call_logs/，并根据CALL_LOG_RETENTION_DAYS和CALL_LOG_MAX_ENTRIES进行轮换。"
+  - alert [ref=f11e337]

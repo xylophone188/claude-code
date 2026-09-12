@@ -8,7 +8,6 @@ import { FileReadTool } from '@claude-code-best/builtin-tools/tools/FileReadTool
 import { FileWriteTool } from '@claude-code-best/builtin-tools/tools/FileWriteTool/FileWriteTool.js'
 import { GlobTool } from '@claude-code-best/builtin-tools/tools/GlobTool/GlobTool.js'
 import { NotebookEditTool } from '@claude-code-best/builtin-tools/tools/NotebookEditTool/NotebookEditTool.js'
-import { WebFetchTool } from '@claude-code-best/builtin-tools/tools/WebFetchTool/WebFetchTool.js'
 import { TaskStopTool } from '@claude-code-best/builtin-tools/tools/TaskStopTool/TaskStopTool.js'
 import { BriefTool } from '@claude-code-best/builtin-tools/tools/BriefTool/BriefTool.js'
 // Dead code elimination: conditional import for ant-only tools
@@ -59,7 +58,6 @@ const SubscribePRTool = feature('KAIROS_GITHUB_WEBHOOKS')
   : null
 /* eslint-enable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 import { TaskOutputTool } from '@claude-code-best/builtin-tools/tools/TaskOutputTool/TaskOutputTool.js'
-import { WebSearchTool } from '@claude-code-best/builtin-tools/tools/WebSearchTool/WebSearchTool.js'
 import { TodoWriteTool } from '@claude-code-best/builtin-tools/tools/TodoWriteTool/TodoWriteTool.js'
 import { ExitPlanModeV2Tool } from '@claude-code-best/builtin-tools/tools/ExitPlanModeTool/ExitPlanModeV2Tool.js'
 import { ArtifactTool } from '@claude-code-best/builtin-tools/tools/ArtifactTool/ArtifactTool.js'
@@ -230,9 +228,7 @@ export function getAllBaseTools(): Tools {
     FileWriteTool,
     NotebookEditTool,
     ArtifactTool,
-    WebFetchTool,
     TodoWriteTool,
-    WebSearchTool,
     TaskStopTool,
     AskUserQuestionTool,
     SkillTool,

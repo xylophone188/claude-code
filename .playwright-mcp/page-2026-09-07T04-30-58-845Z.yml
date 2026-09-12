@@ -1,0 +1,334 @@
+- generic [active] [ref=f8e1]:
+  - link "Skip to content" [ref=f8e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - alert [ref=f8e3]
+  - generic [ref=f8e4]:
+    - complementary [ref=f8e6]:
+      - link "跳到内容" [ref=f8e7] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=f8e12]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.48" [ref=f8e14] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f8e28]:
+          - heading "OmniRoute" [level=1] [ref=f8e29]
+          - generic [ref=f8e30]: v3.8.48
+      - generic [ref=f8e33]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "搜索" [ref=f8e34]
+      - navigation "Main navigation" [ref=f8e35]:
+        - link "home 首页 仪表盘概览" [ref=f8e37] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f8e38]: home
+          - generic [ref=f8e39]:
+            - generic [ref=f8e40]: 首页
+            - generic [ref=f8e41]: 仪表盘概览
+        - generic [ref=f8e42]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f8e43] [cursor=pointer]:
+            - generic [ref=f8e44]: OmniProxy
+            - button "push_pin" [ref=f8e45]
+            - generic: expand_more
+          - generic [ref=f8e46]:
+            - link "api 端点 您的 AI 连接 URL" [ref=f8e47] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f8e48]: api
+              - generic [ref=f8e49]:
+                - generic [ref=f8e50]: 端点
+                - generic [ref=f8e51]: 您的 AI 连接 URL
+            - link "vpn_key API 管理 管理 API 密钥和访问" [ref=f8e52] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f8e53]: vpn_key
+              - generic [ref=f8e54]:
+                - generic [ref=f8e55]: API 管理
+                - generic [ref=f8e56]: 管理 API 密钥和访问
+            - link "dns 提供商 管理 AI 提供商" [ref=f8e57] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f8e58]: dns
+              - generic [ref=f8e59]:
+                - generic [ref=f8e60]: 提供商
+                - generic [ref=f8e61]: 管理 AI 提供商
+            - link "deployed_code 内嵌服务 管理本地代理服务" [ref=f8e62] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f8e63]: deployed_code
+              - generic [ref=f8e64]:
+                - generic [ref=f8e65]: 内嵌服务
+                - generic [ref=f8e66]: 管理本地代理服务
+            - link "layers 组合 用于故障转移的组提供程序" [ref=f8e67] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f8e68]: layers
+              - generic [ref=f8e69]:
+                - generic [ref=f8e70]: 组合
+                - generic [ref=f8e71]: 用于故障转移的组提供程序
+            - link "account_tree Combo Studio Live routing cascade" [ref=f8e72] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f8e73]: account_tree
+              - generic [ref=f8e74]:
+                - generic [ref=f8e75]: Combo Studio
+                - generic [ref=f8e76]: Live routing cascade
+            - link "tune 提供商配额 跟踪提供商使用限制" [ref=f8e77] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f8e78]: tune
+              - generic [ref=f8e79]:
+                - generic [ref=f8e80]: 提供商配额
+                - generic [ref=f8e81]: 跟踪提供商使用限制
+            - link "pie_chart 配额共享 跨密钥共享提供商配额" [ref=f8e82] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f8e83]: pie_chart
+              - generic [ref=f8e84]:
+                - generic [ref=f8e85]: 配额共享
+                - generic [ref=f8e86]: 跨密钥共享提供商配额
+            - generic [ref=f8e87]:
+              - generic [ref=f8e88]: 压缩上下文
+              - link "settings Compression Settings Global defaults" [ref=f8e91] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f8e92]: settings
+                - generic [ref=f8e93]:
+                  - generic [ref=f8e94]: Compression Settings
+                  - generic [ref=f8e95]: Global defaults
+              - link "hub 引擎组合 组合压缩引擎" [ref=f8e96] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f8e97]: hub
+                - generic [ref=f8e98]:
+                  - generic [ref=f8e99]: 引擎组合
+                  - generic [ref=f8e100]: 组合压缩引擎
+              - link "compress Caveman 迅速压缩" [ref=f8e101] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f8e102]: compress
+                - generic [ref=f8e103]:
+                  - generic [ref=f8e104]: Caveman
+                  - generic [ref=f8e105]: 迅速压缩
+              - link "filter_alt RTK 输出滤波" [ref=f8e106] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f8e107]: filter_alt
+                - generic [ref=f8e108]:
+                  - generic [ref=f8e109]: RTK
+                  - generic [ref=f8e110]: 输出滤波
+              - link "table_rows Headroom Tabular compaction" [ref=f8e111] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f8e112]: table_rows
+                - generic [ref=f8e113]:
+                  - generic [ref=f8e114]: Headroom
+                  - generic [ref=f8e115]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn dedup" [ref=f8e116] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f8e117]: content_copy
+                - generic [ref=f8e118]:
+                  - generic [ref=f8e119]: Session Dedup
+                  - generic [ref=f8e120]: Cross-turn dedup
+              - link "archive CCR Retrieve markers" [ref=f8e121] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f8e122]: archive
+                - generic [ref=f8e123]:
+                  - generic [ref=f8e124]: CCR
+                  - generic [ref=f8e125]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f8e126] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f8e127]: psychology
+                - generic [ref=f8e128]:
+                  - generic [ref=f8e129]: LLMLingua
+                  - generic [ref=f8e130]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f8e131] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f8e132]: compress
+                - generic [ref=f8e133]:
+                  - generic [ref=f8e134]: Lite
+                  - generic [ref=f8e135]: Fast whitespace cleanup
+              - link "speed Aggressive Summary + aging" [ref=f8e136] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f8e137]: speed
+                - generic [ref=f8e138]:
+                  - generic [ref=f8e139]: Aggressive
+                  - generic [ref=f8e140]: Summary + aging
+              - link "bolt Ultra Heuristic pruning" [ref=f8e141] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f8e142]: bolt
+                - generic [ref=f8e143]:
+                  - generic [ref=f8e144]: Ultra
+                  - generic [ref=f8e145]: Heuristic pruning
+              - link "grain OmniGlyph Context-as-image" [ref=f8e146] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f8e147]: grain
+                - generic [ref=f8e148]:
+                  - generic [ref=f8e149]: OmniGlyph
+                  - generic [ref=f8e150]: Context-as-image
+              - link "monitoring Compression Studio Live engine cascade" [ref=f8e151] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f8e152]: monitoring
+                - generic [ref=f8e153]:
+                  - generic [ref=f8e154]: Compression Studio
+                  - generic [ref=f8e155]: Live engine cascade
+            - generic [ref=f8e156]:
+              - generic [ref=f8e157]: 工具
+              - link "terminal CLI 代码的 指向 OmniRoute 的代码工具" [ref=f8e160] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f8e161]: terminal
+                - generic [ref=f8e162]:
+                  - generic [ref=f8e163]: CLI 代码的
+                  - generic [ref=f8e164]: 指向 OmniRoute 的代码工具
+              - link "smart_toy CLI 代理 自主 CLI 代理" [ref=f8e165] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f8e166]: smart_toy
+                - generic [ref=f8e167]:
+                  - generic [ref=f8e168]: CLI 代理
+                  - generic [ref=f8e169]: 自主 CLI 代理
+              - link "device_hub ACP 代理 由 OmniRoute 生成的 CLI" [ref=f8e170] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f8e171]: device_hub
+                - generic [ref=f8e172]:
+                  - generic [ref=f8e173]: ACP 代理
+                  - generic [ref=f8e174]: 由 OmniRoute 生成的 CLI
+              - link "cloud 云代理 管理基于云的代理" [ref=f8e175] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f8e176]: cloud
+                - generic [ref=f8e177]:
+                  - generic [ref=f8e178]: 云代理
+                  - generic [ref=f8e179]: 管理基于云的代理
+              - link "link 代理桥接 拦截 IDE 代理流量" [ref=f8e180] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f8e181]: link
+                - generic [ref=f8e182]:
+                  - generic [ref=f8e183]: 代理桥接
+                  - generic [ref=f8e184]: 拦截 IDE 代理流量
+              - link "network_check 流量检查器 监控 LLM 调用 + 调试任何 HTTPS 流量" [ref=f8e185] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f8e186]: network_check
+                - generic [ref=f8e187]:
+                  - generic [ref=f8e188]: 流量检查器
+                  - generic [ref=f8e189]: 监控 LLM 调用 + 调试任何 HTTPS 流量
+              - link "travel_explore Discovery Scan providers for free access" [ref=f8e190] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f8e191]: travel_explore
+                - generic [ref=f8e192]:
+                  - generic [ref=f8e193]: Discovery
+                  - generic [ref=f8e194]: Scan providers for free access
+            - generic [ref=f8e195]:
+              - generic [ref=f8e196]: 集成
+              - link "api API 端点 暴露自定义端点" [ref=f8e199] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f8e200]: api
+                - generic [ref=f8e201]:
+                  - generic [ref=f8e202]: API 端点
+                  - generic [ref=f8e203]: 暴露自定义端点
+              - link "webhook Webhook 获取事件通知" [ref=f8e204] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f8e205]: webhook
+                - generic [ref=f8e206]:
+                  - generic [ref=f8e207]: Webhook
+                  - generic [ref=f8e208]: 获取事件通知
+            - link "dns 代理 HTTP 代理设置" [ref=f8e209] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f8e210]: dns
+              - generic [ref=f8e211]:
+                - generic [ref=f8e212]: 代理
+                - generic [ref=f8e213]: HTTP 代理设置
+        - button "分析 push_pin expand_more" [ref=f8e215] [cursor=pointer]:
+          - generic [ref=f8e216]: 分析
+          - button "push_pin" [ref=f8e217]
+          - generic: expand_more
+        - button "成本 push_pin expand_more" [ref=f8e219] [cursor=pointer]:
+          - generic [ref=f8e220]: 成本
+          - button "push_pin" [ref=f8e221]
+          - generic: expand_more
+        - button "监控 push_pin expand_more" [ref=f8e223] [cursor=pointer]:
+          - generic [ref=f8e224]: 监控
+          - button "push_pin" [ref=f8e225]
+          - generic: expand_more
+        - button "代理功能 push_pin expand_more" [ref=f8e227] [cursor=pointer]:
+          - generic [ref=f8e228]: 代理功能
+          - button "push_pin" [ref=f8e229]
+          - generic: expand_more
+        - button "其他功能 push_pin expand_more" [ref=f8e231] [cursor=pointer]:
+          - generic [ref=f8e232]: 其他功能
+          - button "push_pin" [ref=f8e233]
+          - generic: expand_more
+        - generic [ref=f8e234]:
+          - button "配置 push_pin expand_more" [expanded] [ref=f8e235] [cursor=pointer]:
+            - generic [ref=f8e236]: 配置
+            - button "push_pin" [ref=f8e237]
+            - generic: expand_more
+          - generic [ref=f8e238]:
+            - link "tune 通用 应用基础" [ref=f8e239] [cursor=pointer]:
+              - /url: /dashboard/settings/general
+              - generic [ref=f8e240]: tune
+              - generic [ref=f8e241]:
+                - generic [ref=f8e242]: 通用
+                - generic [ref=f8e243]: 应用基础
+            - link "palette 外观 主题与布局" [ref=f8e244] [cursor=pointer]:
+              - /url: /dashboard/settings/appearance
+              - generic [ref=f8e245]: palette
+              - generic [ref=f8e246]:
+                - generic [ref=f8e247]: 外观
+                - generic [ref=f8e248]: 主题与布局
+            - link "auto_awesome AI 设置 AI 行为默认值" [ref=f8e249] [cursor=pointer]:
+              - /url: /dashboard/settings/ai
+              - generic [ref=f8e250]: auto_awesome
+              - generic [ref=f8e251]:
+                - generic [ref=f8e252]: AI 设置
+                - generic [ref=f8e253]: AI 行为默认值
+            - link "route 全局路由 全局路由规则" [ref=f8e254] [cursor=pointer]:
+              - /url: /dashboard/settings/routing
+              - generic [ref=f8e255]: route
+              - generic [ref=f8e256]:
+                - generic [ref=f8e257]: 全局路由
+                - generic [ref=f8e258]: 全局路由规则
+            - link "health_and_safety 弹性 重试与断路器" [ref=f8e259] [cursor=pointer]:
+              - /url: /dashboard/settings/resilience
+              - generic [ref=f8e260]: health_and_safety
+              - generic [ref=f8e261]:
+                - generic [ref=f8e262]: 弹性
+                - generic [ref=f8e263]: 重试与断路器
+            - link "engineering 高级 高级用户选项" [ref=f8e264] [cursor=pointer]:
+              - /url: /dashboard/settings/advanced
+              - generic [ref=f8e265]: engineering
+              - generic [ref=f8e266]:
+                - generic [ref=f8e267]: 高级
+                - generic [ref=f8e268]: 高级用户选项
+            - link "shield 安全 认证与加密" [ref=f8e269] [cursor=pointer]:
+              - /url: /dashboard/settings/security
+              - generic [ref=f8e270]: shield
+              - generic [ref=f8e271]:
+                - generic [ref=f8e272]: 安全
+                - generic [ref=f8e273]: 认证与加密
+            - link "key Access Tokens Scoped CLI tokens for remote mode" [ref=f8e274] [cursor=pointer]:
+              - /url: /dashboard/settings/access-tokens
+              - generic [ref=f8e275]: key
+              - generic [ref=f8e276]:
+                - generic [ref=f8e277]: Access Tokens
+                - generic [ref=f8e278]: Scoped CLI tokens for remote mode
+            - link "flag 功能标志 切换系统功能" [ref=f8e279] [cursor=pointer]:
+              - /url: /dashboard/settings/feature-flags
+              - generic [ref=f8e280]: flag
+              - generic [ref=f8e281]:
+                - generic [ref=f8e282]: 功能标志
+                - generic [ref=f8e283]: 切换系统功能
+            - link "view_sidebar 侧边栏 自定义侧边栏布局" [ref=f8e284] [cursor=pointer]:
+              - /url: /dashboard/settings/sidebar
+              - generic [ref=f8e285]: view_sidebar
+              - generic [ref=f8e286]:
+                - generic [ref=f8e287]: 侧边栏
+                - generic [ref=f8e288]: 自定义侧边栏布局
+        - button "帮助 push_pin expand_more" [ref=f8e290] [cursor=pointer]:
+          - generic [ref=f8e291]: 帮助
+          - button "push_pin" [ref=f8e292]
+          - generic: expand_more
+      - generic [ref=f8e293]:
+        - button "restart_alt 重启服务" [ref=f8e294]:
+          - generic: restart_alt
+          - generic [ref=f8e295]: 重启服务
+        - button "power_settings_new 停止服务" [ref=f8e296]:
+          - generic: power_settings_new
+          - generic [ref=f8e297]: 停止服务
+    - main [ref=f8e298]:
+      - generic [ref=f8e300]:
+        - button "Open quick navigation" [ref=f8e301]:
+          - generic: search
+          - generic [ref=f8e302]: Quick nav
+          - generic [ref=f8e303]: Ctrl+K
+        - button "中文 (简体) ZH-CN expand_more" [ref=f8e305]:
+          - img "中文 (简体)" [ref=f8e306]
+          - generic [ref=f8e307]: ZH-CN
+          - generic: expand_more
+        - button "Switch to dark mode" [ref=f8e308]:
+          - generic: dark_mode
+        - button "logout" [ref=f8e309]

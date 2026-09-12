@@ -71,6 +71,22 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
   isReadOnly() {
     return true
   },
+  async checkPermissions(input, context) {
+    if (
+      context.getAppState().toolPermissionContext.mode === 'bypassPermissions'
+    ) {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input,
+      }
+    }
+
+    return {
+      behavior: 'ask' as const,
+      message: 'Enter plan mode?',
+      updatedInput: input,
+    }
+  },
   renderToolUseMessage,
   renderToolResultMessage,
   renderToolUseRejectedMessage,

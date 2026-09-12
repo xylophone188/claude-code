@@ -511,6 +511,22 @@ export function extractPartialResult(
   return undefined
 }
 
+/**
+ * query() reports terminal provider failures as synthetic assistant messages
+ * instead of throwing. An agent that merely reaches the end of that stream
+ * must not therefore be reported as having completed successfully.
+ */
+export function getAgentApiErrorMessage(
+  message: MessageType,
+): string | undefined {
+  if (message.type !== 'assistant' || !message.isApiErrorMessage) {
+    return undefined
+  }
+
+  const content = message.message?.content as ContentItem[] | undefined
+  return extractTextContent(content ?? [], '\n') || 'Agent API request failed'
+}
+
 type SetAppState = (f: (prev: AppState) => AppState) => void
 
 /**
@@ -547,6 +563,7 @@ export async function runAsyncAgentLifecycle({
 }): Promise<void> {
   let stopSummarization: (() => void) | undefined
   const agentMessages: MessageType[] = []
+  let terminalApiError: string | undefined
   try {
     const tracker = createProgressTracker()
     const resolveActivity = createActivityDescriptionResolver(
@@ -565,6 +582,7 @@ export async function runAsyncAgentLifecycle({
       : undefined
     for await (const message of makeStream(onCacheSafeParams)) {
       agentMessages.push(message)
+      terminalApiError ??= getAgentApiErrorMessage(message)
       // Append immediately when UI holds the task (retain). Bootstrap reads
       // disk in parallel and UUID-merges the prefix — disk-write-before-yield
       // means live is always a suffix of disk, so merge is order-correct.
@@ -602,6 +620,10 @@ export async function runAsyncAgentLifecycle({
           lastToolName,
         )
       }
+    }
+
+    if (terminalApiError) {
+      throw new Error(terminalApiError)
     }
 
     stopSummarization?.()

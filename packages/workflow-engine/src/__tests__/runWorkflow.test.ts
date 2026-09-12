@@ -182,6 +182,39 @@ test('advisor workflow always performs final acceptance', async () => {
   }
 })
 
+test('advisor workflow rejects an empty plan before spawning workers', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
+  try {
+    const ports = portsWith(dir, new Map())
+    ports.agentRunner.runAgentToResult = async params =>
+      params.label === 'advisor:plan'
+        ? {
+            kind: 'ok',
+            output: {
+              plan: 'do work',
+              acceptance: ['test passes'],
+              subtasks: [],
+            },
+            usage: { outputTokens: 1 },
+          }
+        : { kind: 'dead' }
+    const result = await runWorkflow({
+      script: createAdvisorWorkflowScript(),
+      args: { task: 'fix it' },
+      runId: 'advisor-empty-plan',
+      ports,
+      host: createHostHandle(null),
+      signal: new AbortController().signal,
+      cwd: dir,
+      budgetTotal: null,
+    })
+    expect(result.status).toBe('failed')
+    expect(result.error).toMatch(/advisor plan did not produce subtasks/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('advisor workflow stops when execution does not complete', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'wf-run-'))
   try {

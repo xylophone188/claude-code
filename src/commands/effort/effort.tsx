@@ -24,7 +24,16 @@ type EffortCommandResult = {
   effortUpdate?: { value: EffortValue | undefined };
 };
 
+function omniRouteOwnsEffort(): boolean {
+  return process.env.CCB_ENV === '1' && process.env.OMNIROUTE_SERVER_ROUTING !== '0';
+}
+
 function setEffortValue(effortValue: EffortValue): EffortCommandResult {
+  if (omniRouteOwnsEffort()) {
+    return {
+      message: '推理强度由 OmniRoute 根据任务和模型能力自动决定。',
+    };
+  }
   const persistable = toPersistableEffort(effortValue);
   if (persistable !== undefined) {
     const result = updateSettingsForSource('userSettings', {
@@ -67,6 +76,9 @@ function setEffortValue(effortValue: EffortValue): EffortCommandResult {
 }
 
 export function showCurrentEffort(appStateEffort: EffortValue | undefined, model: string): EffortCommandResult {
+  if (omniRouteOwnsEffort()) {
+    return { message: '推理强度由 OmniRoute 自动决定。' };
+  }
   const envOverride = getEffortEnvOverride();
   const effectiveValue = envOverride === null ? undefined : (envOverride ?? appStateEffort);
   if (effectiveValue === undefined) {
@@ -80,6 +92,9 @@ export function showCurrentEffort(appStateEffort: EffortValue | undefined, model
 }
 
 function unsetEffortLevel(): EffortCommandResult {
+  if (omniRouteOwnsEffort()) {
+    return { message: '推理强度由 OmniRoute 自动决定。' };
+  }
   const result = updateSettingsForSource('userSettings', {
     effortLevel: undefined,
   });
@@ -108,6 +123,9 @@ function unsetEffortLevel(): EffortCommandResult {
 }
 
 export function executeEffort(args: string): EffortCommandResult {
+  if (omniRouteOwnsEffort()) {
+    return { message: '推理强度由 OmniRoute 根据任务自动决定。' };
+  }
   const normalized = args.toLowerCase();
   if (normalized === 'auto' || normalized === 'unset') {
     return unsetEffortLevel();

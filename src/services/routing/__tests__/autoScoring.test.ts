@@ -5,9 +5,13 @@ import { join } from 'node:path'
 import {
   calculateFactors,
   calculateScore,
+  currentFreeOpenCodeModels,
   DEFAULT_WEIGHTS,
   getAutoCandidateTiers,
+  refreshSenseNovaCatalog,
+  resetSenseNovaCatalogForTests,
   scorePoolSync,
+  writeOpenCodeModelsCache,
 } from '../autoScoring.js'
 import { fetchCodeBuddyQuota } from '../usage/codebuddy.js'
 
@@ -40,13 +44,20 @@ describe('calculateFactors', () => {
 
 describe('getAutoCandidateTiers', () => {
   const candidates = process.env.CCB_AUTO_CANDIDATES
+  const candidatesFile = process.env.CCB_AUTO_CANDIDATES_FILE
 
   afterEach(() => {
     if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
     else process.env.CCB_AUTO_CANDIDATES = candidates
+    if (candidatesFile === undefined)
+      delete process.env.CCB_AUTO_CANDIDATES_FILE
+    else process.env.CCB_AUTO_CANDIDATES_FILE = candidatesFile
   })
 
   it('treats environment candidates as L1 only', () => {
+    // Isolate the deployed auto-candidates.json: the env branch is the unit
+    // under test, not whatever a real machine happens to have configured.
+    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
     process.env.CCB_AUTO_CANDIDATES = 'opencode/deepseek-v4-flash-free'
     expect(getAutoCandidateTiers()).toEqual({
       l1: ['opencode/deepseek-v4-flash-free'],
@@ -55,15 +66,69 @@ describe('getAutoCandidateTiers', () => {
       l4: [],
       l5: [],
       l6: [],
+      l7: [],
     })
   })
 
-  it('keeps a non-empty L2 pool when no env override exists', () => {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+  it('keeps a non-empty L2 pool when no env override or config file exists', () => {
     delete process.env.CCB_AUTO_CANDIDATES
+    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
     const l2 = getAutoCandidateTiers().l2
     expect(l2.length).toBeGreaterThan(0)
-    // Present in both the built-in default and the deployed auto-candidates.json.
     expect(l2).toContain('nvidia/z-ai/glm-5.2')
+=======
+  it('keeps a non-empty candidate pool when no env override exists', () => {
+    delete process.env.CCB_AUTO_CANDIDATES
+=======
+  it('keeps a non-empty candidate pool when no env override exists', () => {
+    delete process.env.CCB_AUTO_CANDIDATES
+>>>>>>> Stashed changes
+    const tiers = getAutoCandidateTiers()
+    const pool = [...tiers.l1, ...tiers.l2]
+    expect(pool.length).toBeGreaterThan(0)
+    expect(pool.every(candidate => !candidate.startsWith('gitee/'))).toBe(true)
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+  })
+
+  it('merges a synced SenseNova catalog into the L2 pool', async () => {
+    delete process.env.CCB_AUTO_CANDIDATES
+    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
+    const previousUrl = process.env.CCB_SENSENOVA_MODELS_URL
+    process.env.CCB_SENSENOVA_MODELS_URL = 'https://sensenova.example/v1/models'
+    resetSenseNovaCatalogForTests()
+    try {
+      await refreshSenseNovaCatalog(
+        (async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                { id: 'glm-5.2' },
+                { id: 'sensenova-6.8-flash-lite' },
+                { id: 'glm-5.2-pro' },
+              ],
+            }),
+            { status: 200 },
+          )) as unknown as typeof fetch,
+      )
+
+      const l2 = getAutoCandidateTiers().l2
+      expect(l2).toEqual([
+        'sensenova/glm-5.2',
+        'sensenova/sensenova-6.8-flash-lite',
+        'sensenova/glm-5.2-pro',
+        'sensenova/deepseek-v4-flash',
+        'nvidia/z-ai/glm-5.2',
+      ])
+    } finally {
+      if (previousUrl === undefined) delete process.env.CCB_SENSENOVA_MODELS_URL
+      else process.env.CCB_SENSENOVA_MODELS_URL = previousUrl
+      resetSenseNovaCatalogForTests()
+    }
+=======
+>>>>>>> Stashed changes
   })
 })
 
@@ -102,6 +167,37 @@ describe('scorePoolSync', () => {
     expect(scorePoolSync(['slow/model', 'fast/model'])[0]?.candidate).toBe(
       'slow/model',
     )
+  })
+
+  it('omits gitee from every generation candidate pool and ranking', () => {
+    const candidates = process.env.CCB_AUTO_CANDIDATES
+    process.env.CCB_AUTO_CANDIDATES =
+      'gitee/model,opencode/deepseek-v4-flash-free'
+    try {
+      const tiers = getAutoCandidateTiers()
+      const pool = [
+        ...tiers.l1,
+        ...tiers.l2,
+        ...tiers.l3,
+        ...tiers.l4,
+        ...tiers.l5,
+        ...tiers.l6,
+      ]
+      expect(pool).not.toContain('gitee/model')
+      expect(pool.every(candidate => !candidate.startsWith('gitee/'))).toBe(
+        true,
+      )
+      const ranked = scorePoolSync([
+        'gitee/model',
+        'opencode/deepseek-v4-flash-free',
+      ])
+      expect(ranked.every(entry => !entry.candidate.startsWith('gitee/'))).toBe(
+        true,
+      )
+    } finally {
+      if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
+      else process.env.CCB_AUTO_CANDIDATES = candidates
+    }
   })
 })
 
@@ -222,10 +318,84 @@ describe('refreshAutoHealth', () => {
       const { refreshAutoHealth } = await import(
         `../autoScoring.js?quota-failure=${Date.now()}`
       )
-      await expect(refreshAutoHealth()).resolves.toBeUndefined()
+      expect(await refreshAutoHealth()).toBeUndefined()
     } finally {
       if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
       else process.env.CCB_AUTO_CANDIDATES = candidates
     }
+  })
+})
+
+describe('OpenCode free-model cache', () => {
+  const hour = 60 * 60 * 1000
+  const baseTime = Date.parse('2026-09-06T12:00:00Z')
+  const cacheDate = (offsetMs: number) =>
+    new Date(baseTime + offsetMs).toISOString()
+  const previousCacheFile = process.env.CCB_OPENCODE_MODELS_CACHE_FILE
+
+  beforeEach(() => {
+    process.env.CCB_OPENCODE_MODELS_CACHE_FILE = join(
+      dir,
+      'opencode-free-models.json',
+    )
+  })
+
+  afterEach(() => {
+    if (previousCacheFile === undefined)
+      delete process.env.CCB_OPENCODE_MODELS_CACHE_FILE
+    else process.env.CCB_OPENCODE_MODELS_CACHE_FILE = previousCacheFile
+  })
+
+  it('serves fresh cache inside the 8-hour window', () => {
+    writeOpenCodeModelsCache({
+      updatedAt: cacheDate(0),
+      models: ['mimo-v2.5-free'],
+    })
+    const realNow = Date.now
+    Date.now = () => baseTime + 7 * hour
+    try {
+      expect(currentFreeOpenCodeModels()).toEqual(['mimo-v2.5-free'])
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  it('rejects an expired cache past the 8-hour window', () => {
+    writeOpenCodeModelsCache({
+      updatedAt: cacheDate(0),
+      models: ['mimo-v2.5-free'],
+    })
+    const realNow = Date.now
+    Date.now = () => baseTime + 8 * hour
+    try {
+      expect(currentFreeOpenCodeModels()).toEqual([])
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  it('rejects a future-dated cache (clock skew)', () => {
+    writeOpenCodeModelsCache({
+      updatedAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      models: ['mimo-v2.5-free'],
+    })
+    expect(currentFreeOpenCodeModels()).toEqual([])
+  })
+
+  it('rejects a corrupted cache file', () => {
+    writeFileSync(process.env.CCB_OPENCODE_MODELS_CACHE_FILE!, '{not json')
+    expect(currentFreeOpenCodeModels()).toEqual([])
+  })
+
+  it('rejects an empty models array', () => {
+    writeOpenCodeModelsCache({
+      updatedAt: cacheDate(0),
+      models: [],
+    })
+    expect(currentFreeOpenCodeModels()).toEqual([])
+  })
+
+  it('never falls back to a hardcoded legacy model', () => {
+    expect(currentFreeOpenCodeModels()).not.toContain('deepseek-v4-flash-free')
   })
 })

@@ -1,5 +1,9 @@
 import type { Command } from '../commands.js'
-import type { LocalCommandCall } from '../types/command.js'
+import type { CanUseToolFn } from '../hooks/useCanUseTool.js'
+import type {
+  LocalCommandCall,
+  LocalJSXCommandContext,
+} from '../types/command.js'
 import {
   listProviders,
   resolveModel,
@@ -13,6 +17,46 @@ function normalizeBaseUrl(baseUrl: string): string {
   return /\/v1\/?$/.test(baseUrl)
     ? baseUrl
     : `${baseUrl.replace(/\/+$/, '')}/v1`
+}
+
+type AdvisorLaunchInput = {
+  mode: 'advisor'
+  args: { task: string }
+  title: string
+  description: string
+}
+
+type WorkflowLaunch = (
+  input: AdvisorLaunchInput,
+  context: LocalJSXCommandContext,
+  canUseTool: CanUseToolFn,
+) => Promise<{ runId: string }>
+
+const defaultWorkflowLauncher: WorkflowLaunch = async (
+  input,
+  context,
+  canUseTool,
+) => {
+  const { getWorkflowService } = await import('../workflow/service.js')
+  const { runId } = await getWorkflowService().launch(
+    input,
+    context,
+    canUseTool,
+  )
+  return { runId }
+}
+
+let launchWorkflow: WorkflowLaunch = defaultWorkflowLauncher
+
+/**
+ * Test-only seam: replace the workflow launcher without mocking the module
+ * graph (mock.module on `workflow/service.js` would leak a stub service into
+ * every other test that imports the singleton). Pass null to restore.
+ */
+export function setWorkflowLauncherForTests(
+  launcher: WorkflowLaunch | null,
+): void {
+  launchWorkflow = launcher ?? defaultWorkflowLauncher
 }
 
 /** Resolve a `<spec>` (provider/model, bare provider, combo, or alias) and
@@ -125,8 +169,16 @@ const call: LocalCommandCall = async (args, _context) => {
     if (!_context.canUseTool) {
       return { type: 'text', value: '当前会话不能启动后台 Workflow。' }
     }
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
     const { getWorkflowService } = await import('../workflow/serviceRef.js')
     const { runId } = await getWorkflowService().launch(
+=======
+    const { runId } = await launchWorkflow(
+>>>>>>> Stashed changes
+=======
+    const { runId } = await launchWorkflow(
+>>>>>>> Stashed changes
       {
         mode: 'advisor',
         args: { task },

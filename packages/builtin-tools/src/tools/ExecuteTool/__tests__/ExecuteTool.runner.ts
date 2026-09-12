@@ -81,7 +81,8 @@ function makeContext(tools: unknown[] = []) {
 function makeMockTool(name: string, callResult: unknown = 'ok') {
   return {
     name,
-    call: async () => ({ data: callResult }),
+    mcpInfo: undefined as { serverName: string; toolName: string } | undefined,
+    call: async (_params: Record<string, unknown>) => ({ data: callResult }),
     checkPermissions: async () => ({ behavior: 'allow' as const }),
     prompt: async () => `Description for ${name}`,
     description: async () => `Description for ${name}`,

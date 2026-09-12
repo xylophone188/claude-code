@@ -25,7 +25,27 @@ const MODEL_KEYS = Object.keys(ALL_MODEL_CONFIGS) as ModelKey[]
 function getBuiltinModelStrings(provider: APIProvider): ModelStrings {
   const out = {} as ModelStrings
   for (const key of MODEL_KEYS) {
-    out[key] = ALL_MODEL_CONFIGS[key][provider]
+    const config = ALL_MODEL_CONFIGS[key]
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    out[key] =
+      (config as Record<APIProvider, string | undefined>)[provider] ??
+      config.firstParty
+=======
+=======
+>>>>>>> Stashed changes
+    // `opencode-free` is the no-key default provider and has no per-provider
+    // model IDs of its own. Fall back to the canonical first-party string so
+    // the ModelStrings record stays total instead of containing undefined.
+    if (provider === 'opencode-free') {
+      out[key] = config.firstParty
+    } else {
+      out[key] = config[provider]!
+    }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   }
   return out
 }

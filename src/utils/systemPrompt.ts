@@ -21,6 +21,16 @@ const proactiveModule =
  * even when the feature is off; loading lazily keeps the default path lean.
  */
 function getModeInstructions(): string | undefined {
+  // OmniRoute owns the shared compression/style pipeline for CCB sessions.
+  // Keep local modes only when the gateway is deliberately disabled so a
+  // disconnected or legacy CCB session still has its existing fallback.
+  if (
+    isEnvTruthy(process.env.CCB_ENV) &&
+    process.env.OMNIROUTE_SERVER_ROUTING !== '0'
+  ) {
+    return undefined
+  }
+
   const parts: Array<string | undefined> = []
   if (feature('CAVEMAN')) {
     const { getCavemanInstructions } =

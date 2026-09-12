@@ -1,0 +1,13 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "Dashboard" [ref=e7]
+        - generic [ref=e11]: /
+        - generic [ref=e12]: session_6d21ca2f28df42fe8eabc9cdb247f377
+        - generic [ref=e13]: ACP
+      - generic [ref=e14]:
+        - button "Toggle theme" [ref=e15]
+        - button "No Token" [ref=e17]
+        - button "Identity" [ref=e22]
+  - generic [ref=e27]: Loading...

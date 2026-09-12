@@ -238,6 +238,9 @@ export type GlobalConfig = {
   bypassPermissionsModeAccepted?: boolean
   hasUsedBackslashReturn?: boolean
   autoCompactEnabled: boolean // Controls whether auto-compact is enabled
+  contextCompressionEnabled?: boolean // Controls lightweight pre-provider compression
+  contextCompressionBudgetTokens?: number // Maximum estimated tokens for local compression
+  contextCompressionSkipWhenOmniRoute?: boolean // Let OmniRoute perform its own compression
   contextCompressionRemoteUrl?: string // Optional remote compressor for Termux
   showTurnDuration: boolean // Controls whether to show turn duration message (e.g., "Cooked for 1m 6s")
   /**
@@ -601,6 +604,9 @@ function createDefaultGlobalConfig(): GlobalConfig {
     verbose: false,
     editorMode: 'normal',
     autoCompactEnabled: true,
+    contextCompressionEnabled: true,
+    contextCompressionBudgetTokens: 24000,
+    contextCompressionSkipWhenOmniRoute: true,
     showTurnDuration: true,
     hasSeenTasksHint: false,
     hasUsedStash: false,
@@ -645,6 +651,9 @@ export const GLOBAL_CONFIG_KEYS = [
   'editorMode',
   'hasUsedBackslashReturn',
   'autoCompactEnabled',
+  'contextCompressionEnabled',
+  'contextCompressionBudgetTokens',
+  'contextCompressionSkipWhenOmniRoute',
   'contextCompressionRemoteUrl',
   'showTurnDuration',
   'diffTool',

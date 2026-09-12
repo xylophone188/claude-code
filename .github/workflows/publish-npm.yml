@@ -40,6 +40,8 @@ jobs:
         run: bun run typecheck
 
       - name: Run tests
+        env:
+          NODE_ENV: test
         run: bun test
 
       - name: Publish to npm

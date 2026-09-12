@@ -1,0 +1,5 @@
+- generic [active] [ref=f4e1]:
+  - link "Skip to content" [ref=f4e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f4e3]: 正在加载...
+  - alert [ref=f4e9]

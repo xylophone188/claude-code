@@ -78,6 +78,12 @@ export function getAgentModel(
   const agentModelWithExp = agentModel ?? getDefaultSubagentModel()
 
   if (agentModelWithExp === 'inherit') {
+    if (
+      process.env.CCB_ENV === '1' &&
+      process.env.OMNIROUTE_SERVER_ROUTING !== '0'
+    ) {
+      return 'ccb-coding'
+    }
     // Apply runtime model resolution for inherit to get the effective model
     // This ensures agents using 'inherit' get opusplan→Opus resolution in plan mode
     return getRuntimeMainLoopModel({

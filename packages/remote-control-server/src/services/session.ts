@@ -21,7 +21,19 @@ import type {
 
 const CODE_SESSION_PREFIX = 'cse_'
 const WEB_SESSION_PREFIX = 'session_'
-const CLOSED_SESSION_STATUSES = new Set(['archived', 'inactive'])
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+// Only 'archived' is terminal. 'inactive' is a liveness timeout from the
+// disconnect monitor — a session can reconnect and resume, so it must not
+// be treated as closed (that would soft-lock the Web UI with 409s).
+>>>>>>> Stashed changes
+=======
+// Only 'archived' is terminal. 'inactive' is a liveness timeout from the
+// disconnect monitor — a session can reconnect and resume, so it must not
+// be treated as closed (that would soft-lock the Web UI with 409s).
+>>>>>>> Stashed changes
+const CLOSED_SESSION_STATUSES = new Set(['archived'])
 
 function toResponse(row: {
   id: string

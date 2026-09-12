@@ -1,0 +1,55 @@
+---
+title: "OmniRoute Context Boundary"
+description: "CCB、OmniRoute 与 Context provider 的职责边界。"
+keywords: ["OmniRoute", "Context", "MCP", "Codebase-memory"]
+---
+
+## 架构契约
+
+```text
+User
+  CAO
+  CCB
+  OmniRoute
+  Context Router
+  Codebase-memory / OpenViking / LLM-Wiki / Context7 / Search / Cache
+```
+
+CCB 是执行端：filesystem、git、shell、代码编辑、测试。它只把任务和
+workspace/repository/mission metadata 交给 OmniRoute，不选择模型、project、
+Context source 或 Context MCP。
+
+OmniRoute 是决策端：解析 project、选择模型与 Context source、查询 provider，
+并返回 context bundle 和 receipt 给 CCB。
+
+## Context source ownership
+
+| Owner | Resources |
+|---|---|
+| CCB | Local execution tools；non-Context user MCP servers |
+| OmniRoute Context Router | Codebase-memory、OpenViking、LLM-Wiki、Context7、Search/Web、Context Cache |
+
+CCB 在 MCP load、reconnect、SDK setup、tool/prompt/resource/`skill://` discovery
+和 late-call guard 处拒绝上述 Context provider。匹配检查覆盖 server name、stdio
+command/arguments、SDK name 和 HTTP/SSE/WebSocket URL；被重命名的 provider 也不会
+被连接或暴露给模型。
+
+## Context decision contract
+
+| Task | Sources |
+|---|---|
+| Coding/execution | Codebase-memory |
+| Architecture/planning | Codebase-memory + OpenViking |
+| Framework/API | LLM-Wiki / Context7 |
+| Unknown/research | Search/Web |
+
+Project resolution is OmniRoute-only. It uses explicit mission metadata first,
+then workspace, git remote/repository name. It must not issue an unscoped
+`search_code` request.
+
+## Cache contract
+
+OmniRoute caches architecture, repository map, symbol index, recent changed
+files and mission context. Cache keys include source, resolved project,
+repository revision, normalized query and budget. Concurrent identical requests
+share one in-flight lookup; revision changes isolate stale entries.

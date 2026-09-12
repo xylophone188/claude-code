@@ -1,0 +1,1523 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e5]:
+      - link "跳到内容" [ref=f1e6] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=f1e11]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.48" [ref=f1e13] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f1e27]:
+          - heading "OmniRoute" [level=1] [ref=f1e28]
+          - generic [ref=f1e29]: v3.8.48
+      - generic [ref=f1e32]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "搜索" [ref=f1e33]
+      - navigation "Main navigation" [ref=f1e34]:
+        - link "home 首页 仪表盘概览" [ref=f1e36] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f1e37]: home
+          - generic [ref=f1e38]:
+            - generic [ref=f1e39]: 首页
+            - generic [ref=f1e40]: 仪表盘概览
+        - generic [ref=f1e41]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f1e42] [cursor=pointer]:
+            - generic [ref=f1e43]: OmniProxy
+            - button "push_pin" [ref=f1e44]
+            - generic: expand_more
+          - generic [ref=f1e45]:
+            - link "api 端点 您的 AI 连接 URL" [ref=f1e46] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f1e47]: api
+              - generic [ref=f1e48]:
+                - generic [ref=f1e49]: 端点
+                - generic [ref=f1e50]: 您的 AI 连接 URL
+            - link "vpn_key API 管理 管理 API 密钥和访问" [ref=f1e51] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f1e52]: vpn_key
+              - generic [ref=f1e53]:
+                - generic [ref=f1e54]: API 管理
+                - generic [ref=f1e55]: 管理 API 密钥和访问
+            - link "dns 提供商 管理 AI 提供商" [ref=f1e56] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f1e57]: dns
+              - generic [ref=f1e58]:
+                - generic [ref=f1e59]: 提供商
+                - generic [ref=f1e60]: 管理 AI 提供商
+            - link "deployed_code 内嵌服务 管理本地代理服务" [ref=f1e61] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f1e62]: deployed_code
+              - generic [ref=f1e63]:
+                - generic [ref=f1e64]: 内嵌服务
+                - generic [ref=f1e65]: 管理本地代理服务
+            - link "layers 组合 用于故障转移的组提供程序" [ref=f1e66] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f1e67]: layers
+              - generic [ref=f1e68]:
+                - generic [ref=f1e69]: 组合
+                - generic [ref=f1e70]: 用于故障转移的组提供程序
+            - link "account_tree Combo Studio Live routing cascade" [ref=f1e71] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f1e72]: account_tree
+              - generic [ref=f1e73]:
+                - generic [ref=f1e74]: Combo Studio
+                - generic [ref=f1e75]: Live routing cascade
+            - link "tune 提供商配额 跟踪提供商使用限制" [ref=f1e76] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f1e77]: tune
+              - generic [ref=f1e78]:
+                - generic [ref=f1e79]: 提供商配额
+                - generic [ref=f1e80]: 跟踪提供商使用限制
+            - link "pie_chart 配额共享 跨密钥共享提供商配额" [ref=f1e81] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f1e82]: pie_chart
+              - generic [ref=f1e83]:
+                - generic [ref=f1e84]: 配额共享
+                - generic [ref=f1e85]: 跨密钥共享提供商配额
+            - generic [ref=f1e86]:
+              - generic [ref=f1e87]: 压缩上下文
+              - link "settings Compression Settings Global defaults" [ref=f1e90] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f1e91]: settings
+                - generic [ref=f1e92]:
+                  - generic [ref=f1e93]: Compression Settings
+                  - generic [ref=f1e94]: Global defaults
+              - link "hub 引擎组合 组合压缩引擎" [ref=f1e95] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f1e96]: hub
+                - generic [ref=f1e97]:
+                  - generic [ref=f1e98]: 引擎组合
+                  - generic [ref=f1e99]: 组合压缩引擎
+              - link "compress Caveman 迅速压缩" [ref=f1e100] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f1e101]: compress
+                - generic [ref=f1e102]:
+                  - generic [ref=f1e103]: Caveman
+                  - generic [ref=f1e104]: 迅速压缩
+              - link "filter_alt RTK 输出滤波" [ref=f1e105] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f1e106]: filter_alt
+                - generic [ref=f1e107]:
+                  - generic [ref=f1e108]: RTK
+                  - generic [ref=f1e109]: 输出滤波
+              - link "table_rows Headroom Tabular compaction" [ref=f1e110] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f1e111]: table_rows
+                - generic [ref=f1e112]:
+                  - generic [ref=f1e113]: Headroom
+                  - generic [ref=f1e114]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn dedup" [ref=f1e115] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f1e116]: content_copy
+                - generic [ref=f1e117]:
+                  - generic [ref=f1e118]: Session Dedup
+                  - generic [ref=f1e119]: Cross-turn dedup
+              - link "archive CCR Retrieve markers" [ref=f1e120] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f1e121]: archive
+                - generic [ref=f1e122]:
+                  - generic [ref=f1e123]: CCR
+                  - generic [ref=f1e124]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f1e125] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f1e126]: psychology
+                - generic [ref=f1e127]:
+                  - generic [ref=f1e128]: LLMLingua
+                  - generic [ref=f1e129]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f1e130] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f1e131]: compress
+                - generic [ref=f1e132]:
+                  - generic [ref=f1e133]: Lite
+                  - generic [ref=f1e134]: Fast whitespace cleanup
+              - link "speed Aggressive Summary + aging" [ref=f1e135] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f1e136]: speed
+                - generic [ref=f1e137]:
+                  - generic [ref=f1e138]: Aggressive
+                  - generic [ref=f1e139]: Summary + aging
+              - link "bolt Ultra Heuristic pruning" [ref=f1e140] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f1e141]: bolt
+                - generic [ref=f1e142]:
+                  - generic [ref=f1e143]: Ultra
+                  - generic [ref=f1e144]: Heuristic pruning
+              - link "grain OmniGlyph Context-as-image" [ref=f1e145] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f1e146]: grain
+                - generic [ref=f1e147]:
+                  - generic [ref=f1e148]: OmniGlyph
+                  - generic [ref=f1e149]: Context-as-image
+              - link "monitoring Compression Studio Live engine cascade" [ref=f1e150] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f1e151]: monitoring
+                - generic [ref=f1e152]:
+                  - generic [ref=f1e153]: Compression Studio
+                  - generic [ref=f1e154]: Live engine cascade
+            - generic [ref=f1e155]:
+              - generic [ref=f1e156]: 工具
+              - link "terminal CLI 代码的 指向 OmniRoute 的代码工具" [ref=f1e159] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f1e160]: terminal
+                - generic [ref=f1e161]:
+                  - generic [ref=f1e162]: CLI 代码的
+                  - generic [ref=f1e163]: 指向 OmniRoute 的代码工具
+              - link "smart_toy CLI 代理 自主 CLI 代理" [ref=f1e164] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f1e165]: smart_toy
+                - generic [ref=f1e166]:
+                  - generic [ref=f1e167]: CLI 代理
+                  - generic [ref=f1e168]: 自主 CLI 代理
+              - link "device_hub ACP 代理 由 OmniRoute 生成的 CLI" [ref=f1e169] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f1e170]: device_hub
+                - generic [ref=f1e171]:
+                  - generic [ref=f1e172]: ACP 代理
+                  - generic [ref=f1e173]: 由 OmniRoute 生成的 CLI
+              - link "cloud 云代理 管理基于云的代理" [ref=f1e174] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f1e175]: cloud
+                - generic [ref=f1e176]:
+                  - generic [ref=f1e177]: 云代理
+                  - generic [ref=f1e178]: 管理基于云的代理
+              - link "link 代理桥接 拦截 IDE 代理流量" [ref=f1e179] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f1e180]: link
+                - generic [ref=f1e181]:
+                  - generic [ref=f1e182]: 代理桥接
+                  - generic [ref=f1e183]: 拦截 IDE 代理流量
+              - link "network_check 流量检查器 监控 LLM 调用 + 调试任何 HTTPS 流量" [ref=f1e184] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f1e185]: network_check
+                - generic [ref=f1e186]:
+                  - generic [ref=f1e187]: 流量检查器
+                  - generic [ref=f1e188]: 监控 LLM 调用 + 调试任何 HTTPS 流量
+              - link "travel_explore Discovery Scan providers for free access" [ref=f1e189] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f1e190]: travel_explore
+                - generic [ref=f1e191]:
+                  - generic [ref=f1e192]: Discovery
+                  - generic [ref=f1e193]: Scan providers for free access
+            - generic [ref=f1e194]:
+              - generic [ref=f1e195]: 集成
+              - link "api API 端点 暴露自定义端点" [ref=f1e198] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f1e199]: api
+                - generic [ref=f1e200]:
+                  - generic [ref=f1e201]: API 端点
+                  - generic [ref=f1e202]: 暴露自定义端点
+              - link "webhook Webhook 获取事件通知" [ref=f1e203] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f1e204]: webhook
+                - generic [ref=f1e205]:
+                  - generic [ref=f1e206]: Webhook
+                  - generic [ref=f1e207]: 获取事件通知
+            - link "dns 代理 HTTP 代理设置" [ref=f1e208] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f1e209]: dns
+              - generic [ref=f1e210]:
+                - generic [ref=f1e211]: 代理
+                - generic [ref=f1e212]: HTTP 代理设置
+        - button "分析 push_pin expand_more" [ref=f1e214] [cursor=pointer]:
+          - generic [ref=f1e215]: 分析
+          - button "push_pin" [ref=f1e216]
+          - generic: expand_more
+        - button "成本 push_pin expand_more" [ref=f1e218] [cursor=pointer]:
+          - generic [ref=f1e219]: 成本
+          - button "push_pin" [ref=f1e220]
+          - generic: expand_more
+        - generic [ref=f1e221]:
+          - button "监控 push_pin expand_more" [expanded] [ref=f1e222] [cursor=pointer]:
+            - generic [ref=f1e223]: 监控
+            - button "push_pin" [ref=f1e224]
+            - generic: expand_more
+          - generic [ref=f1e225]:
+            - link "timeline 活动 近期事件的友好动态" [ref=f1e226] [cursor=pointer]:
+              - /url: /dashboard/activity
+              - generic [ref=f1e227]: timeline
+              - generic [ref=f1e228]:
+                - generic [ref=f1e229]: 活动
+                - generic [ref=f1e230]: 近期事件的友好动态
+            - generic [ref=f1e231]:
+              - generic [ref=f1e232]: 日志
+              - link "description 日志 应用日志" [ref=f1e235] [cursor=pointer]:
+                - /url: /dashboard/logs
+                - generic [ref=f1e236]: description
+                - generic [ref=f1e237]:
+                  - generic [ref=f1e238]: 日志
+                  - generic [ref=f1e239]: 应用日志
+              - link "lan 代理日志 代理流量日志" [ref=f1e240] [cursor=pointer]:
+                - /url: /dashboard/logs/proxy
+                - generic [ref=f1e241]: lan
+                - generic [ref=f1e242]:
+                  - generic [ref=f1e243]: 代理日志
+                  - generic [ref=f1e244]: 代理流量日志
+              - link "terminal 控制台日志 控制台输出" [ref=f1e245] [cursor=pointer]:
+                - /url: /dashboard/logs/console
+                - generic [ref=f1e246]: terminal
+                - generic [ref=f1e247]:
+                  - generic [ref=f1e248]: 控制台日志
+                  - generic [ref=f1e249]: 控制台输出
+            - generic [ref=f1e250]:
+              - generic [ref=f1e251]: 审计
+              - link "policy 审计日志 授权审计" [ref=f1e254] [cursor=pointer]:
+                - /url: /dashboard/audit
+                - generic [ref=f1e255]: policy
+                - generic [ref=f1e256]:
+                  - generic [ref=f1e257]: 审计日志
+                  - generic [ref=f1e258]: 授权审计
+              - link "security MCP 审计 MCP 服务器审计" [ref=f1e259] [cursor=pointer]:
+                - /url: /dashboard/audit/mcp
+                - generic [ref=f1e260]: security
+                - generic [ref=f1e261]:
+                  - generic [ref=f1e262]: MCP 审计
+                  - generic [ref=f1e263]: MCP 服务器审计
+              - link "device_hub A2A审核 A2A 协议审计" [ref=f1e264] [cursor=pointer]:
+                - /url: /dashboard/audit/a2a
+                - generic [ref=f1e265]: device_hub
+                - generic [ref=f1e266]:
+                  - generic [ref=f1e267]: A2A审核
+                  - generic [ref=f1e268]: A2A 协议审计
+            - generic [ref=f1e269]:
+              - generic [ref=f1e270]: 系统
+              - link "health_and_safety 健康 系统健康检查" [ref=f1e273] [cursor=pointer]:
+                - /url: /dashboard/health
+                - generic [ref=f1e274]: health_and_safety
+                - generic [ref=f1e275]:
+                  - generic [ref=f1e276]: 健康
+                  - generic [ref=f1e277]: 系统健康检查
+              - link "bolt 运行时 实时弹性与会话" [ref=f1e278] [cursor=pointer]:
+                - /url: /dashboard/runtime
+                - generic [ref=f1e279]: bolt
+                - generic [ref=f1e280]:
+                  - generic [ref=f1e281]: 运行时
+                  - generic [ref=f1e282]: 实时弹性与会话
+        - button "开发工具 push_pin expand_more" [ref=f1e284] [cursor=pointer]:
+          - generic [ref=f1e285]: 开发工具
+          - button "push_pin" [ref=f1e286]
+          - generic: expand_more
+        - button "代理功能 push_pin expand_more" [ref=f1e288] [cursor=pointer]:
+          - generic [ref=f1e289]: 代理功能
+          - button "push_pin" [ref=f1e290]
+          - generic: expand_more
+        - button "其他功能 push_pin expand_more" [ref=f1e292] [cursor=pointer]:
+          - generic [ref=f1e293]: 其他功能
+          - button "push_pin" [ref=f1e294]
+          - generic: expand_more
+        - generic [ref=f1e295]:
+          - button "配置 push_pin expand_more" [expanded] [ref=f1e296] [cursor=pointer]:
+            - generic [ref=f1e297]: 配置
+            - button "push_pin" [ref=f1e298]
+            - generic: expand_more
+          - generic [ref=f1e299]:
+            - link "tune 通用 应用基础" [ref=f1e300] [cursor=pointer]:
+              - /url: /dashboard/settings/general
+              - generic [ref=f1e301]: tune
+              - generic [ref=f1e302]:
+                - generic [ref=f1e303]: 通用
+                - generic [ref=f1e304]: 应用基础
+            - link "palette 外观 主题与布局" [ref=f1e305] [cursor=pointer]:
+              - /url: /dashboard/settings/appearance
+              - generic [ref=f1e306]: palette
+              - generic [ref=f1e307]:
+                - generic [ref=f1e308]: 外观
+                - generic [ref=f1e309]: 主题与布局
+            - link "auto_awesome AI 设置 AI 行为默认值" [ref=f1e310] [cursor=pointer]:
+              - /url: /dashboard/settings/ai
+              - generic [ref=f1e311]: auto_awesome
+              - generic [ref=f1e312]:
+                - generic [ref=f1e313]: AI 设置
+                - generic [ref=f1e314]: AI 行为默认值
+            - link "route 全局路由 全局路由规则" [ref=f1e315] [cursor=pointer]:
+              - /url: /dashboard/settings/routing
+              - generic [ref=f1e316]: route
+              - generic [ref=f1e317]:
+                - generic [ref=f1e318]: 全局路由
+                - generic [ref=f1e319]: 全局路由规则
+            - link "health_and_safety 弹性 重试与断路器" [ref=f1e320] [cursor=pointer]:
+              - /url: /dashboard/settings/resilience
+              - generic [ref=f1e321]: health_and_safety
+              - generic [ref=f1e322]:
+                - generic [ref=f1e323]: 弹性
+                - generic [ref=f1e324]: 重试与断路器
+            - link "engineering 高级 高级用户选项" [ref=f1e325] [cursor=pointer]:
+              - /url: /dashboard/settings/advanced
+              - generic [ref=f1e326]: engineering
+              - generic [ref=f1e327]:
+                - generic [ref=f1e328]: 高级
+                - generic [ref=f1e329]: 高级用户选项
+            - link "shield 安全 认证与加密" [ref=f1e330] [cursor=pointer]:
+              - /url: /dashboard/settings/security
+              - generic [ref=f1e331]: shield
+              - generic [ref=f1e332]:
+                - generic [ref=f1e333]: 安全
+                - generic [ref=f1e334]: 认证与加密
+            - link "key Access Tokens Scoped CLI tokens for remote mode" [ref=f1e335] [cursor=pointer]:
+              - /url: /dashboard/settings/access-tokens
+              - generic [ref=f1e336]: key
+              - generic [ref=f1e337]:
+                - generic [ref=f1e338]: Access Tokens
+                - generic [ref=f1e339]: Scoped CLI tokens for remote mode
+            - link "flag 功能标志 切换系统功能" [ref=f1e340] [cursor=pointer]:
+              - /url: /dashboard/settings/feature-flags
+              - generic [ref=f1e341]: flag
+              - generic [ref=f1e342]:
+                - generic [ref=f1e343]: 功能标志
+                - generic [ref=f1e344]: 切换系统功能
+            - link "view_sidebar 侧边栏 自定义侧边栏布局" [ref=f1e345] [cursor=pointer]:
+              - /url: /dashboard/settings/sidebar
+              - generic [ref=f1e346]: view_sidebar
+              - generic [ref=f1e347]:
+                - generic [ref=f1e348]: 侧边栏
+                - generic [ref=f1e349]: 自定义侧边栏布局
+        - button "帮助 push_pin expand_more" [ref=f1e351] [cursor=pointer]:
+          - generic [ref=f1e352]: 帮助
+          - button "push_pin" [ref=f1e353]
+          - generic: expand_more
+      - generic [ref=f1e354]:
+        - button "restart_alt 重启服务" [ref=f1e355]:
+          - generic: restart_alt
+          - generic [ref=f1e356]: 重启服务
+        - button "power_settings_new 停止服务" [ref=f1e357]:
+          - generic: power_settings_new
+          - generic [ref=f1e358]: 停止服务
+    - main [ref=f1e359]:
+      - generic [ref=f1e360]:
+        - generic [ref=f1e361]:
+          - generic [ref=f1e362]: description
+          - generic [ref=f1e364]:
+            - heading "日志" [level=1] [ref=f1e365]
+            - paragraph [ref=f1e366]: 实时请求日志、错误追踪和流式事件检查器
+        - generic [ref=f1e367]:
+          - button "Open quick navigation" [ref=f1e368]:
+            - generic: search
+            - generic [ref=f1e369]: Quick nav
+            - generic [ref=f1e370]: Ctrl+K
+          - button "中文 (简体) ZH-CN expand_more" [ref=f1e372]:
+            - img "中文 (简体)" [ref=f1e373]
+            - generic [ref=f1e374]: ZH-CN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=f1e375]:
+            - generic: dark_mode
+          - button "warning" [ref=f1e377]
+          - button "logout" [ref=f1e378]
+      - generic [ref=f1e380]:
+        - navigation "Breadcrumb" [ref=f1e381]:
+          - link "Dashboard" [ref=f1e383] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=f1e384]:
+            - generic [aria-hidden] [ref=f1e385]: ›
+            - generic [ref=f1e386]: Logs
+        - generic [ref=f1e388]:
+          - generic [ref=f1e389]:
+            - heading "请求日志" [level=2] [ref=f1e390]
+            - generic [ref=f1e391]:
+              - button "Clean history" [ref=f1e392]
+              - button "导出" [ref=f1e396]
+          - generic [ref=f1e400]:
+            - generic [ref=f1e401]:
+              - button "正在录制" [ref=f1e402]
+              - button "管道日志开启" [ref=f1e404]
+              - generic [ref=f1e406]:
+                - generic [ref=f1e407]: search
+                - textbox "搜索模型、提供商、账户、API密钥、组合..." [ref=f1e408]
+              - generic [ref=f1e409]:
+                - generic [ref=f1e410]: tag
+                - textbox "Correlation ID" [ref=f1e411]
+              - button "unfold_more All" [ref=f1e412]:
+                - generic: unfold_more
+                - text: All
+              - combobox [ref=f1e413] [cursor=pointer]:
+                - option "所有提供商" [selected]
+                - option "Codex"
+                - option "GITEE"
+                - option "Kiro"
+                - option "SENSENOVA"
+              - combobox [ref=f1e414] [cursor=pointer]:
+                - option "所有模型" [selected]
+                - option "ccb-chat"
+                - option "claude-sonnet-5"
+                - option "codex/gpt-5.6-luna"
+                - option "codex/gpt-5.6-sol-ultra"
+                - option "codex/gpt-5.6-terra"
+                - option "deepseek-v4-flash"
+                - option "gitee/Qwen3-Embedding-8B"
+                - option "gpt-5.6-luna"
+                - option "gpt-5.6-sol-ultra"
+                - option "gpt-5.6-terra"
+                - option "kiro/claude-sonnet-5"
+                - option "sensenova-6.8-flash-lite"
+                - option "sensenova/deepseek-v4-flash"
+                - option "sensenova/sensenova-6.8-flash-lite"
+              - combobox [ref=f1e415] [cursor=pointer]:
+                - option "所有账户" [selected]
+                - 'option "Sense*** · #ef22"'
+                - 'option "clu********************@*******com · #569a"'
+                - 'option "dca1f8c6 · #b522"'
+                - 'option "san*********@******com · #7c2f"'
+              - combobox [ref=f1e416] [cursor=pointer]:
+                - option "所有API密钥" [selected]
+                - option "Claude Code (a13a***6feb)"
+                - option "openviking (ca5b***86d4)"
+              - generic [ref=f1e417]:
+                - generic [ref=f1e418]: 50 总计
+                - generic [ref=f1e419]: 29 成功
+                - generic [ref=f1e420]: 21 错误
+                - generic [ref=f1e421]: 46 组合
+                - generic [ref=f1e422]: 2 密钥
+                - generic [ref=f1e423]: 50 显示
+              - combobox "日志排序" [ref=f1e424] [cursor=pointer]:
+                - option "最新" [selected]
+                - option "最早"
+                - option "令牌 ↓"
+                - option "令牌 ↑"
+                - option "时长 ↓"
+                - option "时长 ↑"
+                - option "状态 ↓"
+                - option "状态 ↑"
+                - option "模型 A-Z"
+                - option "模型 Z-A"
+              - generic [ref=f1e425]:
+                - button "−" [ref=f1e426]
+                - spinbutton "Auto-refresh interval in seconds" [ref=f1e427]: "10"
+                - button "+" [ref=f1e428]
+                - generic [ref=f1e429]: s
+              - button "refresh" [ref=f1e430]
+            - generic [ref=f1e431]:
+              - button "全部" [ref=f1e432]
+              - button "error 错误" [ref=f1e433]:
+                - generic: error
+                - text: 错误
+              - button "check_circle 成功" [ref=f1e434]:
+                - generic: check_circle
+                - text: 成功
+              - button "hub 组合" [ref=f1e435]:
+                - generic: hub
+                - text: 组合
+              - button "Codex" [ref=f1e437]
+              - button "GITEE" [ref=f1e438]
+              - button "Kiro" [ref=f1e439]
+              - button "SENSENOVA" [ref=f1e440]
+            - generic [ref=f1e441]:
+              - generic [ref=f1e442]: 列
+              - button "状态" [ref=f1e443]
+              - button "缓存来源" [ref=f1e444]
+              - button "模型" [ref=f1e445]
+              - button "请求" [ref=f1e446]
+              - button "提供商" [ref=f1e447]
+              - button "请求协议" [ref=f1e448]
+              - button "账户" [ref=f1e449]
+              - button "API密钥" [ref=f1e450]
+              - button "组合" [ref=f1e451]
+              - button "Tokens" [ref=f1e452]
+              - button "TPS" [ref=f1e453]
+              - button "时长" [ref=f1e454]
+              - button "时间" [ref=f1e455]
+            - generic [ref=f1e457]:
+              - table [ref=f1e458]:
+                - rowgroup [ref=f1e459]:
+                  - row [ref=f1e460]:
+                    - columnheader "状态" [ref=f1e461] [cursor=pointer]
+                    - columnheader "缓存来源" [ref=f1e462]
+                    - columnheader "模型" [ref=f1e463]
+                    - columnheader "请求" [ref=f1e464]
+                    - columnheader "提供商" [ref=f1e465]
+                    - columnheader "请求协议" [ref=f1e466]
+                    - columnheader "账户" [ref=f1e467]
+                    - columnheader "API密钥" [ref=f1e468]
+                    - columnheader "组合" [ref=f1e469]
+                    - columnheader "Tokens" [ref=f1e470] [cursor=pointer]
+                    - columnheader "TPS" [ref=f1e471] [cursor=pointer]
+                    - columnheader "时长" [ref=f1e472] [cursor=pointer]
+                    - columnheader "时间 ↓" [ref=f1e473] [cursor=pointer]
+                - rowgroup [ref=f1e474]:
+                  - row [ref=f1e475] [cursor=pointer]:
+                    - cell "200" [ref=f1e476]
+                    - cell "上游" [ref=f1e479]:
+                      - generic "上游提供商响应" [ref=f1e480]: 上游
+                    - cell "sensenova-6.8-flash-lite healed cfd2dc1b-c2b… · 2 attempts" [ref=f1e481]:
+                      - generic [ref=f1e482]:
+                        - generic [ref=f1e483]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 1 retry" [ref=f1e484]: healed
+                      - generic "cfd2dc1b-c2b5-4cc5-91a3-0d09e1ee0429" [ref=f1e485]: cfd2dc1b-c2b… · 2 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e486]
+                    - cell "SENSENOVA" [ref=f1e487]
+                    - cell "OpenAI-Chat" [ref=f1e489]
+                    - cell "Sense***" [ref=f1e491]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e492]
+                    - cell "ccb-chat" [ref=f1e493]
+                    - 'cell "TI: 40,002|TO: 302|↓10,574" [ref=f1e495]':
+                      - text: "TI: 40,002|TO: 302|"
+                      - generic "10,574 tokens compressed" [ref=f1e496]: ↓10,574
+                    - cell "22.3" [ref=f1e497]
+                    - cell "13.5s" [ref=f1e498]
+                    - cell "14:18:54" [ref=f1e499]
+                  - row [ref=f1e500] [cursor=pointer]:
+                    - cell "200" [ref=f1e501]
+                    - cell "上游" [ref=f1e504]:
+                      - generic "上游提供商响应" [ref=f1e505]: 上游
+                    - cell "gpt-5.6-sol-ultra d72e989e-b29…" [ref=f1e506]:
+                      - generic [ref=f1e507]: gpt-5.6-sol-ultra
+                      - generic "d72e989e-b296-4bdd-baba-5f5284c3bee5" [ref=f1e509]: d72e989e-b29…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e510]
+                    - cell "Codex" [ref=f1e511]
+                    - cell "OpenAI-Chat" [ref=f1e513]
+                    - cell "clu********************@*******com" [ref=f1e515]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e516]
+                    - cell "auto/smart" [ref=f1e517]
+                    - 'cell "TI: 59,399|TO: 1,237|↓1,385" [ref=f1e519]':
+                      - text: "TI: 59,399|TO: 1,237|"
+                      - generic "1,385 tokens compressed" [ref=f1e520]: ↓1,385
+                    - cell "48.6" [ref=f1e521]
+                    - cell "25.5s" [ref=f1e522]
+                    - cell "14:18:49" [ref=f1e523]
+                  - row [ref=f1e524] [cursor=pointer]:
+                    - cell "200" [ref=f1e525]
+                    - cell "上游" [ref=f1e528]:
+                      - generic "上游提供商响应" [ref=f1e529]: 上游
+                    - cell "gpt-5.6-terra 8a81e588-5db…" [ref=f1e530]:
+                      - generic [ref=f1e531]: gpt-5.6-terra
+                      - generic "8a81e588-5dbf-4223-92d6-a75f37ef304e" [ref=f1e533]: 8a81e588-5db…
+                    - cell "codex/gpt-5.6-terra" [ref=f1e534]
+                    - cell "Codex" [ref=f1e535]
+                    - cell "OpenAI-Chat" [ref=f1e537]
+                    - cell "clu********************@*******com" [ref=f1e539]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e540]
+                    - cell "hermes-score" [ref=f1e541]
+                    - 'cell "TI: 1,602|TO: 185|↓7" [ref=f1e543]':
+                      - text: "TI: 1,602|TO: 185|"
+                      - generic "7 tokens compressed" [ref=f1e544]: ↓7
+                    - cell "36.2" [ref=f1e545]
+                    - cell "5.1s" [ref=f1e546]
+                    - cell "14:18:48" [ref=f1e547]
+                  - row [ref=f1e548] [cursor=pointer]:
+                    - cell "200" [ref=f1e549]
+                    - cell "上游" [ref=f1e552]:
+                      - generic "上游提供商响应" [ref=f1e553]: 上游
+                    - cell "sensenova-6.8-flash-lite healed d2148a59-ea3… · 2 attempts" [ref=f1e554]:
+                      - generic [ref=f1e555]:
+                        - generic [ref=f1e556]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 1 retry" [ref=f1e557]: healed
+                      - generic "d2148a59-ea34-4fab-95f6-a810755f4946" [ref=f1e558]: d2148a59-ea3… · 2 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e559]
+                    - cell "SENSENOVA" [ref=f1e560]
+                    - cell "OpenAI-Chat" [ref=f1e562]
+                    - cell "Sense***" [ref=f1e564]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e565]
+                    - cell "ccb-chat" [ref=f1e566]
+                    - 'cell "TI: 43,441|TO: 334|↓4,176" [ref=f1e568]':
+                      - text: "TI: 43,441|TO: 334|"
+                      - generic "4,176 tokens compressed" [ref=f1e569]: ↓4,176
+                    - cell "18.6" [ref=f1e570]
+                    - cell "18.0s" [ref=f1e571]
+                    - cell "14:18:48" [ref=f1e572]
+                  - row [ref=f1e573] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e574]:
+                      - generic [ref=f1e575]:
+                        - generic [ref=f1e576]: "429"
+                        - button "↳" [ref=f1e577]
+                    - cell "上游" [ref=f1e578]:
+                      - generic "上游提供商响应" [ref=f1e579]: 上游
+                    - cell "deepseek-v4-flash cfd2dc1b-c2b…" [ref=f1e580]:
+                      - generic [ref=f1e581]: deepseek-v4-flash
+                      - generic "cfd2dc1b-c2b5-4cc5-91a3-0d09e1ee0429" [ref=f1e583]: cfd2dc1b-c2b…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e584]
+                    - cell "SENSENOVA" [ref=f1e585]
+                    - cell "OpenAI-Chat" [ref=f1e587]
+                    - cell "Sense***" [ref=f1e589]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e590]
+                    - cell "ccb-chat" [ref=f1e591]
+                    - 'cell "TI: 0|TO: 0|↓10,575" [ref=f1e593]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,575 tokens compressed" [ref=f1e594]: ↓10,575
+                    - cell "—" [ref=f1e595]
+                    - cell "2.0s" [ref=f1e596]
+                    - cell "14:18:40" [ref=f1e597]
+                  - row [ref=f1e598] [cursor=pointer]:
+                    - cell "429" [ref=f1e599]
+                    - cell "上游" [ref=f1e602]:
+                      - generic "上游提供商响应" [ref=f1e603]: 上游
+                    - cell "ccb-chat failed 1ba3549d-70d… · 3 attempts" [ref=f1e604]:
+                      - generic [ref=f1e605]:
+                        - generic [ref=f1e606]: ccb-chat
+                        - generic "All 3 attempts failed" [ref=f1e607]: failed
+                      - generic "1ba3549d-70d2-4f2b-a24c-b70e8536007b" [ref=f1e608]: 1ba3549d-70d… · 3 attempts
+                    - cell "ccb-chat" [ref=f1e609]
+                    - cell "-" [ref=f1e610]
+                    - cell "-" [ref=f1e612]
+                    - cell "-" [ref=f1e614]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e615]
+                    - cell "ccb-chat" [ref=f1e616]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e618]'
+                    - cell "—" [ref=f1e619]
+                    - cell "23.9s" [ref=f1e620]
+                    - cell "14:18:38" [ref=f1e621]
+                  - row [ref=f1e622] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e623]:
+                      - generic [ref=f1e624]:
+                        - generic [ref=f1e625]: "429"
+                        - button "↳" [ref=f1e626]
+                    - cell "上游" [ref=f1e627]:
+                      - generic "上游提供商响应" [ref=f1e628]: 上游
+                    - cell "sensenova-6.8-flash-lite 1ba3549d-70d…" [ref=f1e629]:
+                      - generic [ref=f1e630]: sensenova-6.8-flash-lite
+                      - generic "1ba3549d-70d2-4f2b-a24c-b70e8536007b" [ref=f1e632]: 1ba3549d-70d…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e633]
+                    - cell "SENSENOVA" [ref=f1e634]
+                    - cell "OpenAI-Chat" [ref=f1e636]
+                    - cell "Sense***" [ref=f1e638]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e639]
+                    - cell "ccb-chat" [ref=f1e640]
+                    - 'cell "TI: 0|TO: 0|↓10,574" [ref=f1e642]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,574 tokens compressed" [ref=f1e643]: ↓10,574
+                    - cell "—" [ref=f1e644]
+                    - cell "21.4s" [ref=f1e645]
+                    - cell "14:18:38" [ref=f1e646]
+                  - row [ref=f1e647] [cursor=pointer]:
+                    - cell "200" [ref=f1e648]
+                    - cell "上游" [ref=f1e651]:
+                      - generic "上游提供商响应" [ref=f1e652]: 上游
+                    - cell "sensenova-6.8-flash-lite healed e8d62916-e4b… · 2 attempts" [ref=f1e653]:
+                      - generic [ref=f1e654]:
+                        - generic [ref=f1e655]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 1 retry" [ref=f1e656]: healed
+                      - generic "e8d62916-e4b9-4f89-809c-48e830055755" [ref=f1e657]: e8d62916-e4b… · 2 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e658]
+                    - cell "SENSENOVA" [ref=f1e659]
+                    - cell "OpenAI-Chat" [ref=f1e661]
+                    - cell "Sense***" [ref=f1e663]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e664]
+                    - cell "ccb-chat" [ref=f1e665]
+                    - 'cell "TI: 49,101|TO: 221|↓486" [ref=f1e667]':
+                      - text: "TI: 49,101|TO: 221|"
+                      - generic "486 tokens compressed" [ref=f1e668]: ↓486
+                    - cell "15.4" [ref=f1e669]
+                    - cell "14.4s" [ref=f1e670]
+                    - cell "14:18:36" [ref=f1e671]
+                  - row [ref=f1e672] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e673]:
+                      - generic [ref=f1e674]:
+                        - generic [ref=f1e675]: "429"
+                        - button "↳" [ref=f1e676]
+                    - cell "上游" [ref=f1e677]:
+                      - generic "上游提供商响应" [ref=f1e678]: 上游
+                    - cell "deepseek-v4-flash d2148a59-ea3…" [ref=f1e679]:
+                      - generic [ref=f1e680]: deepseek-v4-flash
+                      - generic "d2148a59-ea34-4fab-95f6-a810755f4946" [ref=f1e682]: d2148a59-ea3…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e683]
+                    - cell "SENSENOVA" [ref=f1e684]
+                    - cell "OpenAI-Chat" [ref=f1e686]
+                    - cell "Sense***" [ref=f1e688]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e689]
+                    - cell "ccb-chat" [ref=f1e690]
+                    - 'cell "TI: 0|TO: 0|↓4,175" [ref=f1e692]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "4,175 tokens compressed" [ref=f1e693]: ↓4,175
+                    - cell "—" [ref=f1e694]
+                    - cell "1.4s" [ref=f1e695]
+                    - cell "14:18:29" [ref=f1e696]
+                  - row [ref=f1e697] [cursor=pointer]:
+                    - cell "200" [ref=f1e698]
+                    - cell "上游" [ref=f1e701]:
+                      - generic "上游提供商响应" [ref=f1e702]: 上游
+                    - cell "sensenova-6.8-flash-lite 658067bd-e3a…" [ref=f1e703]:
+                      - generic [ref=f1e704]: sensenova-6.8-flash-lite
+                      - generic "658067bd-e3ae-4529-bef1-621f4e2cda68" [ref=f1e706]: 658067bd-e3a…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e707]
+                    - cell "SENSENOVA" [ref=f1e708]
+                    - cell "OpenAI-Chat" [ref=f1e710]
+                    - cell "Sense***" [ref=f1e712]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e713]
+                    - cell "ccb-chat" [ref=f1e714]
+                    - 'cell "TI: 43,073|TO: 225|↓4,362" [ref=f1e716]':
+                      - text: "TI: 43,073|TO: 225|"
+                      - generic "4,362 tokens compressed" [ref=f1e717]: ↓4,362
+                    - cell "7.1" [ref=f1e718]
+                    - cell "31.9s" [ref=f1e719]
+                    - cell "14:18:26" [ref=f1e720]
+                  - row [ref=f1e721] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e722]:
+                      - generic [ref=f1e723]:
+                        - generic [ref=f1e724]: "429"
+                        - button "↳" [ref=f1e725]
+                    - cell "上游" [ref=f1e726]:
+                      - generic "上游提供商响应" [ref=f1e727]: 上游
+                    - cell "deepseek-v4-flash e8d62916-e4b…" [ref=f1e728]:
+                      - generic [ref=f1e729]: deepseek-v4-flash
+                      - generic "e8d62916-e4b9-4f89-809c-48e830055755" [ref=f1e731]: e8d62916-e4b…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e732]
+                    - cell "SENSENOVA" [ref=f1e733]
+                    - cell "OpenAI-Chat" [ref=f1e735]
+                    - cell "Sense***" [ref=f1e737]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e738]
+                    - cell "ccb-chat" [ref=f1e739]
+                    - 'cell "TI: 0|TO: 0|↓486" [ref=f1e741]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "486 tokens compressed" [ref=f1e742]: ↓486
+                    - cell "—" [ref=f1e743]
+                    - cell "1.3s" [ref=f1e744]
+                    - cell "14:18:21" [ref=f1e745]
+                  - row [ref=f1e746] [cursor=pointer]:
+                    - cell "429" [ref=f1e747]
+                    - cell "上游" [ref=f1e750]:
+                      - generic "上游提供商响应" [ref=f1e751]: 上游
+                    - cell "ccb-chat failed 450d67ca-cad… · 3 attempts" [ref=f1e752]:
+                      - generic [ref=f1e753]:
+                        - generic [ref=f1e754]: ccb-chat
+                        - generic "All 3 attempts failed" [ref=f1e755]: failed
+                      - generic "450d67ca-cad0-4630-b425-8b2ebc09d004" [ref=f1e756]: 450d67ca-cad… · 3 attempts
+                    - cell "ccb-chat" [ref=f1e757]
+                    - cell "-" [ref=f1e758]
+                    - cell "-" [ref=f1e760]
+                    - cell "-" [ref=f1e762]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e763]
+                    - cell "ccb-chat" [ref=f1e764]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e766]'
+                    - cell "—" [ref=f1e767]
+                    - cell "24.2s" [ref=f1e768]
+                    - cell "14:18:20" [ref=f1e769]
+                  - row [ref=f1e770] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e771]:
+                      - generic [ref=f1e772]:
+                        - generic [ref=f1e773]: "429"
+                        - button "↳" [ref=f1e774]
+                    - cell "上游" [ref=f1e775]:
+                      - generic "上游提供商响应" [ref=f1e776]: 上游
+                    - cell "sensenova-6.8-flash-lite 450d67ca-cad…" [ref=f1e777]:
+                      - generic [ref=f1e778]: sensenova-6.8-flash-lite
+                      - generic "450d67ca-cad0-4630-b425-8b2ebc09d004" [ref=f1e780]: 450d67ca-cad…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e781]
+                    - cell "SENSENOVA" [ref=f1e782]
+                    - cell "OpenAI-Chat" [ref=f1e784]
+                    - cell "Sense***" [ref=f1e786]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e787]
+                    - cell "ccb-chat" [ref=f1e788]
+                    - 'cell "TI: 0|TO: 0|↓486" [ref=f1e790]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "486 tokens compressed" [ref=f1e791]: ↓486
+                    - cell "—" [ref=f1e792]
+                    - cell "22.2s" [ref=f1e793]
+                    - cell "14:18:20" [ref=f1e794]
+                  - row [ref=f1e795] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e796]:
+                      - generic [ref=f1e797]:
+                        - generic [ref=f1e798]: "429"
+                        - button "↳" [ref=f1e799]
+                    - cell "上游" [ref=f1e800]:
+                      - generic "上游提供商响应" [ref=f1e801]: 上游
+                    - cell "deepseek-v4-flash 1ba3549d-70d…" [ref=f1e802]:
+                      - generic [ref=f1e803]: deepseek-v4-flash
+                      - generic "1ba3549d-70d2-4f2b-a24c-b70e8536007b" [ref=f1e805]: 1ba3549d-70d…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e806]
+                    - cell "SENSENOVA" [ref=f1e807]
+                    - cell "OpenAI-Chat" [ref=f1e809]
+                    - cell "Sense***" [ref=f1e811]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e812]
+                    - cell "ccb-chat" [ref=f1e813]
+                    - 'cell "TI: 0|TO: 0|↓10,575" [ref=f1e815]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,575 tokens compressed" [ref=f1e816]: ↓10,575
+                    - cell "—" [ref=f1e817]
+                    - cell "1.3s" [ref=f1e818]
+                    - cell "14:18:16" [ref=f1e819]
+                  - row [ref=f1e820] [cursor=pointer]:
+                    - cell "200" [ref=f1e821]
+                    - cell "上游" [ref=f1e824]:
+                      - generic "上游提供商响应" [ref=f1e825]: 上游
+                    - cell "gpt-5.6-sol-ultra e12f81cc-de2…" [ref=f1e826]:
+                      - generic [ref=f1e827]: gpt-5.6-sol-ultra
+                      - generic "e12f81cc-de2a-4c3e-9ad7-c88c7f90e3c2" [ref=f1e829]: e12f81cc-de2…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e830]
+                    - cell "Codex" [ref=f1e831]
+                    - cell "OpenAI-Chat" [ref=f1e833]
+                    - cell "clu********************@*******com" [ref=f1e835]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e836]
+                    - cell "auto/smart" [ref=f1e837]
+                    - 'cell "TI: 55,336|TO: 1,356|↓1,385" [ref=f1e839]':
+                      - text: "TI: 55,336|TO: 1,356|"
+                      - generic "1,385 tokens compressed" [ref=f1e840]: ↓1,385
+                    - cell "51.3" [ref=f1e841]
+                    - cell "26.4s" [ref=f1e842]
+                    - cell "14:18:15" [ref=f1e843]
+                  - row [ref=f1e844] [cursor=pointer]:
+                    - cell "429" [ref=f1e845]
+                    - cell "上游" [ref=f1e848]:
+                      - generic "上游提供商响应" [ref=f1e849]: 上游
+                    - cell "ccb-chat failed 917ee46d-d24… · 3 attempts" [ref=f1e850]:
+                      - generic [ref=f1e851]:
+                        - generic [ref=f1e852]: ccb-chat
+                        - generic "All 3 attempts failed" [ref=f1e853]: failed
+                      - generic "917ee46d-d240-4850-8e84-5966e33ca343" [ref=f1e854]: 917ee46d-d24… · 3 attempts
+                    - cell "ccb-chat" [ref=f1e855]
+                    - cell "-" [ref=f1e856]
+                    - cell "-" [ref=f1e858]
+                    - cell "-" [ref=f1e860]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e861]
+                    - cell "ccb-chat" [ref=f1e862]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e864]'
+                    - cell "—" [ref=f1e865]
+                    - cell "23.1s" [ref=f1e866]
+                    - cell "14:18:14" [ref=f1e867]
+                  - row [ref=f1e868] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e869]:
+                      - generic [ref=f1e870]:
+                        - generic [ref=f1e871]: "429"
+                        - button "↳" [ref=f1e872]
+                    - cell "上游" [ref=f1e873]:
+                      - generic "上游提供商响应" [ref=f1e874]: 上游
+                    - cell "sensenova-6.8-flash-lite 917ee46d-d24…" [ref=f1e875]:
+                      - generic [ref=f1e876]: sensenova-6.8-flash-lite
+                      - generic "917ee46d-d240-4850-8e84-5966e33ca343" [ref=f1e878]: 917ee46d-d24…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e879]
+                    - cell "SENSENOVA" [ref=f1e880]
+                    - cell "OpenAI-Chat" [ref=f1e882]
+                    - cell "Sense***" [ref=f1e884]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e885]
+                    - cell "ccb-chat" [ref=f1e886]
+                    - 'cell "TI: 0|TO: 0|↓10,574" [ref=f1e888]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,574 tokens compressed" [ref=f1e889]: ↓10,574
+                    - cell "—" [ref=f1e890]
+                    - cell "21.5s" [ref=f1e891]
+                    - cell "14:18:14" [ref=f1e892]
+                  - row [ref=f1e893] [cursor=pointer]:
+                    - cell "200" [ref=f1e894]
+                    - cell "上游" [ref=f1e897]:
+                      - generic "上游提供商响应" [ref=f1e898]: 上游
+                    - cell "gpt-5.6-sol-ultra healed 9d0ffabf-451… · 2 attempts" [ref=f1e899]:
+                      - generic [ref=f1e900]:
+                        - generic [ref=f1e901]: gpt-5.6-sol-ultra
+                        - generic "Failed, recovered after 1 retry" [ref=f1e902]: healed
+                      - generic "9d0ffabf-4516-4107-a79d-154b70abd280" [ref=f1e903]: 9d0ffabf-451… · 2 attempts
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e904]
+                    - cell "Codex" [ref=f1e905]
+                    - cell "OpenAI-Chat" [ref=f1e907]
+                    - cell "clu********************@*******com" [ref=f1e909]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e910]
+                    - cell "auto/smart" [ref=f1e911]
+                    - 'cell "TI: 13,116|TO: 562" [ref=f1e913]'
+                    - cell "37.7" [ref=f1e914]
+                    - cell "14.9s" [ref=f1e915]
+                    - cell "14:18:10" [ref=f1e916]
+                  - row [ref=f1e917] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e918]:
+                      - generic [ref=f1e919]:
+                        - generic [ref=f1e920]: "429"
+                        - button "↳" [ref=f1e921]
+                    - cell "上游" [ref=f1e922]:
+                      - generic "上游提供商响应" [ref=f1e923]: 上游
+                    - cell "deepseek-v4-flash 450d67ca-cad…" [ref=f1e924]:
+                      - generic [ref=f1e925]: deepseek-v4-flash
+                      - generic "450d67ca-cad0-4630-b425-8b2ebc09d004" [ref=f1e927]: 450d67ca-cad…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e928]
+                    - cell "SENSENOVA" [ref=f1e929]
+                    - cell "OpenAI-Chat" [ref=f1e931]
+                    - cell "Sense***" [ref=f1e933]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e934]
+                    - cell "ccb-chat" [ref=f1e935]
+                    - 'cell "TI: 0|TO: 0|↓486" [ref=f1e937]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "486 tokens compressed" [ref=f1e938]: ↓486
+                    - cell "—" [ref=f1e939]
+                    - cell "1.6s" [ref=f1e940]
+                    - cell "14:17:57" [ref=f1e941]
+                  - row [ref=f1e942] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e943]:
+                      - generic [ref=f1e944]:
+                        - generic [ref=f1e945]: "429"
+                        - button "↳" [ref=f1e946]
+                    - cell "上游" [ref=f1e947]:
+                      - generic "上游提供商响应" [ref=f1e948]: 上游
+                    - cell "claude-sonnet-5 9d0ffabf-451…" [ref=f1e949]:
+                      - generic [ref=f1e950]: claude-sonnet-5
+                      - generic "9d0ffabf-4516-4107-a79d-154b70abd280" [ref=f1e952]: 9d0ffabf-451…
+                    - cell "kiro/claude-sonnet-5" [ref=f1e953]
+                    - cell "Kiro" [ref=f1e954]
+                    - cell "OpenAI-Chat" [ref=f1e956]
+                    - cell "dca1f8c6" [ref=f1e958]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e959]
+                    - cell "auto/smart" [ref=f1e960]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e962]'
+                    - cell "—" [ref=f1e963]
+                    - cell "1.5s" [ref=f1e964]
+                    - cell "14:17:55" [ref=f1e965]
+                  - row [ref=f1e966] [cursor=pointer]:
+                    - cell "200" [ref=f1e967]
+                    - cell "上游" [ref=f1e970]:
+                      - generic "上游提供商响应" [ref=f1e971]: 上游
+                    - cell "gpt-5.6-luna 4618d727-e44…" [ref=f1e972]:
+                      - generic [ref=f1e973]: gpt-5.6-luna
+                      - generic "4618d727-e44d-47ca-89fc-18c76003ecf4" [ref=f1e975]: 4618d727-e44…
+                    - cell "codex/gpt-5.6-luna" [ref=f1e976]
+                    - cell "Codex" [ref=f1e977]
+                    - cell "OpenAI-Chat" [ref=f1e979]
+                    - cell "clu********************@*******com" [ref=f1e981]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e982]
+                    - cell "ccb-chat" [ref=f1e983]
+                    - 'cell "TI: 61,139|TO: 230|↓503" [ref=f1e985]':
+                      - text: "TI: 61,139|TO: 230|"
+                      - generic "503 tokens compressed" [ref=f1e986]: ↓503
+                    - cell "20.6" [ref=f1e987]
+                    - cell "11.2s" [ref=f1e988]
+                    - cell "14:17:55" [ref=f1e989]
+                  - row [ref=f1e990] [cursor=pointer]:
+                    - cell "200" [ref=f1e991]
+                    - cell "上游" [ref=f1e994]:
+                      - generic "上游提供商响应" [ref=f1e995]: 上游
+                    - cell "sensenova-6.8-flash-lite e5a7581e-17d…" [ref=f1e996]:
+                      - generic [ref=f1e997]: sensenova-6.8-flash-lite
+                      - generic "e5a7581e-17d1-425b-84e8-12b9867dbb19" [ref=f1e999]: e5a7581e-17d…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1000]
+                    - cell "SENSENOVA" [ref=f1e1001]
+                    - cell "OpenAI-Chat" [ref=f1e1003]
+                    - cell "Sense***" [ref=f1e1005]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1006]
+                    - cell "ccb-chat" [ref=f1e1007]
+                    - 'cell "TI: 43,072|TO: 84|↓4,363" [ref=f1e1009]':
+                      - text: "TI: 43,072|TO: 84|"
+                      - generic "4,363 tokens compressed" [ref=f1e1010]: ↓4,363
+                    - cell "3.3" [ref=f1e1011]
+                    - cell "25.4s" [ref=f1e1012]
+                    - cell "14:17:54" [ref=f1e1013]
+                  - row [ref=f1e1014] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1015]:
+                      - generic [ref=f1e1016]:
+                        - generic [ref=f1e1017]: "429"
+                        - button "↳" [ref=f1e1018]
+                    - cell "上游" [ref=f1e1019]:
+                      - generic "上游提供商响应" [ref=f1e1020]: 上游
+                    - cell "deepseek-v4-flash 917ee46d-d24…" [ref=f1e1021]:
+                      - generic [ref=f1e1022]: deepseek-v4-flash
+                      - generic "917ee46d-d240-4850-8e84-5966e33ca343" [ref=f1e1024]: 917ee46d-d24…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1025]
+                    - cell "SENSENOVA" [ref=f1e1026]
+                    - cell "OpenAI-Chat" [ref=f1e1028]
+                    - cell "Sense***" [ref=f1e1030]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1031]
+                    - cell "ccb-chat" [ref=f1e1032]
+                    - 'cell "TI: 0|TO: 0|↓10,575" [ref=f1e1034]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,575 tokens compressed" [ref=f1e1035]: ↓10,575
+                    - cell "—" [ref=f1e1036]
+                    - cell "1.1s" [ref=f1e1037]
+                    - cell "14:17:52" [ref=f1e1038]
+                  - row [ref=f1e1039] [cursor=pointer]:
+                    - cell "200" [ref=f1e1040]
+                    - cell "上游" [ref=f1e1043]:
+                      - generic "上游提供商响应" [ref=f1e1044]: 上游
+                    - cell "gitee/Qwen3-Embedding-8B" [ref=f1e1045]
+                    - cell "—" [ref=f1e1048]
+                    - cell "GITEE" [ref=f1e1049]
+                    - cell "GITEE" [ref=f1e1051]
+                    - cell "-" [ref=f1e1053]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e1054]
+                    - cell "—" [ref=f1e1055]
+                    - 'cell "TI: 7|TO: 0" [ref=f1e1056]'
+                    - cell "—" [ref=f1e1057]
+                    - cell "935ms" [ref=f1e1058]
+                    - cell "14:17:51" [ref=f1e1059]
+                  - row [ref=f1e1060] [cursor=pointer]:
+                    - cell "200" [ref=f1e1061]
+                    - cell "上游" [ref=f1e1064]:
+                      - generic "上游提供商响应" [ref=f1e1065]: 上游
+                    - cell "gitee/Qwen3-Embedding-8B" [ref=f1e1066]
+                    - cell "—" [ref=f1e1069]
+                    - cell "GITEE" [ref=f1e1070]
+                    - cell "GITEE" [ref=f1e1072]
+                    - cell "-" [ref=f1e1074]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e1075]
+                    - cell "—" [ref=f1e1076]
+                    - 'cell "TI: 7|TO: 0" [ref=f1e1077]'
+                    - cell "—" [ref=f1e1078]
+                    - cell "872ms" [ref=f1e1079]
+                    - cell "14:17:51" [ref=f1e1080]
+                  - row [ref=f1e1081] [cursor=pointer]:
+                    - cell "200" [ref=f1e1082]
+                    - cell "上游" [ref=f1e1085]:
+                      - generic "上游提供商响应" [ref=f1e1086]: 上游
+                    - cell "gitee/Qwen3-Embedding-8B" [ref=f1e1087]
+                    - cell "—" [ref=f1e1090]
+                    - cell "GITEE" [ref=f1e1091]
+                    - cell "GITEE" [ref=f1e1093]
+                    - cell "-" [ref=f1e1095]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e1096]
+                    - cell "—" [ref=f1e1097]
+                    - 'cell "TI: 6|TO: 0" [ref=f1e1098]'
+                    - cell "—" [ref=f1e1099]
+                    - cell "838ms" [ref=f1e1100]
+                    - cell "14:17:51" [ref=f1e1101]
+                  - row [ref=f1e1102] [cursor=pointer]:
+                    - cell "200" [ref=f1e1103]
+                    - cell "上游" [ref=f1e1106]:
+                      - generic "上游提供商响应" [ref=f1e1107]: 上游
+                    - cell "gitee/Qwen3-Embedding-8B" [ref=f1e1108]
+                    - cell "—" [ref=f1e1111]
+                    - cell "GITEE" [ref=f1e1112]
+                    - cell "GITEE" [ref=f1e1114]
+                    - cell "-" [ref=f1e1116]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e1117]
+                    - cell "—" [ref=f1e1118]
+                    - 'cell "TI: 7|TO: 0" [ref=f1e1119]'
+                    - cell "—" [ref=f1e1120]
+                    - cell "572ms" [ref=f1e1121]
+                    - cell "14:17:50" [ref=f1e1122]
+                  - row [ref=f1e1123] [cursor=pointer]:
+                    - cell "200" [ref=f1e1124]
+                    - cell "上游" [ref=f1e1127]:
+                      - generic "上游提供商响应" [ref=f1e1128]: 上游
+                    - cell "gpt-5.6-terra a057b30d-ca4…" [ref=f1e1129]:
+                      - generic [ref=f1e1130]: gpt-5.6-terra
+                      - generic "a057b30d-ca4d-4d89-8554-a88ce04b811d" [ref=f1e1132]: a057b30d-ca4…
+                    - cell "codex/gpt-5.6-terra" [ref=f1e1133]
+                    - cell "Codex" [ref=f1e1134]
+                    - cell "OpenAI-Chat" [ref=f1e1136]
+                    - cell "clu********************@*******com" [ref=f1e1138]
+                    - cell "openviking (ca5b***86d4)" [ref=f1e1139]
+                    - cell "hermes-score" [ref=f1e1140]
+                    - 'cell "TI: 2,135|TO: 196" [ref=f1e1142]'
+                    - cell "36.3" [ref=f1e1143]
+                    - cell "5.4s" [ref=f1e1144]
+                    - cell "14:17:50" [ref=f1e1145]
+                  - row [ref=f1e1146] [cursor=pointer]:
+                    - cell "200" [ref=f1e1147]
+                    - cell "上游" [ref=f1e1150]:
+                      - generic "上游提供商响应" [ref=f1e1151]: 上游
+                    - cell "sensenova-6.8-flash-lite healed a3ed4398-59d… · 2 attempts" [ref=f1e1152]:
+                      - generic [ref=f1e1153]:
+                        - generic [ref=f1e1154]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 1 retry" [ref=f1e1155]: healed
+                      - generic "a3ed4398-59dc-40d3-8f50-7280c01b251b" [ref=f1e1156]: a3ed4398-59d… · 2 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1157]
+                    - cell "SENSENOVA" [ref=f1e1158]
+                    - cell "OpenAI-Chat" [ref=f1e1160]
+                    - cell "Sense***" [ref=f1e1162]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1163]
+                    - cell "ccb-chat" [ref=f1e1164]
+                    - 'cell "TI: 49,160|TO: 87|↓503" [ref=f1e1166]':
+                      - text: "TI: 49,160|TO: 87|"
+                      - generic "503 tokens compressed" [ref=f1e1167]: ↓503
+                    - cell "5.7" [ref=f1e1168]
+                    - cell "15.3s" [ref=f1e1169]
+                    - cell "14:17:43" [ref=f1e1170]
+                  - row [ref=f1e1171] [cursor=pointer]:
+                    - cell "200" [ref=f1e1172]
+                    - cell "上游" [ref=f1e1175]:
+                      - generic "上游提供商响应" [ref=f1e1176]: 上游
+                    - cell "sensenova-6.8-flash-lite healed 2e651a0d-fc0… · 2 attempts" [ref=f1e1177]:
+                      - generic [ref=f1e1178]:
+                        - generic [ref=f1e1179]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 1 retry" [ref=f1e1180]: healed
+                      - generic "2e651a0d-fc0e-49bd-b672-b8296f886acc" [ref=f1e1181]: 2e651a0d-fc0… · 2 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1182]
+                    - cell "SENSENOVA" [ref=f1e1183]
+                    - cell "OpenAI-Chat" [ref=f1e1185]
+                    - cell "Sense***" [ref=f1e1187]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1188]
+                    - cell "ccb-chat" [ref=f1e1189]
+                    - 'cell "TI: 39,681|TO: 299|↓10,557" [ref=f1e1191]':
+                      - text: "TI: 39,681|TO: 299|"
+                      - generic "10,557 tokens compressed" [ref=f1e1192]: ↓10,557
+                    - cell "10.8" [ref=f1e1193]
+                    - cell "27.8s" [ref=f1e1194]
+                    - cell "14:17:43" [ref=f1e1195]
+                  - row [ref=f1e1196] [cursor=pointer]:
+                    - cell "200" [ref=f1e1197]
+                    - cell "上游" [ref=f1e1200]:
+                      - generic "上游提供商响应" [ref=f1e1201]: 上游
+                    - cell "sensenova-6.8-flash-lite healed fb223d4c-843… · 3 attempts" [ref=f1e1202]:
+                      - generic [ref=f1e1203]:
+                        - generic [ref=f1e1204]: sensenova-6.8-flash-lite
+                        - generic "Failed, recovered after 2 retry" [ref=f1e1205]: healed
+                      - generic "fb223d4c-843f-471b-937e-d6add6cb098f" [ref=f1e1206]: fb223d4c-843… · 3 attempts
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1207]
+                    - cell "SENSENOVA" [ref=f1e1208]
+                    - cell "OpenAI-Chat" [ref=f1e1210]
+                    - cell "Sense***" [ref=f1e1212]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1213]
+                    - cell "ccb-chat" [ref=f1e1214]
+                    - 'cell "TI: 49,160|TO: 137|↓503" [ref=f1e1216]':
+                      - text: "TI: 49,160|TO: 137|"
+                      - generic "503 tokens compressed" [ref=f1e1217]: ↓503
+                    - cell "2.4" [ref=f1e1218]
+                    - cell "58.2s" [ref=f1e1219]
+                    - cell "14:17:39" [ref=f1e1220]
+                  - row [ref=f1e1221] [cursor=pointer]:
+                    - cell "200" [ref=f1e1222]
+                    - cell "上游" [ref=f1e1225]:
+                      - generic "上游提供商响应" [ref=f1e1226]: 上游
+                    - cell "gpt-5.6-sol-ultra 4076c393-b04…" [ref=f1e1227]:
+                      - generic [ref=f1e1228]: gpt-5.6-sol-ultra
+                      - generic "4076c393-b04f-4820-a02b-28a5d4820aa2" [ref=f1e1230]: 4076c393-b04…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1231]
+                    - cell "Codex" [ref=f1e1232]
+                    - cell "OpenAI-Chat" [ref=f1e1234]
+                    - cell "clu********************@*******com" [ref=f1e1236]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1237]
+                    - cell "auto/smart" [ref=f1e1238]
+                    - 'cell "TI: 43,891|TO: 962|↓1,384" [ref=f1e1240]':
+                      - text: "TI: 43,891|TO: 962|"
+                      - generic "1,384 tokens compressed" [ref=f1e1241]: ↓1,384
+                    - cell "45.4" [ref=f1e1242]
+                    - cell "21.2s" [ref=f1e1243]
+                    - cell "14:17:38" [ref=f1e1244]
+                  - row [ref=f1e1245] [cursor=pointer]:
+                    - cell "429" [ref=f1e1246]
+                    - cell "上游" [ref=f1e1249]:
+                      - generic "上游提供商响应" [ref=f1e1250]: 上游
+                    - cell "ccb-chat failed 6250167a-22a… · 2 attempts" [ref=f1e1251]:
+                      - generic [ref=f1e1252]:
+                        - generic [ref=f1e1253]: ccb-chat
+                        - generic "All 2 attempts failed" [ref=f1e1254]: failed
+                      - generic "6250167a-22ab-42a6-8c1b-571e5cc9a645" [ref=f1e1255]: 6250167a-22a… · 2 attempts
+                    - cell "ccb-chat" [ref=f1e1256]
+                    - cell "-" [ref=f1e1257]
+                    - cell "-" [ref=f1e1259]
+                    - cell "-" [ref=f1e1261]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1262]
+                    - cell "ccb-chat" [ref=f1e1263]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e1265]'
+                    - cell "—" [ref=f1e1266]
+                    - cell "1.6s" [ref=f1e1267]
+                    - cell "14:17:28" [ref=f1e1268]
+                  - row [ref=f1e1269] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1270]:
+                      - generic [ref=f1e1271]:
+                        - generic [ref=f1e1272]: "429"
+                        - button "↳" [ref=f1e1273]
+                    - cell "上游" [ref=f1e1274]:
+                      - generic "上游提供商响应" [ref=f1e1275]: 上游
+                    - cell "deepseek-v4-flash 6250167a-22a…" [ref=f1e1276]:
+                      - generic [ref=f1e1277]: deepseek-v4-flash
+                      - generic "6250167a-22ab-42a6-8c1b-571e5cc9a645" [ref=f1e1279]: 6250167a-22a…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1280]
+                    - cell "SENSENOVA" [ref=f1e1281]
+                    - cell "OpenAI-Chat" [ref=f1e1283]
+                    - cell "Sense***" [ref=f1e1285]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1286]
+                    - cell "ccb-chat" [ref=f1e1287]
+                    - 'cell "TI: 0|TO: 0|↓4,362" [ref=f1e1289]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "4,362 tokens compressed" [ref=f1e1290]: ↓4,362
+                    - cell "—" [ref=f1e1291]
+                    - cell "1.3s" [ref=f1e1292]
+                    - cell "14:17:28" [ref=f1e1293]
+                  - row [ref=f1e1294] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1295]:
+                      - generic [ref=f1e1296]:
+                        - generic [ref=f1e1297]: "429"
+                        - button "↳" [ref=f1e1298]
+                    - cell "上游" [ref=f1e1299]:
+                      - generic "上游提供商响应" [ref=f1e1300]: 上游
+                    - cell "deepseek-v4-flash a3ed4398-59d…" [ref=f1e1301]:
+                      - generic [ref=f1e1302]: deepseek-v4-flash
+                      - generic "a3ed4398-59dc-40d3-8f50-7280c01b251b" [ref=f1e1304]: a3ed4398-59d…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1305]
+                    - cell "SENSENOVA" [ref=f1e1306]
+                    - cell "OpenAI-Chat" [ref=f1e1308]
+                    - cell "Sense***" [ref=f1e1310]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1311]
+                    - cell "ccb-chat" [ref=f1e1312]
+                    - 'cell "TI: 0|TO: 0|↓504" [ref=f1e1314]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "504 tokens compressed" [ref=f1e1315]: ↓504
+                    - cell "—" [ref=f1e1316]
+                    - cell "1.6s" [ref=f1e1317]
+                    - cell "14:17:28" [ref=f1e1318]
+                  - row [ref=f1e1319] [cursor=pointer]:
+                    - cell "524 ↳" [ref=f1e1320]:
+                      - generic [ref=f1e1321]:
+                        - generic [ref=f1e1322]: "524"
+                        - button "↳" [ref=f1e1323]
+                    - cell "上游" [ref=f1e1324]:
+                      - generic "上游提供商响应" [ref=f1e1325]: 上游
+                    - cell "ccb-chat fb223d4c-843…" [ref=f1e1326]:
+                      - generic [ref=f1e1327]: ccb-chat
+                      - generic "fb223d4c-843f-471b-937e-d6add6cb098f" [ref=f1e1329]: fb223d4c-843…
+                    - cell "ccb-chat" [ref=f1e1330]
+                    - cell "-" [ref=f1e1331]
+                    - cell "-" [ref=f1e1333]
+                    - cell "-" [ref=f1e1335]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1336]
+                    - cell "ccb-chat" [ref=f1e1337]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e1339]'
+                    - cell "—" [ref=f1e1340]
+                    - cell "46.7s" [ref=f1e1341]
+                    - cell "14:17:26" [ref=f1e1342]
+                  - row [ref=f1e1343] [cursor=pointer]:
+                    - cell "200" [ref=f1e1344]
+                    - cell "上游" [ref=f1e1347]:
+                      - generic "上游提供商响应" [ref=f1e1348]: 上游
+                    - cell "deepseek-v4-flash 2998270a-81b…" [ref=f1e1349]:
+                      - generic [ref=f1e1350]: deepseek-v4-flash
+                      - generic "2998270a-81b7-4e5b-adb1-485655d02999" [ref=f1e1352]: 2998270a-81b…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1353]
+                    - cell "SENSENOVA" [ref=f1e1354]
+                    - cell "OpenAI-Chat" [ref=f1e1356]
+                    - cell "Sense***" [ref=f1e1358]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1359]
+                    - cell "ccb-chat" [ref=f1e1360]
+                    - 'cell "TI: 47,769|TO: 421|↓5,635" [ref=f1e1362]':
+                      - text: "TI: 47,769|TO: 421|"
+                      - generic "5,635 tokens compressed" [ref=f1e1363]: ↓5,635
+                    - cell "21.0" [ref=f1e1364]
+                    - cell "20.0s" [ref=f1e1365]
+                    - cell "14:17:25" [ref=f1e1366]
+                  - row [ref=f1e1367] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1368]:
+                      - generic [ref=f1e1369]:
+                        - generic [ref=f1e1370]: "429"
+                        - button "↳" [ref=f1e1371]
+                    - cell "上游" [ref=f1e1372]:
+                      - generic "上游提供商响应" [ref=f1e1373]: 上游
+                    - cell "deepseek-v4-flash 2e651a0d-fc0…" [ref=f1e1374]:
+                      - generic [ref=f1e1375]: deepseek-v4-flash
+                      - generic "2e651a0d-fc0e-49bd-b672-b8296f886acc" [ref=f1e1377]: 2e651a0d-fc0…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1378]
+                    - cell "SENSENOVA" [ref=f1e1379]
+                    - cell "OpenAI-Chat" [ref=f1e1381]
+                    - cell "Sense***" [ref=f1e1383]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1384]
+                    - cell "ccb-chat" [ref=f1e1385]
+                    - 'cell "TI: 0|TO: 0|↓10,557" [ref=f1e1387]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "10,557 tokens compressed" [ref=f1e1388]: ↓10,557
+                    - cell "—" [ref=f1e1389]
+                    - cell "1.4s" [ref=f1e1390]
+                    - cell "14:17:14" [ref=f1e1391]
+                  - row [ref=f1e1392] [cursor=pointer]:
+                    - cell "200" [ref=f1e1393]
+                    - cell "上游" [ref=f1e1396]:
+                      - generic "上游提供商响应" [ref=f1e1397]: 上游
+                    - cell "sensenova-6.8-flash-lite 845bad78-156…" [ref=f1e1398]:
+                      - generic [ref=f1e1399]: sensenova-6.8-flash-lite
+                      - generic "845bad78-1564-4bdc-9e70-040bcdc6ec71" [ref=f1e1401]: 845bad78-156…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1402]
+                    - cell "SENSENOVA" [ref=f1e1403]
+                    - cell "OpenAI-Chat" [ref=f1e1405]
+                    - cell "Sense***" [ref=f1e1407]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1408]
+                    - cell "ccb-chat" [ref=f1e1409]
+                    - 'cell "TI: 39,736|TO: 177|↓10,557" [ref=f1e1411]':
+                      - text: "TI: 39,736|TO: 177|"
+                      - generic "10,557 tokens compressed" [ref=f1e1412]: ↓10,557
+                    - cell "3.8" [ref=f1e1413]
+                    - cell "46.9s" [ref=f1e1414]
+                    - cell "14:17:10" [ref=f1e1415]
+                  - row [ref=f1e1416] [cursor=pointer]:
+                    - cell "200" [ref=f1e1417]
+                    - cell "上游" [ref=f1e1420]:
+                      - generic "上游提供商响应" [ref=f1e1421]: 上游
+                    - cell "gpt-5.6-sol-ultra b992ac5e-948…" [ref=f1e1422]:
+                      - generic [ref=f1e1423]: gpt-5.6-sol-ultra
+                      - generic "b992ac5e-9484-47f1-aa3e-d22c1f7cf187" [ref=f1e1425]: b992ac5e-948…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1426]
+                    - cell "Codex" [ref=f1e1427]
+                    - cell "OpenAI-Chat" [ref=f1e1429]
+                    - cell "clu********************@*******com" [ref=f1e1431]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1432]
+                    - cell "auto/smart" [ref=f1e1433]
+                    - 'cell "TI: 31,238|TO: 724|↓1,385" [ref=f1e1435]':
+                      - text: "TI: 31,238|TO: 724|"
+                      - generic "1,385 tokens compressed" [ref=f1e1436]: ↓1,385
+                    - cell "44.7" [ref=f1e1437]
+                    - cell "16.2s" [ref=f1e1438]
+                    - cell "14:17:09" [ref=f1e1439]
+                  - row [ref=f1e1440] [cursor=pointer]:
+                    - cell "429" [ref=f1e1441]
+                    - cell "上游" [ref=f1e1444]:
+                      - generic "上游提供商响应" [ref=f1e1445]: 上游
+                    - cell "ccb-chat failed ec115dd2-1f3… · 2 attempts" [ref=f1e1446]:
+                      - generic [ref=f1e1447]:
+                        - generic [ref=f1e1448]: ccb-chat
+                        - generic "All 2 attempts failed" [ref=f1e1449]: failed
+                      - generic "ec115dd2-1f37-4b1e-9242-bd9e730798bf" [ref=f1e1450]: ec115dd2-1f3… · 2 attempts
+                    - cell "ccb-chat" [ref=f1e1451]
+                    - cell "-" [ref=f1e1452]
+                    - cell "-" [ref=f1e1454]
+                    - cell "-" [ref=f1e1456]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1457]
+                    - cell "ccb-chat" [ref=f1e1458]
+                    - 'cell "TI: 0|TO: 0" [ref=f1e1460]'
+                    - cell "—" [ref=f1e1461]
+                    - cell "21.7s" [ref=f1e1462]
+                    - cell "14:17:04" [ref=f1e1463]
+                  - row [ref=f1e1464] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1465]:
+                      - generic [ref=f1e1466]:
+                        - generic [ref=f1e1467]: "429"
+                        - button "↳" [ref=f1e1468]
+                    - cell "上游" [ref=f1e1469]:
+                      - generic "上游提供商响应" [ref=f1e1470]: 上游
+                    - cell "sensenova-6.8-flash-lite ec115dd2-1f3…" [ref=f1e1471]:
+                      - generic [ref=f1e1472]: sensenova-6.8-flash-lite
+                      - generic "ec115dd2-1f37-4b1e-9242-bd9e730798bf" [ref=f1e1474]: ec115dd2-1f3…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1475]
+                    - cell "SENSENOVA" [ref=f1e1476]
+                    - cell "OpenAI-Chat" [ref=f1e1478]
+                    - cell "Sense***" [ref=f1e1480]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1481]
+                    - cell "ccb-chat" [ref=f1e1482]
+                    - 'cell "TI: 0|TO: 0|↓5,636" [ref=f1e1484]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "5,636 tokens compressed" [ref=f1e1485]: ↓5,636
+                    - cell "—" [ref=f1e1486]
+                    - cell "21.4s" [ref=f1e1487]
+                    - cell "14:17:04" [ref=f1e1488]
+                  - row [ref=f1e1489] [cursor=pointer]:
+                    - cell "200" [ref=f1e1490]
+                    - cell "上游" [ref=f1e1493]:
+                      - generic "上游提供商响应" [ref=f1e1494]: 上游
+                    - cell "gpt-5.6-sol-ultra d661dd7d-6f8…" [ref=f1e1495]:
+                      - generic [ref=f1e1496]: gpt-5.6-sol-ultra
+                      - generic "d661dd7d-6f87-4a16-8789-d52e591a4a17" [ref=f1e1498]: d661dd7d-6f8…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1499]
+                    - cell "Codex" [ref=f1e1500]
+                    - cell "OpenAI-Chat" [ref=f1e1502]
+                    - cell "clu********************@*******com" [ref=f1e1504]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1505]
+                    - cell "auto/smart" [ref=f1e1506]
+                    - 'cell "TI: 13,158|TO: 1,732" [ref=f1e1508]'
+                    - cell "51.2" [ref=f1e1509]
+                    - cell "33.8s" [ref=f1e1510]
+                    - cell "14:16:43" [ref=f1e1511]
+                  - row [ref=f1e1512] [cursor=pointer]:
+                    - cell "200" [ref=f1e1513]
+                    - cell "上游" [ref=f1e1516]:
+                      - generic "上游提供商响应" [ref=f1e1517]: 上游
+                    - cell "gpt-5.6-sol-ultra ab27f848-76e…" [ref=f1e1518]:
+                      - generic [ref=f1e1519]: gpt-5.6-sol-ultra
+                      - generic "ab27f848-76eb-477a-b869-df9659515651" [ref=f1e1521]: ab27f848-76e…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1522]
+                    - cell "Codex" [ref=f1e1523]
+                    - cell "OpenAI-Chat" [ref=f1e1525]
+                    - cell "clu********************@*******com" [ref=f1e1527]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1528]
+                    - cell "auto/smart" [ref=f1e1529]
+                    - 'cell "TI: 24,529|TO: 587|↓1,385" [ref=f1e1531]':
+                      - text: "TI: 24,529|TO: 587|"
+                      - generic "1,385 tokens compressed" [ref=f1e1532]: ↓1,385
+                    - cell "42.6" [ref=f1e1533]
+                    - cell "13.8s" [ref=f1e1534]
+                    - cell "14:16:43" [ref=f1e1535]
+                  - row [ref=f1e1536] [cursor=pointer]:
+                    - cell "200" [ref=f1e1537]
+                    - cell "上游" [ref=f1e1540]:
+                      - generic "上游提供商响应" [ref=f1e1541]: 上游
+                    - cell "gpt-5.6-luna 338e7c65-b17…" [ref=f1e1542]:
+                      - generic [ref=f1e1543]: gpt-5.6-luna
+                      - generic "338e7c65-b177-4955-bfc5-e97e5ceb3ed5" [ref=f1e1545]: 338e7c65-b17…
+                    - cell "codex/gpt-5.6-luna" [ref=f1e1546]
+                    - cell "Codex" [ref=f1e1547]
+                    - cell "OpenAI-Chat" [ref=f1e1549]
+                    - cell "clu********************@*******com" [ref=f1e1551]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1552]
+                    - cell "ccb-chat" [ref=f1e1553]
+                    - 'cell "TI: 56,025|TO: 125|↓5,826" [ref=f1e1555]':
+                      - text: "TI: 56,025|TO: 125|"
+                      - generic "5,826 tokens compressed" [ref=f1e1556]: ↓5,826
+                    - cell "18.8" [ref=f1e1557]
+                    - cell "6.6s" [ref=f1e1558]
+                    - cell "14:16:42" [ref=f1e1559]
+                  - row [ref=f1e1560] [cursor=pointer]:
+                    - cell "429 ↳" [ref=f1e1561]:
+                      - generic [ref=f1e1562]:
+                        - generic [ref=f1e1563]: "429"
+                        - button "↳" [ref=f1e1564]
+                    - cell "上游" [ref=f1e1565]:
+                      - generic "上游提供商响应" [ref=f1e1566]: 上游
+                    - cell "deepseek-v4-flash fb223d4c-843…" [ref=f1e1567]:
+                      - generic [ref=f1e1568]: deepseek-v4-flash
+                      - generic "fb223d4c-843f-471b-937e-d6add6cb098f" [ref=f1e1570]: fb223d4c-843…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1571]
+                    - cell "SENSENOVA" [ref=f1e1572]
+                    - cell "OpenAI-Chat" [ref=f1e1574]
+                    - cell "Sense***" [ref=f1e1576]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1577]
+                    - cell "ccb-chat" [ref=f1e1578]
+                    - 'cell "TI: 0|TO: 0|↓504" [ref=f1e1580]':
+                      - text: "TI: 0|TO: 0|"
+                      - generic "504 tokens compressed" [ref=f1e1581]: ↓504
+                    - cell "—" [ref=f1e1582]
+                    - cell "1.5s" [ref=f1e1583]
+                    - cell "14:16:41" [ref=f1e1584]
+                  - row [ref=f1e1585] [cursor=pointer]:
+                    - cell "200" [ref=f1e1586]
+                    - cell "上游" [ref=f1e1589]:
+                      - generic "上游提供商响应" [ref=f1e1590]: 上游
+                    - cell "deepseek-v4-flash e3e314c7-e0e…" [ref=f1e1591]:
+                      - generic [ref=f1e1592]: deepseek-v4-flash
+                      - generic "e3e314c7-e0ee-4534-b578-1633df320f7f" [ref=f1e1594]: e3e314c7-e0e…
+                    - cell "sensenova/deepseek-v4-flash" [ref=f1e1595]
+                    - cell "SENSENOVA" [ref=f1e1596]
+                    - cell "OpenAI-Chat" [ref=f1e1598]
+                    - cell "Sense***" [ref=f1e1600]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1601]
+                    - cell "ccb-chat" [ref=f1e1602]
+                    - 'cell "TI: 49,280|TO: 314|↓549" [ref=f1e1604]':
+                      - text: "TI: 49,280|TO: 314|"
+                      - generic "549 tokens compressed" [ref=f1e1605]: ↓549
+                    - cell "19.4" [ref=f1e1606]
+                    - cell "16.2s" [ref=f1e1607]
+                    - cell "14:16:38" [ref=f1e1608]
+                  - row [ref=f1e1609] [cursor=pointer]:
+                    - cell "200" [ref=f1e1610]
+                    - cell "上游" [ref=f1e1613]:
+                      - generic "上游提供商响应" [ref=f1e1614]: 上游
+                    - cell "gpt-5.6-sol-ultra 9bc258cb-c24…" [ref=f1e1615]:
+                      - generic [ref=f1e1616]: gpt-5.6-sol-ultra
+                      - generic "9bc258cb-c24c-4a27-a4b2-5f24855104d3" [ref=f1e1618]: 9bc258cb-c24…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1619]
+                    - cell "Codex" [ref=f1e1620]
+                    - cell "OpenAI-Chat" [ref=f1e1622]
+                    - cell "san*********@******com" [ref=f1e1624]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1625]
+                    - cell "auto/smart" [ref=f1e1626]
+                    - 'cell "TI: 13,120|TO: 224" [ref=f1e1628]'
+                    - cell "26.6" [ref=f1e1629]
+                    - cell "8.4s" [ref=f1e1630]
+                    - cell "14:16:35" [ref=f1e1631]
+                  - row [ref=f1e1632] [cursor=pointer]:
+                    - cell "200" [ref=f1e1633]
+                    - cell "上游" [ref=f1e1636]:
+                      - generic "上游提供商响应" [ref=f1e1637]: 上游
+                    - cell "sensenova-6.8-flash-lite aaa0148f-491…" [ref=f1e1638]:
+                      - generic [ref=f1e1639]: sensenova-6.8-flash-lite
+                      - generic "aaa0148f-4911-48f1-b961-fbb311adfffb" [ref=f1e1641]: aaa0148f-491…
+                    - cell "sensenova/sensenova-6.8-flash-lite" [ref=f1e1642]
+                    - cell "SENSENOVA" [ref=f1e1643]
+                    - cell "OpenAI-Chat" [ref=f1e1645]
+                    - cell "Sense***" [ref=f1e1647]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1648]
+                    - cell "ccb-chat" [ref=f1e1649]
+                    - 'cell "TI: 41,949|TO: 150|↓5,838" [ref=f1e1651]':
+                      - text: "TI: 41,949|TO: 150|"
+                      - generic "5,838 tokens compressed" [ref=f1e1652]: ↓5,838
+                    - cell "7.7" [ref=f1e1653]
+                    - cell "19.4s" [ref=f1e1654]
+                    - cell "14:16:34" [ref=f1e1655]
+                  - row [ref=f1e1656] [cursor=pointer]:
+                    - cell "200" [ref=f1e1657]
+                    - cell "上游" [ref=f1e1660]:
+                      - generic "上游提供商响应" [ref=f1e1661]: 上游
+                    - cell "gpt-5.6-sol-ultra 3bbfb925-978…" [ref=f1e1662]:
+                      - generic [ref=f1e1663]: gpt-5.6-sol-ultra
+                      - generic "3bbfb925-9783-4a4b-860d-a2f62dac9876" [ref=f1e1665]: 3bbfb925-978…
+                    - cell "codex/gpt-5.6-sol-ultra" [ref=f1e1666]
+                    - cell "Codex" [ref=f1e1667]
+                    - cell "OpenAI-Chat" [ref=f1e1669]
+                    - cell "clu********************@*******com" [ref=f1e1671]
+                    - cell "Claude Code (a13a***6feb)" [ref=f1e1672]
+                    - cell "auto/smart" [ref=f1e1673]
+                    - 'cell "TI: 19,589|TO: 338|↓8" [ref=f1e1675]':
+                      - text: "TI: 19,589|TO: 338|"
+                      - generic "8 tokens compressed" [ref=f1e1676]: ↓8
+                    - cell "40.6" [ref=f1e1677]
+                    - cell "8.3s" [ref=f1e1678]
+                    - cell "14:16:27" [ref=f1e1679]
+              - button "Load More" [ref=f1e1681]
+            - generic [ref=f1e1682]: "调用日志也保存为JSON文件到{DATA_DIR}/call_logs/，并根据CALL_LOG_RETENTION_DAYS和CALL_LOG_MAX_ENTRIES进行轮换。"
+  - alert [ref=f1e1683]

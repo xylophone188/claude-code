@@ -173,6 +173,10 @@ const rtkCmd = feature('RTK')
       require('./commands/rtk/index.js') as typeof import('./commands/rtk/index.js')
     ).default
   : null
+// OmniRoute owns compression/style policy in CCB server-routing mode. Keep
+// local controls available only for the deliberate legacy embed fallback.
+const omniRouteOwnsAgentOS =
+  process.env.CCB_ENV === '1' && process.env.OMNIROUTE_SERVER_ROUTING !== '0'
 const poor = feature('POOR')
   ? (
       require('./commands/poor/index.js') as typeof import('./commands/poor/index.js')
@@ -392,9 +396,9 @@ const COMMANDS = memoize((): Command[] => [
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(buddy ? [buddy] : []),
-  ...(caveman ? [caveman] : []),
-  ...(ponytail ? [ponytail] : []),
-  ...(rtkCmd ? [rtkCmd] : []),
+  ...(caveman && !omniRouteOwnsAgentOS ? [caveman] : []),
+  ...(ponytail && !omniRouteOwnsAgentOS ? [ponytail] : []),
+  ...(rtkCmd && !omniRouteOwnsAgentOS ? [rtkCmd] : []),
   ...(poor ? [poor] : []),
   ...(goalCmd ? [goalCmd] : []),
   ...(proactive ? [proactive] : []),

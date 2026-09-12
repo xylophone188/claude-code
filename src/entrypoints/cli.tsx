@@ -83,10 +83,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Ordinary CCB sessions use the ordered L1-L6 provider chain. Advisor is
-  // opt-in; defaulting here to advisor incorrectly forced the Codex backend.
+  // `auto` is a gateway capability, not a model choice. OmniRoute classifies
+  // each request into conversation/advisor/worker before selecting a model.
   if (!args.some(arg => arg === '--model' || arg.startsWith('--model='))) {
-    process.argv.push('--model', 'ccb');
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    process.argv.push('--model', 'ccb-main');
+=======
+    process.argv.push('--model', 'auto');
+>>>>>>> Stashed changes
+=======
+    process.argv.push('--model', 'auto');
+>>>>>>> Stashed changes
   }
 
   // For all other paths, load the startup profiler

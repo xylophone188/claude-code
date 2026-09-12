@@ -76,6 +76,7 @@ import {
   emitTaskProgress,
   extractPartialResult,
   finalizeAgentTool,
+  getAgentApiErrorMessage,
   getLastToolUseName,
   runAsyncAgentLifecycle,
 } from './agentToolUtils.js';
@@ -1009,6 +1010,7 @@ export const AgentTool = buildTool({
 
           // Track if an error occurred during iteration
           let syncAgentError: Error | undefined;
+          let syncApiError: Error | undefined;
           let wasAborted = false;
           let worktreeResult: {
             worktreePath?: string;
@@ -1071,6 +1073,7 @@ export const AgentTool = buildTool({
                   // Continue agent in background and return async result
                   void runWithAgentContext(syncAgentContext, async () => {
                     let stopBackgroundedSummarization: (() => void) | undefined;
+                    let terminalApiError: string | undefined;
                     try {
                       // Clean up the foreground iterator so its finally block runs
                       // (releases MCP connections, session hooks, prompt cache tracking, etc.)
@@ -1104,6 +1107,7 @@ export const AgentTool = buildTool({
                           : undefined,
                       })) {
                         agentMessages.push(msg);
+                        terminalApiError ??= getAgentApiErrorMessage(msg);
 
                         // Track progress for backgrounded agents
                         updateProgressFromMessage(tracker, msg, resolveActivity2, toolUseContext.options.tools);
@@ -1120,6 +1124,9 @@ export const AgentTool = buildTool({
                             lastToolName,
                           );
                         }
+                      }
+                      if (terminalApiError) {
+                        throw new Error(terminalApiError);
                       }
                       const agentResult = finalizeAgentTool(agentMessages, backgroundedTaskId, metadata);
 
@@ -1241,6 +1248,10 @@ export const AgentTool = buildTool({
               const message = result.value as MessageType;
 
               agentMessages.push(message);
+              const apiErrorMessage = getAgentApiErrorMessage(message);
+              if (apiErrorMessage) {
+                syncApiError ??= new Error(apiErrorMessage);
+              }
 
               // Emit task_progress for the VS Code subagent panel
               updateProgressFromMessage(syncTracker, message, syncResolveActivity, toolUseContext.options.tools);
@@ -1392,6 +1403,13 @@ export const AgentTool = buildTool({
             if (!wasBackgrounded) {
               worktreeResult = await cleanupWorktreeIfNeeded();
             }
+          }
+
+          // query() can surface terminal provider failures as a synthetic
+          // assistant message and then close the iterator normally. Do not
+          // turn that message into a successful AgentTool result.
+          if (syncApiError) {
+            throw syncApiError;
           }
 
           // Re-throw abort errors

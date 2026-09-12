@@ -7,10 +7,8 @@ import { AGENT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/AgentTool
 import { ASK_USER_QUESTION_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/AskUserQuestionTool/prompt.js'
 import { TASK_STOP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskStopTool/prompt.js'
 import { FILE_READ_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/FileReadTool/prompt.js'
-import { WEB_SEARCH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/WebSearchTool/prompt.js'
 import { TODO_WRITE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TodoWriteTool/constants.js'
 import { GREP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/GrepTool/prompt.js'
-import { WEB_FETCH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/WebFetchTool/prompt.js'
 import { GLOB_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/GlobTool/prompt.js'
 import { SHELL_TOOL_NAMES } from '../utils/shell/shellToolUtils.js'
 import { FILE_EDIT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/FileEditTool/constants.js'
@@ -158,9 +156,6 @@ export const CORE_TOOLS = new Set([
   ENTER_PLAN_MODE_TOOL_NAME, // 'EnterPlanMode'
   EXIT_PLAN_MODE_V2_TOOL_NAME, // 'ExitPlanMode'
   VERIFY_PLAN_EXECUTION_TOOL_NAME, // 'VerifyPlanExecution'
-  // Web
-  WEB_FETCH_TOOL_NAME, // 'WebFetch'
-  WEB_SEARCH_TOOL_NAME, // 'WebSearch'
   // Code intelligence
   LSP_TOOL_NAME, // 'LSP'
   // Skills
@@ -177,3 +172,5 @@ export const CORE_TOOLS = new Set([
   EXECUTE_TOOL_NAME, // 'ExecuteExtraTool'
   SYNTHETIC_OUTPUT_TOOL_NAME, // 'SyntheticOutput'
 ]) as ReadonlySet<string>
+import { WEB_SEARCH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/WebSearchTool/prompt.js'
+import { WEB_FETCH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/WebFetchTool/prompt.js'

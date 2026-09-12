@@ -34,7 +34,7 @@ describe('switchProvider', () => {
     const result = switchProvider('cerebras', DEFAULT_PROVIDERS)
     expect(result.env['CLAUDE_CODE_USE_OPENAI']).toBe('1')
     expect(result.env['OPENAI_BASE_URL']).toBe('https://api.cerebras.ai/v1')
-    expect(result.env['OPENAI_MODEL']).toBe('llama-3.3-70b')
+    expect(result.env['OPENAI_MODEL']).toBe('gpt-oss-120b')
     expect(result.provider.id).toBe('cerebras')
   })
 
@@ -109,7 +109,7 @@ describe('buildShellExportBlock', () => {
     expect(block).toContain('export CLAUDE_CODE_USE_OPENAI=1')
     expect(block).toContain('export OPENAI_BASE_URL=https://api.cerebras.ai/v1')
     expect(block).toContain('export OPENAI_API_KEY=$CEREBRAS_API_KEY')
-    expect(block).toContain('export OPENAI_MODEL=llama-3.3-70b')
+    expect(block).toContain('export OPENAI_MODEL=gpt-oss-120b')
   })
 
   test('api key line uses variable reference not literal value', async () => {

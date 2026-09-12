@@ -7,6 +7,9 @@ import { debugMock } from '../../../../../../tests/mocks/debug'
 // corrupting the module cache for other test files in the same Bun process.
 
 const noop = () => {}
+const failedTasks: Array<{ taskId: string; error: string }> = []
+const completedTaskIds: string[] = []
+const notifications: Array<{ status: string; error?: string }> = []
 
 mock.module('bun:bundle', () => ({ feature: () => false }))
 
@@ -78,11 +81,17 @@ mock.module('src/utils/messages.ts', () => ({
 }))
 
 mock.module('src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
-  completeAgentTask: noop,
+  completeAgentTask: (result: { agentId: string }) => {
+    completedTaskIds.push(result.agentId)
+  },
   createActivityDescriptionResolver: () => ({}),
   createProgressTracker: () => ({}),
-  enqueueAgentNotification: noop,
-  failAgentTask: noop,
+  enqueueAgentNotification: (input: { status: string; error?: string }) => {
+    notifications.push(input)
+  },
+  failAgentTask: (taskId: string, error: string) => {
+    failedTasks.push({ taskId, error })
+  },
   getProgressUpdate: () => ({ tokenCount: 0, toolUseCount: 0 }),
   getTokenCountFromTracker: () => 0,
   isLocalAgentTask: () => false,
@@ -104,7 +113,7 @@ mock.module('src/utils/errors.js', () => ({
   isAbortError: () => false,
   hasExactErrorMessage: () => false,
   toError: (e: any) => (e instanceof Error ? e : new Error(String(e))),
-  errorMessage: (e: any) => String(e),
+  errorMessage: (e: any) => (e instanceof Error ? e.message : String(e)),
   getErrnoCode: () => undefined,
   isENOENT: () => false,
   getErrnoPath: () => undefined,
@@ -153,7 +162,12 @@ mock.module('src/tools/AgentTool/AgentTool.tsx', () => ({
   default: {},
 }))
 
-const { countToolUses, getLastToolUseName } = await import('../agentToolUtils')
+const {
+  countToolUses,
+  getAgentApiErrorMessage,
+  getLastToolUseName,
+  runAsyncAgentLifecycle,
+} = await import('../agentToolUtils')
 
 function makeAssistantMessage(content: any[]): any {
   return { type: 'assistant', message: { content } }
@@ -235,5 +249,72 @@ describe('getLastToolUseName', () => {
   test('handles message with null content', () => {
     const msg = { type: 'assistant', message: { content: null } } as any
     expect(getLastToolUseName(msg)).toBeUndefined()
+  })
+})
+
+describe('getAgentApiErrorMessage', () => {
+  test('recognizes a synthetic terminal API error', () => {
+    const message = {
+      type: 'assistant',
+      isApiErrorMessage: true,
+      message: { content: [{ type: 'text', text: 'API Error: terminated' }] },
+    } as any
+
+    expect(getAgentApiErrorMessage(message)).toBe('API Error: terminated')
+  })
+
+  test('ignores a normal assistant response', () => {
+    expect(
+      getAgentApiErrorMessage({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'done' }] },
+      } as any),
+    ).toBeUndefined()
+  })
+})
+
+describe('runAsyncAgentLifecycle', () => {
+  test('marks a task failed when the agent stream ends in an API error', async () => {
+    failedTasks.length = 0
+    completedTaskIds.length = 0
+    notifications.length = 0
+
+    async function* makeStream(): AsyncGenerator<any, void> {
+      yield {
+        type: 'assistant',
+        isApiErrorMessage: true,
+        message: { content: [{ type: 'text', text: 'API Error: terminated' }] },
+      }
+    }
+
+    await runAsyncAgentLifecycle({
+      taskId: 'agent-terminated',
+      abortController: new AbortController(),
+      makeStream: () => makeStream(),
+      metadata: {
+        prompt: 'Inspect routing',
+        agentType: 'Explore',
+        resolvedAgentModel: 'auto',
+        isBuiltInAgent: true,
+        isAsync: true,
+        startTime: Date.now(),
+      },
+      description: 'Explore routing',
+      toolUseContext: { options: { tools: [] }, toolUseId: 'tool-1' } as any,
+      rootSetAppState: noop as any,
+      agentIdForCleanup: 'agent-terminated',
+      enableSummarization: false,
+      getWorktreeResult: async () => ({}),
+    })
+
+    expect(completedTaskIds).toEqual([])
+    expect(failedTasks).toEqual([
+      { taskId: 'agent-terminated', error: 'API Error: terminated' },
+    ])
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      status: 'failed',
+      error: 'API Error: terminated',
+    })
   })
 })

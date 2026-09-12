@@ -200,14 +200,7 @@ export const EMBEDDED_PROVIDERS: ProviderConfig[] = [
     baseUrl: 'https://api.cerebras.ai/v1',
     apiKeyEnv: 'CCB_CEREBRAS_KEY',
     defaultModel: 'gpt-oss-120b',
-    models: [
-      'gpt-oss-120b',
-      'zai-glm-4.7',
-      'llama-3.3-70b',
-      'llama-4-scout-17b-16e-instruct',
-      'qwen-3-235b-a22b-instruct-2507',
-      'qwen-3-32b',
-    ],
+    models: ['gpt-oss-120b', 'gemma-4-31b', 'qwen-3.8-27b'],
     compatRule: 'cerebras',
   },
   {
@@ -1605,8 +1598,8 @@ export const EMBEDDED_PROVIDERS: ProviderConfig[] = [
     kind: 'openai-compat',
     baseUrl: 'https://sensenova.cn/v1',
     apiKeyEnv: 'CCB_SENSERNOVA_KEY',
-    defaultModel: 'sensenova-6.7-flash-lite',
-    models: ['sensenova-6.7-flash-lite', 'deepseek-v4-flash', 'glm-5.2'],
+    defaultModel: 'sensenova-6.8-flash-lite',
+    models: ['sensenova-6.8-flash-lite', 'deepseek-v4-flash', 'glm-5.2'],
     compatRule: 'permissive',
   },
 ]

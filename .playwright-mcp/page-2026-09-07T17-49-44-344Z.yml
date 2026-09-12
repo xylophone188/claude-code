@@ -1,0 +1,280 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - complementary [ref=e5]:
+      - link "跳到内容" [ref=e6] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=e11]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.48" [ref=e13] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=e27]:
+          - heading "OmniRoute" [level=1] [ref=e28]
+          - generic [ref=e29]: v3.8.48
+      - generic [ref=e32]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "搜索" [ref=e33]
+      - navigation "Main navigation" [ref=e34]:
+        - link "home 首页 仪表盘概览" [ref=e36] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=e37]: home
+          - generic [ref=e38]:
+            - generic [ref=e39]: 首页
+            - generic [ref=e40]: 仪表盘概览
+        - generic [ref=e41]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=e42] [cursor=pointer]:
+            - generic [ref=e43]: OmniProxy
+            - button "push_pin" [ref=e44]
+            - generic: expand_more
+          - generic [ref=e45]:
+            - link "api 端点 您的 AI 连接 URL" [ref=e46] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=e47]: api
+              - generic [ref=e48]:
+                - generic [ref=e49]: 端点
+                - generic [ref=e50]: 您的 AI 连接 URL
+            - link "vpn_key API 管理 管理 API 密钥和访问" [ref=e51] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=e52]: vpn_key
+              - generic [ref=e53]:
+                - generic [ref=e54]: API 管理
+                - generic [ref=e55]: 管理 API 密钥和访问
+            - link "dns 提供商 管理 AI 提供商" [ref=e56] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=e57]: dns
+              - generic [ref=e58]:
+                - generic [ref=e59]: 提供商
+                - generic [ref=e60]: 管理 AI 提供商
+            - link "deployed_code 内嵌服务 管理本地代理服务" [ref=e61] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=e62]: deployed_code
+              - generic [ref=e63]:
+                - generic [ref=e64]: 内嵌服务
+                - generic [ref=e65]: 管理本地代理服务
+            - link "layers 组合 用于故障转移的组提供程序" [ref=e66] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=e67]: layers
+              - generic [ref=e68]:
+                - generic [ref=e69]: 组合
+                - generic [ref=e70]: 用于故障转移的组提供程序
+            - link "account_tree Combo Studio Live routing cascade" [ref=e71] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=e72]: account_tree
+              - generic [ref=e73]:
+                - generic [ref=e74]: Combo Studio
+                - generic [ref=e75]: Live routing cascade
+            - link "tune 提供商配额 跟踪提供商使用限制" [ref=e76] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=e77]: tune
+              - generic [ref=e78]:
+                - generic [ref=e79]: 提供商配额
+                - generic [ref=e80]: 跟踪提供商使用限制
+            - link "pie_chart 配额共享 跨密钥共享提供商配额" [ref=e81] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=e82]: pie_chart
+              - generic [ref=e83]:
+                - generic [ref=e84]: 配额共享
+                - generic [ref=e85]: 跨密钥共享提供商配额
+            - generic [ref=e86]:
+              - generic [ref=e87]: 压缩上下文
+              - link "settings Compression Settings Global defaults" [ref=e90] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=e91]: settings
+                - generic [ref=e92]:
+                  - generic [ref=e93]: Compression Settings
+                  - generic [ref=e94]: Global defaults
+              - link "hub 引擎组合 组合压缩引擎" [ref=e95] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=e96]: hub
+                - generic [ref=e97]:
+                  - generic [ref=e98]: 引擎组合
+                  - generic [ref=e99]: 组合压缩引擎
+              - link "compress Caveman 迅速压缩" [ref=e100] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=e101]: compress
+                - generic [ref=e102]:
+                  - generic [ref=e103]: Caveman
+                  - generic [ref=e104]: 迅速压缩
+              - link "filter_alt RTK 输出滤波" [ref=e105] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=e106]: filter_alt
+                - generic [ref=e107]:
+                  - generic [ref=e108]: RTK
+                  - generic [ref=e109]: 输出滤波
+              - link "table_rows Headroom Tabular compaction" [ref=e110] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=e111]: table_rows
+                - generic [ref=e112]:
+                  - generic [ref=e113]: Headroom
+                  - generic [ref=e114]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn dedup" [ref=e115] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=e116]: content_copy
+                - generic [ref=e117]:
+                  - generic [ref=e118]: Session Dedup
+                  - generic [ref=e119]: Cross-turn dedup
+              - link "archive CCR Retrieve markers" [ref=e120] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=e121]: archive
+                - generic [ref=e122]:
+                  - generic [ref=e123]: CCR
+                  - generic [ref=e124]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=e125] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=e126]: psychology
+                - generic [ref=e127]:
+                  - generic [ref=e128]: LLMLingua
+                  - generic [ref=e129]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=e130] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=e131]: compress
+                - generic [ref=e132]:
+                  - generic [ref=e133]: Lite
+                  - generic [ref=e134]: Fast whitespace cleanup
+              - link "speed Aggressive Summary + aging" [ref=e135] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=e136]: speed
+                - generic [ref=e137]:
+                  - generic [ref=e138]: Aggressive
+                  - generic [ref=e139]: Summary + aging
+              - link "bolt Ultra Heuristic pruning" [ref=e140] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=e141]: bolt
+                - generic [ref=e142]:
+                  - generic [ref=e143]: Ultra
+                  - generic [ref=e144]: Heuristic pruning
+              - link "grain OmniGlyph Context-as-image" [ref=e145] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=e146]: grain
+                - generic [ref=e147]:
+                  - generic [ref=e148]: OmniGlyph
+                  - generic [ref=e149]: Context-as-image
+              - link "monitoring Compression Studio Live engine cascade" [ref=e150] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=e151]: monitoring
+                - generic [ref=e152]:
+                  - generic [ref=e153]: Compression Studio
+                  - generic [ref=e154]: Live engine cascade
+            - generic [ref=e155]:
+              - generic [ref=e156]: 工具
+              - link "terminal CLI 代码的 指向 OmniRoute 的代码工具" [ref=e159] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=e160]: terminal
+                - generic [ref=e161]:
+                  - generic [ref=e162]: CLI 代码的
+                  - generic [ref=e163]: 指向 OmniRoute 的代码工具
+              - link "smart_toy CLI 代理 自主 CLI 代理" [ref=e164] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=e165]: smart_toy
+                - generic [ref=e166]:
+                  - generic [ref=e167]: CLI 代理
+                  - generic [ref=e168]: 自主 CLI 代理
+              - link "device_hub ACP 代理 由 OmniRoute 生成的 CLI" [ref=e169] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=e170]: device_hub
+                - generic [ref=e171]:
+                  - generic [ref=e172]: ACP 代理
+                  - generic [ref=e173]: 由 OmniRoute 生成的 CLI
+              - link "cloud 云代理 管理基于云的代理" [ref=e174] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=e175]: cloud
+                - generic [ref=e176]:
+                  - generic [ref=e177]: 云代理
+                  - generic [ref=e178]: 管理基于云的代理
+              - link "link 代理桥接 拦截 IDE 代理流量" [ref=e179] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=e180]: link
+                - generic [ref=e181]:
+                  - generic [ref=e182]: 代理桥接
+                  - generic [ref=e183]: 拦截 IDE 代理流量
+              - link "network_check 流量检查器 监控 LLM 调用 + 调试任何 HTTPS 流量" [ref=e184] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=e185]: network_check
+                - generic [ref=e186]:
+                  - generic [ref=e187]: 流量检查器
+                  - generic [ref=e188]: 监控 LLM 调用 + 调试任何 HTTPS 流量
+              - link "travel_explore Discovery Scan providers for free access" [ref=e189] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=e190]: travel_explore
+                - generic [ref=e191]:
+                  - generic [ref=e192]: Discovery
+                  - generic [ref=e193]: Scan providers for free access
+            - generic [ref=e194]:
+              - generic [ref=e195]: 集成
+              - link "api API 端点 暴露自定义端点" [ref=e198] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=e199]: api
+                - generic [ref=e200]:
+                  - generic [ref=e201]: API 端点
+                  - generic [ref=e202]: 暴露自定义端点
+              - link "webhook Webhook 获取事件通知" [ref=e203] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=e204]: webhook
+                - generic [ref=e205]:
+                  - generic [ref=e206]: Webhook
+                  - generic [ref=e207]: 获取事件通知
+            - link "dns 代理 HTTP 代理设置" [ref=e208] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=e209]: dns
+              - generic [ref=e210]:
+                - generic [ref=e211]: 代理
+                - generic [ref=e212]: HTTP 代理设置
+        - button "分析 push_pin expand_more" [ref=e214] [cursor=pointer]:
+          - generic [ref=e215]: 分析
+          - button "push_pin" [ref=e216]
+          - generic: expand_more
+        - button "成本 push_pin expand_more" [ref=e218] [cursor=pointer]:
+          - generic [ref=e219]: 成本
+          - button "push_pin" [ref=e220]
+          - generic: expand_more
+        - button "监控 push_pin expand_more" [ref=e222] [cursor=pointer]:
+          - generic [ref=e223]: 监控
+          - button "push_pin" [ref=e224]
+          - generic: expand_more
+        - button "代理功能 push_pin expand_more" [ref=e226] [cursor=pointer]:
+          - generic [ref=e227]: 代理功能
+          - button "push_pin" [ref=e228]
+          - generic: expand_more
+        - button "其他功能 push_pin expand_more" [ref=e230] [cursor=pointer]:
+          - generic [ref=e231]: 其他功能
+          - button "push_pin" [ref=e232]
+          - generic: expand_more
+        - button "配置 push_pin expand_more" [ref=e234] [cursor=pointer]:
+          - generic [ref=e235]: 配置
+          - button "push_pin" [ref=e236]
+          - generic: expand_more
+        - button "帮助 push_pin expand_more" [ref=e238] [cursor=pointer]:
+          - generic [ref=e239]: 帮助
+          - button "push_pin" [ref=e240]
+          - generic: expand_more
+      - generic [ref=e241]:
+        - button "restart_alt 重启服务" [ref=e242]:
+          - generic: restart_alt
+          - generic [ref=e243]: 重启服务
+        - button "power_settings_new 停止服务" [ref=e244]:
+          - generic: power_settings_new
+          - generic [ref=e245]: 停止服务
+    - main [ref=e246]:
+      - generic [ref=e247]:
+        - generic [ref=e248]:
+          - generic [ref=e249]: home
+          - generic [ref=e251]:
+            - heading "首页" [level=1] [ref=e252]
+            - paragraph [ref=e253]: 欢迎使用 OmniRoute
+        - generic [ref=e254]:
+          - button "Open quick navigation" [ref=e255]:
+            - generic: search
+            - generic [ref=e256]: Quick nav
+            - generic [ref=e257]: Ctrl+K
+          - button "中文 (简体) ZH-CN expand_more" [ref=e259]:
+            - img "中文 (简体)" [ref=e260]
+            - generic [ref=e261]: ZH-CN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=e262]:
+            - generic: dark_mode
+          - button "logout" [ref=e263]
+      - navigation "Breadcrumb" [ref=e266]:
+        - generic [ref=e267]: Home
+  - alert [ref=e283]

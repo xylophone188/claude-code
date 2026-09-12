@@ -95,11 +95,22 @@ function substituteVariables(
 /**
  * Build the Magic Docs update prompt with variable substitution
  */
+type PromptModelContext = {
+  getModel: () => string
+  getEffort: (model: string) => string
+}
+
+const defaultPromptModelContext: PromptModelContext = {
+  getModel: getMainLoopModel,
+  getEffort: model => getDisplayedEffortLevel(model, undefined),
+}
+
 export async function buildMagicDocsUpdatePrompt(
   docContents: string,
   docPath: string,
   docTitle: string,
   instructions?: string,
+  modelContext: PromptModelContext = defaultPromptModelContext,
 ): Promise<string> {
   const promptTemplate = await loadMagicDocsPrompt()
 
@@ -116,13 +127,13 @@ These instructions take priority over the general rules below. Make sure your up
     : ''
 
   // Substitute variables in the prompt
-  const currentModel = getMainLoopModel()
+  const currentModel = modelContext.getModel()
   const variables = {
     docContents,
     docPath,
     docTitle,
     customInstructions,
-    CLAUDE_EFFORT: getDisplayedEffortLevel(currentModel, undefined),
+    CLAUDE_EFFORT: modelContext.getEffort(currentModel),
     CLAUDE_MODEL: currentModel,
     CLAUDE_CWD: process.cwd(),
   }

@@ -1,0 +1,960 @@
+- generic [active] [ref=f2e1]:
+  - link "Skip to content" [ref=f2e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - alert [ref=f2e9]: OmniRoute — AI Gateway for Multi-Provider LLMs
+  - generic [ref=f2e26]:
+    - complementary [ref=f2e28]:
+      - link "跳到内容" [ref=f2e29] [cursor=pointer]:
+        - /url: "#main-content"
+      - link "OmniRoute v3.8.48" [ref=f2e35] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f2e49]:
+          - heading "OmniRoute" [level=1] [ref=f2e50]
+          - generic [ref=f2e51]: v3.8.48
+      - generic [ref=f2e54]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "搜索" [ref=f2e55]
+      - navigation "Main navigation" [ref=f2e56]:
+        - link "home 首页 仪表盘概览" [ref=f2e58] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f2e59]: home
+          - generic [ref=f2e60]:
+            - generic [ref=f2e61]: 首页
+            - generic [ref=f2e62]: 仪表盘概览
+        - generic [ref=f2e63]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f2e64] [cursor=pointer]:
+            - generic [ref=f2e65]: OmniProxy
+            - button "push_pin" [ref=f2e66]
+            - generic: expand_more
+          - generic [ref=f2e67]:
+            - link "api 端点 您的 AI 连接 URL" [ref=f2e68] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f2e69]: api
+              - generic [ref=f2e70]:
+                - generic [ref=f2e71]: 端点
+                - generic [ref=f2e72]: 您的 AI 连接 URL
+            - link "vpn_key API 管理 管理 API 密钥和访问" [ref=f2e73] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f2e74]: vpn_key
+              - generic [ref=f2e75]:
+                - generic [ref=f2e76]: API 管理
+                - generic [ref=f2e77]: 管理 API 密钥和访问
+            - link "dns 提供商 管理 AI 提供商" [ref=f2e78] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f2e79]: dns
+              - generic [ref=f2e80]:
+                - generic [ref=f2e81]: 提供商
+                - generic [ref=f2e82]: 管理 AI 提供商
+            - link "deployed_code 内嵌服务 管理本地代理服务" [ref=f2e83] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f2e84]: deployed_code
+              - generic [ref=f2e85]:
+                - generic [ref=f2e86]: 内嵌服务
+                - generic [ref=f2e87]: 管理本地代理服务
+            - link "layers 组合 用于故障转移的组提供程序" [ref=f2e88] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f2e89]: layers
+              - generic [ref=f2e90]:
+                - generic [ref=f2e91]: 组合
+                - generic [ref=f2e92]: 用于故障转移的组提供程序
+            - link "account_tree Combo Studio Live routing cascade" [ref=f2e93] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f2e94]: account_tree
+              - generic [ref=f2e95]:
+                - generic [ref=f2e96]: Combo Studio
+                - generic [ref=f2e97]: Live routing cascade
+            - link "tune 提供商配额 跟踪提供商使用限制" [ref=f2e98] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f2e99]: tune
+              - generic [ref=f2e100]:
+                - generic [ref=f2e101]: 提供商配额
+                - generic [ref=f2e102]: 跟踪提供商使用限制
+            - link "pie_chart 配额共享 跨密钥共享提供商配额" [ref=f2e103] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f2e104]: pie_chart
+              - generic [ref=f2e105]:
+                - generic [ref=f2e106]: 配额共享
+                - generic [ref=f2e107]: 跨密钥共享提供商配额
+            - generic [ref=f2e108]:
+              - generic [ref=f2e109]: 压缩上下文
+              - link "settings Compression Settings Global defaults" [ref=f2e112] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f2e113]: settings
+                - generic [ref=f2e114]:
+                  - generic [ref=f2e115]: Compression Settings
+                  - generic [ref=f2e116]: Global defaults
+              - link "hub 引擎组合 组合压缩引擎" [ref=f2e117] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f2e118]: hub
+                - generic [ref=f2e119]:
+                  - generic [ref=f2e120]: 引擎组合
+                  - generic [ref=f2e121]: 组合压缩引擎
+              - link "compress Caveman 迅速压缩" [ref=f2e122] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f2e123]: compress
+                - generic [ref=f2e124]:
+                  - generic [ref=f2e125]: Caveman
+                  - generic [ref=f2e126]: 迅速压缩
+              - link "filter_alt RTK 输出滤波" [ref=f2e127] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f2e128]: filter_alt
+                - generic [ref=f2e129]:
+                  - generic [ref=f2e130]: RTK
+                  - generic [ref=f2e131]: 输出滤波
+              - link "table_rows Headroom Tabular compaction" [ref=f2e132] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f2e133]: table_rows
+                - generic [ref=f2e134]:
+                  - generic [ref=f2e135]: Headroom
+                  - generic [ref=f2e136]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn dedup" [ref=f2e137] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f2e138]: content_copy
+                - generic [ref=f2e139]:
+                  - generic [ref=f2e140]: Session Dedup
+                  - generic [ref=f2e141]: Cross-turn dedup
+              - link "archive CCR Retrieve markers" [ref=f2e142] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f2e143]: archive
+                - generic [ref=f2e144]:
+                  - generic [ref=f2e145]: CCR
+                  - generic [ref=f2e146]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f2e147] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f2e148]: psychology
+                - generic [ref=f2e149]:
+                  - generic [ref=f2e150]: LLMLingua
+                  - generic [ref=f2e151]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f2e152] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f2e153]: compress
+                - generic [ref=f2e154]:
+                  - generic [ref=f2e155]: Lite
+                  - generic [ref=f2e156]: Fast whitespace cleanup
+              - link "speed Aggressive Summary + aging" [ref=f2e157] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f2e158]: speed
+                - generic [ref=f2e159]:
+                  - generic [ref=f2e160]: Aggressive
+                  - generic [ref=f2e161]: Summary + aging
+              - link "bolt Ultra Heuristic pruning" [ref=f2e162] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f2e163]: bolt
+                - generic [ref=f2e164]:
+                  - generic [ref=f2e165]: Ultra
+                  - generic [ref=f2e166]: Heuristic pruning
+              - link "grain OmniGlyph Context-as-image" [ref=f2e167] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f2e168]: grain
+                - generic [ref=f2e169]:
+                  - generic [ref=f2e170]: OmniGlyph
+                  - generic [ref=f2e171]: Context-as-image
+              - link "monitoring Compression Studio Live engine cascade" [ref=f2e172] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f2e173]: monitoring
+                - generic [ref=f2e174]:
+                  - generic [ref=f2e175]: Compression Studio
+                  - generic [ref=f2e176]: Live engine cascade
+            - generic [ref=f2e177]:
+              - generic [ref=f2e178]: 工具
+              - link "terminal CLI 代码的 指向 OmniRoute 的代码工具" [ref=f2e181] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f2e182]: terminal
+                - generic [ref=f2e183]:
+                  - generic [ref=f2e184]: CLI 代码的
+                  - generic [ref=f2e185]: 指向 OmniRoute 的代码工具
+              - link "smart_toy CLI 代理 自主 CLI 代理" [ref=f2e186] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f2e187]: smart_toy
+                - generic [ref=f2e188]:
+                  - generic [ref=f2e189]: CLI 代理
+                  - generic [ref=f2e190]: 自主 CLI 代理
+              - link "device_hub ACP 代理 由 OmniRoute 生成的 CLI" [ref=f2e191] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f2e192]: device_hub
+                - generic [ref=f2e193]:
+                  - generic [ref=f2e194]: ACP 代理
+                  - generic [ref=f2e195]: 由 OmniRoute 生成的 CLI
+              - link "cloud 云代理 管理基于云的代理" [ref=f2e196] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f2e197]: cloud
+                - generic [ref=f2e198]:
+                  - generic [ref=f2e199]: 云代理
+                  - generic [ref=f2e200]: 管理基于云的代理
+              - link "link 代理桥接 拦截 IDE 代理流量" [ref=f2e201] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f2e202]: link
+                - generic [ref=f2e203]:
+                  - generic [ref=f2e204]: 代理桥接
+                  - generic [ref=f2e205]: 拦截 IDE 代理流量
+              - link "network_check 流量检查器 监控 LLM 调用 + 调试任何 HTTPS 流量" [ref=f2e206] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f2e207]: network_check
+                - generic [ref=f2e208]:
+                  - generic [ref=f2e209]: 流量检查器
+                  - generic [ref=f2e210]: 监控 LLM 调用 + 调试任何 HTTPS 流量
+              - link "travel_explore Discovery Scan providers for free access" [ref=f2e211] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f2e212]: travel_explore
+                - generic [ref=f2e213]:
+                  - generic [ref=f2e214]: Discovery
+                  - generic [ref=f2e215]: Scan providers for free access
+            - generic [ref=f2e216]:
+              - generic [ref=f2e217]: 集成
+              - link "api API 端点 暴露自定义端点" [ref=f2e220] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f2e221]: api
+                - generic [ref=f2e222]:
+                  - generic [ref=f2e223]: API 端点
+                  - generic [ref=f2e224]: 暴露自定义端点
+              - link "webhook Webhook 获取事件通知" [ref=f2e225] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f2e226]: webhook
+                - generic [ref=f2e227]:
+                  - generic [ref=f2e228]: Webhook
+                  - generic [ref=f2e229]: 获取事件通知
+            - link "dns 代理 HTTP 代理设置" [ref=f2e230] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f2e231]: dns
+              - generic [ref=f2e232]:
+                - generic [ref=f2e233]: 代理
+                - generic [ref=f2e234]: HTTP 代理设置
+        - button "分析 push_pin expand_more" [ref=f2e236] [cursor=pointer]:
+          - generic [ref=f2e237]: 分析
+          - button "push_pin" [ref=f2e238]
+          - generic: expand_more
+        - button "成本 push_pin expand_more" [ref=f2e240] [cursor=pointer]:
+          - generic [ref=f2e241]: 成本
+          - button "push_pin" [ref=f2e242]
+          - generic: expand_more
+        - button "监控 push_pin expand_more" [ref=f2e244] [cursor=pointer]:
+          - generic [ref=f2e245]: 监控
+          - button "push_pin" [ref=f2e246]
+          - generic: expand_more
+        - button "开发工具 push_pin expand_more" [ref=f2e248] [cursor=pointer]:
+          - generic [ref=f2e249]: 开发工具
+          - button "push_pin" [ref=f2e250]
+          - generic: expand_more
+        - button "代理功能 push_pin expand_more" [ref=f2e252] [cursor=pointer]:
+          - generic [ref=f2e253]: 代理功能
+          - button "push_pin" [ref=f2e254]
+          - generic: expand_more
+        - button "其他功能 push_pin expand_more" [ref=f2e256] [cursor=pointer]:
+          - generic [ref=f2e257]: 其他功能
+          - button "push_pin" [ref=f2e258]
+          - generic: expand_more
+        - button "配置 push_pin expand_more" [ref=f2e260] [cursor=pointer]:
+          - generic [ref=f2e261]: 配置
+          - button "push_pin" [ref=f2e262]
+          - generic: expand_more
+        - button "帮助 push_pin expand_more" [ref=f2e264] [cursor=pointer]:
+          - generic [ref=f2e265]: 帮助
+          - button "push_pin" [ref=f2e266]
+          - generic: expand_more
+      - generic [ref=f2e267]:
+        - button "restart_alt 重启服务" [ref=f2e268]:
+          - generic: restart_alt
+          - generic [ref=f2e269]: 重启服务
+        - button "power_settings_new 停止服务" [ref=f2e270]:
+          - generic: power_settings_new
+          - generic [ref=f2e271]: 停止服务
+    - main [ref=f2e272]:
+      - generic [ref=f2e273]:
+        - button "menu" [ref=f2e275]
+        - generic [ref=f2e276]:
+          - button "Open quick navigation" [ref=f2e277]:
+            - generic: search
+          - button "中文 (简体) ZH-CN expand_more" [ref=f2e279]:
+            - img "中文 (简体)" [ref=f2e280]
+            - generic [ref=f2e281]: ZH-CN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=f2e282]:
+            - generic: dark_mode
+          - button "warning" [ref=f2e284]
+          - button "logout" [ref=f2e285]
+      - generic [ref=f2e287]:
+        - navigation "Breadcrumb" [ref=f2e288]:
+          - generic [ref=f2e289]: Home
+        - generic [ref=f2e292]:
+          - generic [ref=f2e294]:
+            - generic [ref=f2e295]:
+              - generic [ref=f2e296]:
+                - heading "快速入门" [level=2] [ref=f2e297]
+                - paragraph [ref=f2e298]: 4 个步骤快速上手：连接提供商、路由模型并监控全局运行情况。
+              - link "menu_book 完整文档" [ref=f2e299] [cursor=pointer]:
+                - /url: /docs
+                - generic [ref=f2e300]: menu_book
+                - text: 完整文档
+            - list [ref=f2e301]:
+              - listitem [ref=f2e302]:
+                - generic [ref=f2e303]: key
+                - generic [ref=f2e305]:
+                  - text: 1. 创建 API 密钥
+                  - paragraph [ref=f2e306]:
+                    - text: 前往
+                    - link "端点" [ref=f2e307] [cursor=pointer]:
+                      - /url: /dashboard/api-manager
+                    - text: "-> 已注册密钥。为每个环境生成一个独立密钥。"
+              - listitem [ref=f2e308]:
+                - generic [ref=f2e309]: dns
+                - generic [ref=f2e311]:
+                  - text: 2. 连接提供商
+                  - paragraph [ref=f2e312]:
+                    - text: 在
+                    - link "提供商" [ref=f2e313] [cursor=pointer]:
+                      - /url: /dashboard/providers
+                    - text: 中添加账户。支持 OAuth、API Key 和免费套餐。
+              - listitem [ref=f2e314]:
+                - generic [ref=f2e315]: link
+                - generic [ref=f2e317]:
+                  - text: 3. 配置客户端
+                  - paragraph [ref=f2e318]: 在 IDE 或 API 客户端中将基本 URL 设置为 http://127.0.0.1:20127/v1。
+              - listitem [ref=f2e319]:
+                - generic [ref=f2e320]: analytics
+                - generic [ref=f2e322]:
+                  - text: 4. 监控与优化
+                  - paragraph [ref=f2e323]:
+                    - text: 在
+                    - link "请求日志" [ref=f2e324] [cursor=pointer]:
+                      - /url: /dashboard/logs
+                    - text: 和
+                    - link "分析" [ref=f2e325] [cursor=pointer]:
+                      - /url: /dashboard/analytics
+                    - text: 中跟踪 Token、成本与错误。
+          - generic [ref=f2e326]:
+            - generic [ref=f2e327]:
+              - generic [ref=f2e328]:
+                - heading "提供商拓扑" [level=2] [ref=f2e329]
+                - paragraph [ref=f2e330]: Connected providers routing through OmniRoute in real time
+              - generic [ref=f2e331]:
+                - generic [ref=f2e332]: Active
+                - generic [ref=f2e334]: Recent
+                - generic [ref=f2e336]: Error
+            - application [ref=f2e339]:
+              - generic [ref=f2e341]:
+                - generic:
+                  - generic:
+                    - img:
+                      - group "Edge from router to provider-sensenova"
+                    - img:
+                      - group "Edge from router to provider-agentrouter"
+                    - img:
+                      - group "Edge from router to provider-agnes-node"
+                    - img:
+                      - group "Edge from router to provider-agy"
+                    - img:
+                      - group "Edge from router to provider-amazon-q"
+                    - img:
+                      - group "Edge from router to provider-antigravity"
+                    - img:
+                      - group "Edge from router to provider-api-airforce"
+                    - img:
+                      - group "Edge from router to provider-bazaarlink"
+                    - img:
+                      - group "Edge from router to provider-blackbox"
+                    - img:
+                      - group "Edge from router to provider-brave-search"
+                    - img:
+                      - group "Edge from router to provider-byteplus"
+                    - img:
+                      - group "Edge from router to provider-cerebras"
+                    - img:
+                      - group "Edge from router to provider-chipotle"
+                    - img:
+                      - group "Edge from router to provider-cline"
+                    - img:
+                      - group "Edge from router to provider-codebuddy-cn"
+                    - img:
+                      - group "Edge from router to provider-codex"
+                    - img:
+                      - group "Edge from router to provider-cohere"
+                    - img:
+                      - group "Edge from router to provider-comfyui"
+                    - img:
+                      - group "Edge from router to provider-deepgram"
+                    - img:
+                      - group "Edge from router to provider-deepinfra"
+                    - img:
+                      - group "Edge from router to provider-deepseek"
+                    - img:
+                      - group "Edge from router to provider-doubao"
+                    - img:
+                      - group "Edge from router to provider-duckduckgo-web"
+                    - img:
+                      - group "Edge from router to provider-e3671968-2fec-4e7e-9577-d907775666d7"
+                    - img:
+                      - group "Edge from router to provider-exa-search"
+                    - img:
+                      - group "Edge from router to provider-firecrawl"
+                    - img:
+                      - group "Edge from router to provider-fireworks"
+                    - img:
+                      - group "Edge from router to provider-freemodel-dev"
+                    - img:
+                      - group "Edge from router to provider-friendliai"
+                    - img:
+                      - group "Edge from router to provider-ge"
+                    - img:
+                      - group "Edge from router to provider-gitee"
+                    - img:
+                      - group "Edge from router to provider-github"
+                    - img:
+                      - group "Edge from router to provider-github-models"
+                    - img:
+                      - group "Edge from router to provider-glm-cn"
+                    - img:
+                      - group "Edge from router to provider-groq"
+                    - img:
+                      - group "Edge from router to provider-hackclub"
+                    - img:
+                      - group "Edge from router to provider-huggingface"
+                    - img:
+                      - group "Edge from router to provider-hyperbolic"
+                    - img:
+                      - group "Edge from router to provider-iflow"
+                    - img:
+                      - group "Edge from router to provider-iflytek"
+                    - img:
+                      - group "Edge from router to provider-inworld"
+                    - img:
+                      - group "Edge from router to provider-jina-ai"
+                    - img:
+                      - group "Edge from router to provider-jina-reader"
+                    - img:
+                      - group "Edge from router to provider-kilocode"
+                    - img:
+                      - group "Edge from router to provider-kimi"
+                    - img:
+                      - group "Edge from router to provider-kiro"
+                    - img:
+                      - group "Edge from router to provider-liquid"
+                    - img:
+                      - group "Edge from router to provider-llm7"
+                    - img:
+                      - group "Edge from router to provider-longcat"
+                    - img:
+                      - group "Edge from router to provider-mimocode"
+                    - img:
+                      - group "Edge from router to provider-mistral"
+                    - img:
+                      - group "Edge from router to provider-modelscope"
+                    - img:
+                      - group "Edge from router to provider-monsterapi"
+                    - img:
+                      - group "Edge from router to provider-morph"
+                    - img:
+                      - group "Edge from router to provider-muse-spark-web"
+                    - img:
+                      - group "Edge from router to provider-nvidia"
+                    - img:
+                      - group "Edge from router to provider-ollama-cloud"
+                    - img:
+                      - group "Edge from router to provider-openai"
+                    - img:
+                      - group "Edge from router to provider-openai-compatible-chat-1324a428-5d79-4a33-9364-13e4a456a725"
+                    - img:
+                      - group "Edge from router to provider-openai-compatible-chat-b0674e53-ce33-4d3b-af2d-86cb3101c292"
+                    - img:
+                      - group "Edge from router to provider-opencode"
+                    - img:
+                      - group "Edge from router to provider-opencode-zen"
+                    - img:
+                      - group "Edge from router to provider-openrouter"
+                    - img:
+                      - group "Edge from router to provider-pollinations"
+                    - img:
+                      - group "Edge from router to provider-predibase"
+                    - img:
+                      - group "Edge from router to provider-publicai"
+                    - img:
+                      - group "Edge from router to provider-puter"
+                    - img:
+                      - group "Edge from router to provider-qwen-web"
+                    - img:
+                      - group "Edge from router to provider-serper-search"
+                    - img:
+                      - group "Edge from router to provider-siliconflow"
+                    - img:
+                      - group "Edge from router to provider-sparkdesk"
+                    - img:
+                      - group "Edge from router to provider-t3-web"
+                    - img:
+                      - group "Edge from router to provider-tavily-search"
+                    - img:
+                      - group "Edge from router to provider-theoldllm"
+                    - img:
+                      - group "Edge from router to provider-together"
+                    - img:
+                      - group "Edge from router to provider-uncloseai"
+                    - img:
+                      - group "Edge from router to provider-voyage-ai"
+                    - img:
+                      - group "Edge from router to provider-zenmux"
+                    - img:
+                      - group "Edge from router to provider-zenmux-free"
+                  - generic:
+                    - group:
+                      - generic:
+                        - generic: route
+                        - generic: OmniRoute
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "sensenova"
+                        - generic: SenseNova
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "agentrouter"
+                        - generic: AgentRouter
+                    - group:
+                      - generic: agnes-node
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "agy"
+                        - generic: Antigravity CLI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "amazon-q"
+                        - generic: Amazon Q
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "antigravity"
+                        - generic: Antigravity
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "api-airforce"
+                        - generic: Api.airforce
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "bazaarlink"
+                        - generic: BazaarLink
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "blackbox"
+                        - generic: Blackbox AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "brave-search"
+                        - generic: Brave Search
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "byteplus"
+                        - generic: BytePlus ModelArk
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "cerebras"
+                        - generic: Cerebras
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "chipotle"
+                        - generic: Chipotle Pepper AI (Free)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "cline"
+                        - generic: Cline
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "codebuddy-cn"
+                        - generic: CodeBuddy CN
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "codex"
+                        - generic: OpenAI Codex
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "cohere"
+                        - generic: Cohere
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "comfyui"
+                        - generic: ComfyUI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "deepgram"
+                        - generic: Deepgram
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "deepinfra"
+                        - generic: DeepInfra
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "deepseek"
+                        - generic: DeepSeek
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "doubao"
+                        - generic: Doubao
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "duckduckgo-web"
+                        - generic: DuckDuckGo AI Chat
+                    - group:
+                      - generic: e3671968-2fec-4e7e-9577-d907775666d7
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "exa-search"
+                        - generic: Exa Search
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "firecrawl"
+                        - generic: Firecrawl
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "fireworks"
+                        - generic: Fireworks AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "freemodel-dev"
+                        - generic: FreeModel.dev
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "friendliai"
+                        - generic: FriendliAI
+                    - group:
+                      - generic: ge
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "gitee"
+                        - generic: gitee
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "github"
+                        - generic: GitHub Copilot
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "github-models"
+                        - generic: GitHub Models
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "glm-cn"
+                        - generic: GLM Coding (China)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "groq"
+                        - generic: Groq
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "hackclub"
+                        - generic: Hackclub AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "huggingface"
+                        - generic: HuggingFace
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "hyperbolic"
+                        - generic: Hyperbolic
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "iflow"
+                        - generic: iflow
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "iflytek"
+                        - generic: iFlytek Spark
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "inworld"
+                        - generic: Inworld
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "jina-ai"
+                        - generic: Jina AI
+                    - group:
+                      - generic: Jina Reader
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "kilocode"
+                        - generic: Kilo Code
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "kimi"
+                        - generic: Kimi
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "kiro"
+                        - generic: Kiro AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "liquid"
+                        - generic: Liquid AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "llm7"
+                        - generic: LLM7.io
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "longcat"
+                        - generic: LongCat AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "mimocode"
+                        - generic: MiMoCode (Free)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "mistral"
+                        - generic: Mistral
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "modelscope"
+                        - generic: ModelScope
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "monsterapi"
+                        - generic: MonsterAPI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "morph"
+                        - generic: Morph
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "muse-spark-web"
+                        - generic: Muse Spark Web (Meta AI)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "nvidia"
+                        - generic: NVIDIA NIM
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "ollama-cloud"
+                        - generic: Ollama Cloud
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "openai"
+                        - generic: OpenAI
+                    - group:
+                      - generic: omniroute
+                    - group:
+                      - generic: modelscope
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "opencode"
+                        - generic: OpenCode Free
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "opencode-zen"
+                        - generic: OpenCode Zen
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "openrouter"
+                        - generic: OpenRouter
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "pollinations"
+                        - generic: Pollinations AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "predibase"
+                        - generic: Predibase
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "publicai"
+                        - generic: PublicAI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "puter"
+                        - generic: Puter AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "qwen-web"
+                        - generic: Qwen Web (Free)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "serper-search"
+                        - generic: Serper Search
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "siliconflow"
+                        - generic: SiliconFlow
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "sparkdesk"
+                        - generic: SparkDesk
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "t3-web"
+                        - generic: t3.chat (Pro/Free)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "tavily-search"
+                        - generic: Tavily Search
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "theoldllm"
+                        - generic: The Old LLM (Free)
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "together"
+                        - generic: Together AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "uncloseai"
+                        - generic: UncloseAI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "voyage-ai"
+                        - generic: Voyage AI
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "zenmux"
+                        - generic: ZenMux
+                    - group:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img "zenmux-free"
+                        - generic: ZenMux Free (Web)
+              - generic "Control Panel" [ref=f2e662]:
+                - button "Zoom In" [ref=f2e663] [cursor=pointer]
+                - button "Zoom Out" [ref=f2e666] [cursor=pointer]
+                - button "Fit View" [ref=f2e669] [cursor=pointer]
+    - alert [ref=f2e674] [cursor=pointer]:
+      - generic [ref=f2e675]: ⚠
+      - generic [ref=f2e676]:
+        - generic [ref=f2e677]: API 密钥警告
+        - generic [ref=f2e678]: 54 个 API 密钥在以下连接中处于警告状态：bc181b6e-18a3-4a87-87a3-4c7e1542044b, 989716e0-9f28-4f3b-924b-d1788b0d01fd, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, kimi, codebuddy-cn, codebuddy-cn, codebuddy-cn, codebuddy-cn, f61d85fd-d207-4ece-ade2-5630267f2dcf, 18577334520, GitHub Models (Free), main, main-4, main, Key 1, longcat, main, main, itts, deepgram, ja, morak, Key 5, 5f24ac77-7eb7-4e88-88fb-b4188119b40f, Account 1, 18194078784, elvisanderson8757@gmail.com, main-3, Key 4, 82a8fc96-8018-4938-a19b-4f6e241a8039, Account 2, main-2, Key 3, 3a4788b4-d7e4-4975-8e13-ba3b6b71d239, main, openai-primary, bd2d0836-20e5-448c-ae82-d61ba861faa6, Local llama.cpp - Qwen3.6 Fable 27B Q4_K_M。请检查以防止轮换问题。
+      - button "Dismiss notification" [ref=f2e679]: ×

@@ -26,6 +26,7 @@ const {
   isValidNumericEffort,
   convertEffortValueToLevel,
   getEffortLevelDescription,
+  getEffortSuffix,
   resolvePickerEffortPersistence,
   EFFORT_LEVELS,
 } = await import('src/utils/effort.js')
@@ -359,5 +360,19 @@ describe('modelSupportsEffort', () => {
   test('normal claude models still support effort', async () => {
     const { modelSupportsEffort } = await import('src/utils/effort.js')
     expect(modelSupportsEffort('claude-opus-4-7')).toBe(true)
+  })
+})
+
+describe('getEffortSuffix', () => {
+  test('CCB server routing displays OmniRoute receipt effort instead', () => {
+    const ccb = process.env.CCB_ENV
+    const routing = process.env.OMNIROUTE_SERVER_ROUTING
+    process.env.CCB_ENV = '1'
+    process.env.OMNIROUTE_SERVER_ROUTING = '1'
+    expect(getEffortSuffix('auto', 'max')).toBe('')
+    if (ccb === undefined) delete process.env.CCB_ENV
+    else process.env.CCB_ENV = ccb
+    if (routing === undefined) delete process.env.OMNIROUTE_SERVER_ROUTING
+    else process.env.OMNIROUTE_SERVER_ROUTING = routing
   })
 })

@@ -8,6 +8,21 @@ export * from './advisor'
 // ── Capacity / account fallback (ported ccb subsystems) ──────────
 export * from './capacity'
 export * from './accountFallback'
+export * from './quotaGate'
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+export * from './circuitBreaker'
+export * from './responseQuality'
+export * from './admission'
+export * from './catalogSync'
+export * from './visionQuality'
+export * from './scenarioCombos'
+=======
+export * from './responseQuality'
+>>>>>>> Stashed changes
+=======
+export * from './responseQuality'
+>>>>>>> Stashed changes
 
 // ── Intent routing & classification (L1 keyword + L2 embedding) ─────
 export * from './intentRouter'

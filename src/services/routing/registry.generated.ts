@@ -189,14 +189,7 @@ export const CCB_ROUTING_PROVIDERS: CCBRoutingProvider[] = [
     baseUrl: 'https://api.cerebras.ai/v1',
     apiKeyEnv: 'CCB_CEREBRAS_KEY',
     defaultModel: 'gpt-oss-120b',
-    models: [
-      'gpt-oss-120b',
-      'zai-glm-4.7',
-      'llama-3.3-70b',
-      'llama-4-scout-17b-16e-instruct',
-      'qwen-3-235b-a22b-instruct-2507',
-      'qwen-3-32b',
-    ],
+    models: ['gpt-oss-120b', 'gemma-4-31b', 'qwen-3.8-27b'],
     compatRule: 'permissive',
   },
   {

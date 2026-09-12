@@ -230,6 +230,38 @@ export const ExitPlanModeV2Tool: Tool<InputSchema, Output> = buildTool({
       }
     }
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    // A session started in bypassPermissions stays unattended on plan exit;
+    // prePlanMode is the session-start mode captured before plan mode.
+=======
+    // A session started with bypassPermissions should remain unattended when
+    // plan mode exits. Other modes still require explicit plan approval.
+>>>>>>> Stashed changes
+=======
+    // A session started with bypassPermissions should remain unattended when
+    // plan mode exits. Other modes still require explicit plan approval.
+>>>>>>> Stashed changes
+    if (
+      context.getAppState().toolPermissionContext.prePlanMode ===
+      'bypassPermissions'
+    ) {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input,
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+        decisionReason: {
+          type: 'mode',
+          mode: 'bypassPermissions',
+        },
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+      }
+    }
+
     // For non-teammates, require user confirmation to exit plan mode
     return {
       behavior: 'ask' as const,

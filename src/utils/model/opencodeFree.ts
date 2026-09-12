@@ -8,7 +8,10 @@ import {
   getRegisteredProviders,
 } from './providerRegistry.js'
 import { listDirectProviderModels } from '../../services/omniroute/adapter.js'
-import { getAutoCandidates } from '../../services/routing/autoScoring.js'
+import {
+  currentFreeOpenCodeModels,
+  getAutoCandidates,
+} from '../../services/routing/autoScoring.js'
 
 /** Home directory, read at call time: `os.homedir()` caches its value at
  *  startup in Bun, so tests overriding process.env.HOME would be ignored
@@ -24,7 +27,7 @@ export interface ProviderModelGroup {
 
 const CCB_PREFIX = 'ccb/'
 const CCB_ROUTING_PREFIX = 'ccb/'
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const CACHE_TTL_MS = 8 * 60 * 60 * 1000
 
 /** Stable level-1 provider ids for the two-step /model picker. */
 export const PROVIDER_OC = 'oc'
@@ -224,15 +227,18 @@ export function buildGroups(ids: string[]): ProviderModelGroup[] {
     more.push(id)
   }
 
-  // Sort OpenCode models: deepseek-v4-flash-free first, then alphabetically.
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+  // Keep each group's models in a stable alphabetical order.
+=======
+  // Sort OpenCode models alphabetically by label.
+>>>>>>> Stashed changes
+=======
+  // Sort OpenCode models alphabetically by label.
+>>>>>>> Stashed changes
   const oc = groups.get('oc')
   if (oc) {
-    oc.models.sort((a, b) => {
-      const aFree = (a.value ?? '').includes('deepseek-v4-flash-free') ? 0 : 1
-      const bFree = (b.value ?? '').includes('deepseek-v4-flash-free') ? 0 : 1
-      if (aFree !== bFree) return aFree - bFree
-      return a.label.localeCompare(b.label)
-    })
+    oc.models.sort((a, b) => a.label.localeCompare(b.label))
   }
 
   const result = [...groups.values()].sort((a, b) => {
@@ -421,9 +427,46 @@ export async function getProviderContent(
     }
   }
   if (providerId === PROVIDER_AUTO) {
+    if (
+      process.env.CCB_ENV === '1' &&
+      process.env.OMNIROUTE_SERVER_ROUTING !== '0'
+    ) {
+      return {
+        kind: 'info',
+        options: [
+          {
+            value: 'auto',
+            label: 'OmniRoute 自动路由',
+            description: 'OmniRoute 根据任务决定路由池、上下文、模型和推理强度',
+          },
+        ],
+        lines: buildAutoInfoLines(),
+      }
+    }
     return {
-      kind: 'info',
-      options: [],
+      kind: 'models',
+      options: [
+        {
+          value: 'hermes-score',
+          label: '自动评分',
+          description: 'OmniRoute 自动选模',
+        },
+        {
+          value: 'cx/gpt-5.6-luna',
+          label: 'CX · gpt-5.6-luna',
+          description: 'CX Luna',
+        },
+        {
+          value: 'cx/gpt-5.6-terra',
+          label: 'CX · gpt-5.6-terra',
+          description: 'CX Terra',
+        },
+        {
+          value: 'cx/gpt-5.6-sol',
+          label: 'CX · gpt-5.6-sol',
+          description: 'CX Sol',
+        },
+      ],
       lines: buildAutoInfoLines(),
     }
   }
@@ -489,45 +532,51 @@ function buildAutoInfoLines(): string[] {
   ]
 }
 
+<<<<<<< Updated upstream
+=======
 function fallbackGroups(): ProviderModelGroup[] {
-  return [
-    {
-      id: 'oc',
-      label: 'OpenCode',
-      models: [
-        ocModelToOption(
-          `oc/${process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'}`,
-        ),
-      ],
-    },
-  ]
+  const models = currentFreeOpenCodeModels()
+  return models.length
+    ? [
+        {
+          id: 'oc',
+          label: 'OpenCode',
+          models: models.map(model => ocModelToOption(`oc/${model}`)),
+        },
+      ]
+    : []
 }
 
+>>>>>>> Stashed changes
 let cache: { ts: number; groups: ProviderModelGroup[] } | null = null
 
-/** Test-only: clear the 24h in-memory group cache. */
+/** Test-only: clear the 8h in-memory group cache. */
 export function resetProviderModelGroupsCache(): void {
   cache = null
 }
 
-/** Direct-provider groups with a 24h in-memory cache. */
+/** Direct-provider groups with an 8h in-memory cache. */
 export async function getProviderModelGroups(): Promise<ProviderModelGroup[]> {
   const now = Date.now()
   if (cache && now - cache.ts < CACHE_TTL_MS) return cache.groups
   const gatewayIds: string[] = []
   const ccbIds = embeddedModelIds()
   let groups: ProviderModelGroup[]
+  // OpenCode free ids come from the shared 8h cache; nothing is guessed.
+  const ocIds = currentFreeOpenCodeModels().map(model => `oc/${model}`)
   if (gatewayIds.length === 0 && ccbIds.length === 0) {
-    groups = fallbackGroups()
+    groups = buildGroups(ocIds)
   } else {
+<<<<<<< Updated upstream
+    groups = buildGroups([...gatewayIds, ...ccbIds, ...ocIds])
+=======
     const ids = [...gatewayIds, ...ccbIds]
-    // Keep the default OpenCode free model selectable.
+    const freeModels = currentFreeOpenCodeModels()
     if (gatewayIds.length === 0) {
-      ids.push(
-        `oc/${process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'}`,
-      )
+      ids.push(...freeModels.map(model => `oc/${model}`))
     }
     groups = buildGroups(ids)
+>>>>>>> Stashed changes
   }
   cache = { ts: now, groups }
   return groups
@@ -603,6 +652,18 @@ export async function getProviderModelOptions(
  * (Codex login only), CCB providers, registered custom providers, and
  * finally "添加供应商". */
 export async function getProviderList(): Promise<ModelOption[]> {
+  if (
+    process.env.CCB_ENV === '1' &&
+    process.env.OMNIROUTE_SERVER_ROUTING !== '0'
+  ) {
+    return [
+      {
+        value: PROVIDER_AUTO,
+        label: 'OmniRoute 自动路由',
+        description: '任务理解层负责路由池、上下文、模型和推理强度',
+      },
+    ]
+  }
   const codexLoggedIn = isCodexLoggedIn()
   const embedded = embeddedProviderIds().length
   const registered = getRegisteredProviders().filter(
@@ -611,6 +672,11 @@ export async function getProviderList(): Promise<ModelOption[]> {
   const totalManaged = embedded + registered.length
 
   return [
+    {
+      value: PROVIDER_AUTO,
+      label: 'Hermes-Score (自动)',
+      description: 'OmniRoute 自动评分选模',
+    },
     {
       value: PROVIDER_DEFAULT,
       label: '默认模式',

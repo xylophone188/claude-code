@@ -146,9 +146,10 @@ export function ModelPicker({
     focusedValue !== undefined &&
     focusedValue !== NO_PREFERENCE &&
     marked1MValues.has(focusedValue.replace(/\[1m\]/i, ''));
-  const focusedSupportsEffort = focusedModel ? modelSupportsEffort(focusedModel) : false;
-  const focusedSupportsXhigh = focusedModel ? modelSupportsXhighEffort(focusedModel) : false;
-  const focusedSupportsMax = focusedModel ? modelSupportsMaxEffort(focusedModel) : false;
+  const omniRouteOwnsPolicy = process.env.CCB_ENV === '1' && process.env.OMNIROUTE_SERVER_ROUTING !== '0';
+  const focusedSupportsEffort = !omniRouteOwnsPolicy && focusedModel ? modelSupportsEffort(focusedModel) : false;
+  const focusedSupportsXhigh = !omniRouteOwnsPolicy && focusedModel ? modelSupportsXhighEffort(focusedModel) : false;
+  const focusedSupportsMax = !omniRouteOwnsPolicy && focusedModel ? modelSupportsMaxEffort(focusedModel) : false;
   const focusedDefaultEffort = getDefaultEffortLevelForOption(focusedValue);
   // Clamp display when selected effort isn't supported by the focused model.
   // resolveAppliedEffort() does the same downgrade at API-send time.

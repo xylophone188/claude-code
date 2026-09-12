@@ -1,0 +1,15 @@
+- generic [active] [ref=f20e1]:
+  - link "Skip to content" [ref=f20e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f20e3]:
+    - generic [aria-hidden] [ref=f20e4]: "404"
+    - heading "Page not found" [level=1] [ref=f20e5]
+    - paragraph [ref=f20e6]: The page you're looking for doesn't exist or has been moved.
+    - generic [ref=f20e7]:
+      - link "Return to dashboard" [ref=f20e8] [cursor=pointer]:
+        - /url: /dashboard
+        - text: Go to Dashboard
+      - link "Open system status page" [ref=f20e9] [cursor=pointer]:
+        - /url: /status
+        - text: System Status
+  - alert [ref=f20e10]

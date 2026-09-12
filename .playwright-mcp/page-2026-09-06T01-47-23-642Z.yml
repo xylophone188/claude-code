@@ -1,0 +1,35 @@
+- generic [ref=f1e3]:
+  - navigation [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - button "Dashboard" [ref=f1e7]
+        - generic [ref=f1e11]: /
+        - generic [ref=f1e12]: session_5721acdafbc1409a92a1387e50f9b252
+        - generic [ref=f1e13]: ACP
+      - generic [ref=f1e14]:
+        - button "Toggle theme" [ref=f1e15]
+        - button "No Token" [ref=f1e17]
+        - button "Identity" [ref=f1e22]
+  - generic [ref=f1e28]:
+    - heading "session_5721acdafbc1409a92a1387e50f9b252" [level=1] [ref=f1e29]
+    - generic [ref=f1e31]:
+      - link "← Dashboard" [ref=f1e33] [cursor=pointer]:
+        - /url: /code/
+      - generic [ref=f1e34]:
+        - generic [ref=f1e35]:
+          - heading "session_5721acdafbc1409a92a1387e50f9b252" [level=2] [ref=f1e36]
+          - generic [ref=f1e37]:
+            - generic [ref=f1e38]: idle
+            - generic [ref=f1e39]: 2026/9/6 09:38:25
+        - generic [ref=f1e40]:
+          - button "Session info" [ref=f1e41]
+          - button "Tasks" [ref=f1e44]
+    - log [ref=f1e45]:
+      - generic [ref=f1e49]:
+        - heading "开始对话" [level=3] [ref=f1e50]
+        - paragraph [ref=f1e51]: 输入消息开始聊天
+    - generic [ref=f1e52]:
+      - generic [ref=f1e55]:
+        - textbox "输入消息..." [ref=f1e56]
+        - button [disabled] [ref=f1e57]
+      - generic [ref=f1e61]: Enter 发送，Shift+Enter 换行

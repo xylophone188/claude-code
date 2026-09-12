@@ -125,7 +125,7 @@ const call: LocalCommandCall = async (args, _context) => {
     if (!_context.canUseTool) {
       return { type: 'text', value: '当前会话不能启动后台 Workflow。' }
     }
-    const { getWorkflowService } = await import('../workflow/service.js')
+    const { getWorkflowService } = await import('../workflow/serviceRef.js')
     const { runId } = await getWorkflowService().launch(
       {
         mode: 'advisor',

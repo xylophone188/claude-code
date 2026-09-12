@@ -9,7 +9,9 @@ let launchInput: unknown
 let configDirectory: string
 let previousConfigDirectory: string | undefined
 
-mock.module('src/workflow/service.js', () => ({
+// Mock the serviceRef seam (not service.js itself) so workflow tests
+// importing '../service.js' directly are not polluted process-globally.
+mock.module('src/workflow/serviceRef.js', () => ({
   getWorkflowService: () => ({
     launch: async (input: unknown) => {
       launchInput = input

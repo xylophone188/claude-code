@@ -2,8 +2,9 @@
  * OmniRoute adapter — replaces the legacy ccbRouter runtime path.
  *
  * Direct-route resolution and account management go through the OmniRoute
- * OpenAI-compatible gateway. Configuration priority is OMNIRUTE_URL,
- * OMNIROUTE_BASE_URL, OPENAI_BASE_URL, then local OmniRoute on port 20131.
+ * OpenAI-compatible gateway. CCB enters through Headroom; Headroom forwards to
+ * OmniRoute. Configuration priority is CCB_HEADROOM_BASE_URL, OMNIRUTE_URL,
+ * OMNIROUTE_BASE_URL, OPENAI_BASE_URL, then local Headroom on port 8787.
  */
 
 import type { ProviderConfig } from '../providerRegistry/types.js'
@@ -38,10 +39,11 @@ let cachedConfig: OmniRouteConfig | null | undefined
 export function getOmniRouteConfig(): OmniRouteConfig | null {
   if (cachedConfig !== undefined) return cachedConfig
   const baseUrl =
+    process.env.CCB_HEADROOM_BASE_URL ??
     process.env.OMNIRUTE_URL ??
     process.env.OMNIROUTE_BASE_URL ??
     process.env.OPENAI_BASE_URL ??
-    'http://127.0.0.1:20131/v1'
+    'http://127.0.0.1:8787/v1'
   const apiKey =
     process.env.OMNIRUTE_API_KEY ?? process.env.OMNIROUTE_API_KEY ?? ''
   cachedConfig = {
@@ -75,7 +77,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|hermes-score$)/i.test(raw) ||
+    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|ccb-main$)/i.test(raw) ||
     (raw.includes('/') &&
       !/^(?:advisor|lite|full|ultra|review|smart|opus)$/i.test(raw))
   if (!isGatewayRoute) return []
@@ -95,12 +97,12 @@ function resolveViaOmniRoute(
   // Strip ccb/ prefix. Legacy CCB's bare auto/race aliases are client-side
   // concepts; map them to OmniRoute's server-side smart combo.
   const stripped = trimmed.replace(/^ccb\//i, '')
-  const modelSpec = /^(?:auto|race|hermes-score)$/i.test(stripped)
+  const modelSpec = /^(?:auto|race|ccb-main)$/i.test(stripped)
     ? 'auto/smart'
     : stripped
 
   // Handle auto/race specs
-  if (/^(?:auto|race|hermes-score)(?:\/|$)/i.test(modelSpec)) {
+  if (/^(?:auto|race|ccb-main)(?:\/|$)/i.test(modelSpec)) {
     if (config.serverSideRouting) {
       // OmniRoute handles routing server-side
       return [
@@ -109,6 +111,7 @@ function resolveViaOmniRoute(
           baseURL: config.baseUrl,
           model: modelSpec,
           apiKey: config.apiKey,
+          headers: { 'x-omniroute-client': 'ccb' },
           kind: 'provider',
         },
       ]
@@ -120,6 +123,7 @@ function resolveViaOmniRoute(
         baseURL: config.baseUrl,
         model: modelSpec,
         apiKey: config.apiKey,
+        headers: { 'x-omniroute-client': 'ccb' },
         kind: 'provider',
       },
     ]
@@ -132,6 +136,7 @@ function resolveViaOmniRoute(
       baseURL: config.baseUrl,
       model: modelSpec,
       apiKey: config.apiKey,
+      headers: { 'x-omniroute-client': 'ccb' },
       kind: 'provider',
     },
   ]
@@ -246,9 +251,18 @@ export type RaceErrorCategory =
 export function classifyErrorStatus(
   status: number | undefined,
   aborted = false,
+  errorMessage = '',
 ): RaceErrorCategory {
   if (aborted) return 'transient'
   if (status === undefined) return 'unknown'
+  if (
+    status === 401 &&
+    /credits?\s+exhausted|quota\s+exhausted|all\s+\d+\s+connection/i.test(
+      errorMessage,
+    )
+  ) {
+    return 'rate_limit'
+  }
   if (status === 429) return 'rate_limit'
   if (status === 401 || status === 403) return 'auth'
   if (status === 503 || status === 502 || status === 504) return 'transient'
@@ -269,6 +283,10 @@ export interface OmniRouteReceipt {
   fallbackAttempts?: number
   compression?: string
   decision?: string
+  cognitivePool?: string
+  cognitiveEffort?: string
+  contextProject?: string
+  contextSources?: string
 }
 
 let lastOmniRouteReceipt: OmniRouteReceipt | null = null
@@ -301,6 +319,10 @@ export function parseOmniRouteReceipt(
     fallbackAttempts: number('x-omniroute-fallback-attempts'),
     compression: value('x-omniroute-compression'),
     decision: value('x-omniroute-decision'),
+    cognitivePool: value('x-omniroute-cognitive-pool'),
+    cognitiveEffort: value('x-omniroute-cognitive-effort'),
+    contextProject: value('x-omniroute-context-project'),
+    contextSources: value('x-omniroute-context-sources'),
   }
   if (!Object.values(receipt).some(v => v !== undefined)) return null
   lastOmniRouteReceipt = receipt
@@ -354,6 +376,17 @@ export interface ErrorClassification {
   status?: number
   retryable: boolean
   scope: 'provider' | 'model' | 'account'
+}
+
+export function isGatewayUnavailable(error: unknown): boolean {
+  const status = (error as { status?: number } | undefined)?.status
+  const message = String(
+    (error as { message?: string } | undefined)?.message ?? '',
+  )
+  return (
+    status === 502 &&
+    /all gateway backends unavailable|gateway_unavailable/i.test(message)
+  )
 }
 
 export function classifyError(error: unknown): ErrorClassification {

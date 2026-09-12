@@ -617,7 +617,11 @@ function resolveViaOmniRoute(
     kind: 'provider',
   }
 
-  if (/^(?:auto\/|race\/|auto\/smart$|ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score))/.test(modelSpec)) {
+  if (
+    /^(?:auto\/|race\/|auto\/smart$|ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score))/.test(
+      modelSpec,
+    )
+  ) {
     return [route]
   }
 

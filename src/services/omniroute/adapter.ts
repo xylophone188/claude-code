@@ -298,6 +298,14 @@ export function buildOmniRouteRequestHeaders(
 
 // ── Configuration ──────────────────────────────────────────────────
 
+/**
+ * Label CCB sends to OmniRoute for its main (bare/profile) entry. Configurable
+ * via CCB_ROUTE_NAME; defaults to ccb-main so no route label is hardcoded.
+ */
+export function getCcbRouteName(): string {
+  return process.env.CCB_ROUTE_NAME?.trim() || 'ccb-main'
+}
+
 export interface OmniRouteConfig {
   baseUrl: string
   apiKey: string
@@ -353,7 +361,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|hermes-score$|advisor$|review$|ultra$|smart$|opus$)/i.test(
+    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|advisor$|review$|ultra$|smart$|opus$)/i.test(
       raw,
     ) ||
     /^(?:ccb\/|ccb-main$)/i.test(raw) ||
@@ -587,14 +595,14 @@ function resolveViaOmniRoute(
     if (explicitRoutes) return explicitRoutes
   }
   const modelSpec = /^(?:ccb-main|auto|race)$/i.test(stripped)
-    ? 'auto/smart'
+    ? getCcbRouteName()
     : /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
       ? 'ccb-plan'
       : /^review$/i.test(stripped)
         ? 'ccb-review'
         : /^work$/i.test(stripped)
           ? 'ccb-coding'
-          : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
+          : /^(?:auto|race|chat)(?:\/|$)/i.test(stripped)
             ? 'ccb-chat'
             : stripped
 
@@ -614,7 +622,7 @@ function resolveViaOmniRoute(
   }
 
   return [route]
-}}
+}
 
 // ── Provider Model Listing ─────────────────────────────────────────
 
@@ -819,8 +827,6 @@ export function parseOmniRouteReceipt(
     fallbackAttempts: number('x-omniroute-fallback-attempts'),
     compression: value('x-omniroute-compression'),
     decision: value('x-omniroute-decision'),
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     cognitiveTask: value('x-omniroute-cognitive-task'),
     cognitivePool: value('x-omniroute-cognitive-pool'),
     cognitiveContext: value('x-omniroute-cognitive-context'),
@@ -927,7 +933,7 @@ export function updateCcbRouteFromReceipt(
     activeCcbRoute.proof = 'direct'
     return
   }
-  // For A (omniroute/hermes-score) and B (omniroute/9router)
+  // For A (omniroute/ccb-chat, CCB main) and B (omniroute/9router)
   if (receipt.provider && receipt.model) {
     // Verify if receipt contains explicit 9router evidence for route B
     const has9routerEvidence =
@@ -980,13 +986,11 @@ export interface ErrorClassification {
 
 export function isGatewayUnavailable(error: unknown): boolean {
   const status = (error as { status?: number } | undefined)?.status
+  if (status !== 502) return false
   const message = String(
     (error as { message?: string } | undefined)?.message ?? '',
   )
-  return (
-    status === 502 &&
-    /all gateway backends unavailable|gateway_unavailable/i.test(message)
-  )
+  return /all gateway backends unavailable|gateway_unavailable/i.test(message)
 }
 
 export function classifyError(error: unknown): ErrorClassification {
@@ -1031,20 +1035,11 @@ export function classifyError(error: unknown): ErrorClassification {
 }
 
 /**
- * OmniRoute's hermes-score-front emits a 502 with code `gateway_unavailable`
+ * OmniRoute emits a 502 with code `gateway_unavailable`
  * once every model/port fallback is exhausted — the whole local account pool
  * is down. The pool recovers on its own once the backends restart, so CCB
  * treats this as a longer-retryable failure instead of a fatal provider error.
  */
-export function isGatewayUnavailable(error: unknown): boolean {
-  const status = (error as { status?: number } | undefined)?.status
-  if (status !== 502) return false
-  const message = String(
-    (error as { message?: string } | undefined)?.message ?? '',
-  )
-  return /all gateway backends unavailable|gateway_unavailable/i.test(message)
-}
-
 export function isRetryable(error: unknown): boolean {
   return [
     'rate_limit',

@@ -3,19 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+  buildOmniRouteRequestHeaders,
+  chooseAccounts,
   classifyErrorStatus,
-=======
-  buildOmniRouteRequestHeaders,
-  chooseAccounts,
   getActiveCcbRoute,
->>>>>>> Stashed changes
-=======
-  buildOmniRouteRequestHeaders,
-  chooseAccounts,
-  getActiveCcbRoute,
->>>>>>> Stashed changes
   getLastOmniRouteReceipt,
   parseOmniRouteReceipt,
   resetOmniRouteConfig,
@@ -26,11 +17,7 @@ import { _invalidateProviderCache } from '../providerRegistry/loader.js'
 import type { ProviderConfig } from '../providerRegistry/types.js'
 
 interface RouteEnvironment {
-  OMNIROUTE_BASE_URL: string | undefined
-  OMNIROUTE_9ROUTER_MODEL: string | undefined
-  NINEROUTER_BASE_URL: string | undefined
-  NINEROUTER_MODEL: string | undefined
-  NINEROUTER_API_KEY: string | undefined
+  [name: string]: string | undefined
 }
 
 function restoreRouteEnv(previous: RouteEnvironment): void {
@@ -40,7 +27,6 @@ function restoreRouteEnv(previous: RouteEnvironment): void {
   }
   resetOmniRouteConfig()
 }
-<<<<<<< Updated upstream
 
 describe('classifyErrorStatus', () => {
   const CREDITS_EXHAUSTED =
@@ -70,49 +56,33 @@ describe('classifyErrorStatus', () => {
 })
 
 describe('OmniRoute receipt', () => {
-<<<<<<< Updated upstream
-  it('routes ccb-main through the OmniRoute gateway', () => {
-    const previousHeadroom = process.env.CCB_HEADROOM_BASE_URL
-    const previous = process.env.OMNIROUTE_BASE_URL
+  it('routes ccb-main through the preferred OmniRoute ingress', () => {
+    const previous = {
+      CCB_HEADROOM_BASE_URL: process.env.CCB_HEADROOM_BASE_URL,
+      CCB_ROUTE_NAME: process.env.CCB_ROUTE_NAME,
+      OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL,
+    }
     process.env.CCB_HEADROOM_BASE_URL = 'http://127.0.0.1:8787/v1'
+    process.env.CCB_ROUTE_NAME = 'custom-ccb-route'
     process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20131/v1'
     resetOmniRouteConfig()
-    const routes = resolveDirectRoutes('ccb-main')
-    expect(routes).toHaveLength(1)
-    expect(routes[0]).toMatchObject({
-      providerId: 'omniroute',
-      baseURL: 'http://127.0.0.1:8787/v1',
-      model: 'auto/smart',
-      headers: { 'x-omniroute-client': 'ccb' },
-      kind: 'provider',
-    })
-    if (previous === undefined) delete process.env.OMNIROUTE_BASE_URL
-    else process.env.OMNIROUTE_BASE_URL = previous
-    if (previousHeadroom === undefined) delete process.env.CCB_HEADROOM_BASE_URL
-    else process.env.CCB_HEADROOM_BASE_URL = previousHeadroom
-=======
-  it('sends identity metadata without selecting project or Context provider', () => {
-    expect(
-      buildOmniRouteRequestHeaders({
-        workspace: '/work/ccb\nignored',
-        gitRemote: 'https://token:secret@example.test/org/ccb.git?key=value',
-        gitRevision: 'A'.repeat(40),
-        repo: 'ccb',
-        mission: 'modify CCB source',
-        sessionId: 'session-1',
-      }),
-    ).toEqual({
-      'X-OmniRoute-Client': 'ccb',
-      'X-OmniRoute-Workspace': 'uri:%2Fwork%2Fccb%20ignored',
-      'X-OmniRoute-Git-Remote': 'https://example.test/org/ccb.git',
-      'X-OmniRoute-Git-Revision': 'a'.repeat(40),
-      'X-OmniRoute-Repo': 'ccb',
-      'X-OmniRoute-Mission': 'uri:modify%20CCB%20source',
-      'X-OmniRoute-Session-Id': 'session-1',
-    })
-=======
+    try {
+      expect(resolveDirectRoutes('ccb-main')).toEqual([
+        expect.objectContaining({
+          providerId: 'omniroute',
+          baseURL: 'http://127.0.0.1:8787/v1',
+          model: 'custom-ccb-route',
+          routeId: 'omniroute/ccb-chat',
+          receiptPolicy: 'omniroute',
+          headers: expect.objectContaining({ 'X-OmniRoute-Client': 'ccb' }),
+          kind: 'provider',
+        }),
+      ])
+    } finally {
+      restoreRouteEnv(previous)
+    }
+  })
 
-describe('OmniRoute receipt', () => {
   it('sends identity metadata without selecting project or Context provider', () => {
     expect(
       buildOmniRouteRequestHeaders({
@@ -132,7 +102,6 @@ describe('OmniRoute receipt', () => {
       'X-OmniRoute-Mission': 'uri:modify%20CCB%20source',
       'X-OmniRoute-Session-Id': 'session-1',
     })
->>>>>>> Stashed changes
   })
 
   it('omits malformed Git revisions', () => {
@@ -160,48 +129,53 @@ describe('OmniRoute receipt', () => {
     )
   })
 
-  it('pins every legacy alias to the CCB chat OmniRoute route', () => {
-    const previous = process.env.OMNIROUTE_BASE_URL
+  it('maps CCB aliases to their current OmniRoute route labels', () => {
+    const previous = {
+      CCB_HEADROOM_BASE_URL: process.env.CCB_HEADROOM_BASE_URL,
+      CCB_ROUTE_NAME: process.env.CCB_ROUTE_NAME,
+      OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL,
+    }
+    delete process.env.CCB_HEADROOM_BASE_URL
+    delete process.env.CCB_ROUTE_NAME
     process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20128/v1'
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     resetOmniRouteConfig()
     try {
-      for (const model of [
-        'auto',
-        'race',
-        'auto/fast',
-        'ccb/auto',
-        'hermes-score',
+      for (const [model, routeModel] of [
+        ['auto', 'ccb-main'],
+        ['race', 'ccb-main'],
+        ['auto/fast', 'ccb-chat'],
+        ['ccb/auto', 'ccb-main'],
       ]) {
         const routes = resolveDirectRoutes(model)
-        expect(routes).toHaveLength(1)
-        expect(routes[0]).toMatchObject({
-          providerId: 'omniroute',
-          baseURL: 'http://127.0.0.1:20128/v1',
-          model: 'ccb-chat',
-          routeId: 'omniroute/ccb-chat',
-          receiptPolicy: 'omniroute',
-          kind: 'provider',
-        })
+        expect(routes).toEqual([
+          expect.objectContaining({
+            providerId: 'omniroute',
+            baseURL: 'http://127.0.0.1:20128/v1',
+            model: routeModel,
+            routeId: 'omniroute/ccb-chat',
+            receiptPolicy: 'omniroute',
+            kind: 'provider',
+          }),
+        ])
       }
+      expect(resolveDirectRoutes('hermes-score')).toEqual([])
     } finally {
-      if (previous === undefined) delete process.env.OMNIROUTE_BASE_URL
-      else process.env.OMNIROUTE_BASE_URL = previous
-      resetOmniRouteConfig()
+      restoreRouteEnv(previous)
     }
   })
 
-  it('resolves the three stable routes with distinct transport metadata', () => {
+  it('resolves CCB, gateway 9router, and direct 9router routes', () => {
     const previous = {
+      CCB_HEADROOM_BASE_URL: process.env.CCB_HEADROOM_BASE_URL,
+      OMNIRUTE_URL: process.env.OMNIRUTE_URL,
       OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL,
       OMNIROUTE_9ROUTER_MODEL: process.env.OMNIROUTE_9ROUTER_MODEL,
       NINEROUTER_BASE_URL: process.env.NINEROUTER_BASE_URL,
       NINEROUTER_MODEL: process.env.NINEROUTER_MODEL,
       NINEROUTER_API_KEY: process.env.NINEROUTER_API_KEY,
     }
+    delete process.env.CCB_HEADROOM_BASE_URL
+    delete process.env.OMNIRUTE_URL
     process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20128/v1'
     process.env.OMNIROUTE_9ROUTER_MODEL = '9router/primary/sonnet'
     process.env.NINEROUTER_BASE_URL = 'http://127.0.0.1:20130/v1'
@@ -209,10 +183,10 @@ describe('OmniRoute receipt', () => {
     process.env.NINEROUTER_API_KEY = 'direct-key'
     resetOmniRouteConfig()
     try {
-      expect(resolveDirectRoutes('hermes-score')[0]).toMatchObject({
+      expect(resolveDirectRoutes('ccb-main')[0]).toMatchObject({
         providerId: 'omniroute',
         baseURL: 'http://127.0.0.1:20128/v1',
-        model: 'ccb-chat',
+        model: 'ccb-main',
         routeId: 'omniroute/ccb-chat',
         receiptPolicy: 'omniroute',
       })
@@ -245,12 +219,16 @@ describe('OmniRoute receipt', () => {
 
   it('fails closed for invalid route-specific configuration', () => {
     const previous = {
+      CCB_HEADROOM_BASE_URL: process.env.CCB_HEADROOM_BASE_URL,
+      OMNIRUTE_URL: process.env.OMNIRUTE_URL,
       OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL,
       OMNIROUTE_9ROUTER_MODEL: process.env.OMNIROUTE_9ROUTER_MODEL,
       NINEROUTER_BASE_URL: process.env.NINEROUTER_BASE_URL,
       NINEROUTER_MODEL: process.env.NINEROUTER_MODEL,
       NINEROUTER_API_KEY: process.env.NINEROUTER_API_KEY,
     }
+    delete process.env.CCB_HEADROOM_BASE_URL
+    delete process.env.OMNIRUTE_URL
     process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20128/v1'
     delete process.env.OMNIROUTE_9ROUTER_MODEL
     delete process.env.NINEROUTER_BASE_URL
@@ -281,12 +259,13 @@ describe('OmniRoute receipt', () => {
 
   it('does not fall back from a route-specific configuration failure', () => {
     const previous = {
+      CCB_HEADROOM_BASE_URL: process.env.CCB_HEADROOM_BASE_URL,
+      OMNIRUTE_URL: process.env.OMNIRUTE_URL,
       OMNIROUTE_BASE_URL: process.env.OMNIROUTE_BASE_URL,
       OMNIROUTE_9ROUTER_MODEL: process.env.OMNIROUTE_9ROUTER_MODEL,
-      NINEROUTER_BASE_URL: process.env.NINEROUTER_BASE_URL,
-      NINEROUTER_MODEL: process.env.NINEROUTER_MODEL,
-      NINEROUTER_API_KEY: process.env.NINEROUTER_API_KEY,
     }
+    delete process.env.CCB_HEADROOM_BASE_URL
+    delete process.env.OMNIRUTE_URL
     process.env.OMNIROUTE_BASE_URL = 'http://127.0.0.1:20128/v1'
     delete process.env.OMNIROUTE_9ROUTER_MODEL
     resetOmniRouteConfig()

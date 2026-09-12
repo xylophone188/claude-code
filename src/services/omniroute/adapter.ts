@@ -576,71 +576,27 @@ function resolveViaOmniRoute(
   // `provider/model` (no `ccb/` prefix) still resolves directly.
   const isCcbPrefixed = /^ccb\//i.test(trimmed)
   const stripped = trimmed.replace(/^ccb\//i, '')
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const modelSpec = /^(?:auto|race|ccb-main)$/i.test(stripped)
+  if (/^omniroute\/9router$/i.test(trimmed)) {
+    return [resolveOmniRoute9RouterRoute(config)]
+  }
+  if (/^9router\/direct$/i.test(trimmed)) {
+    return [resolveDirect9RouterRoute(config)]
+  }
+  if (!isCcbPrefixed) {
+    const explicitRoutes = resolveExplicitProviderRoutes(stripped)
+    if (explicitRoutes) return explicitRoutes
+  }
+  const modelSpec = /^(?:ccb-main|auto|race)$/i.test(stripped)
     ? 'auto/smart'
-    : stripped
-
-  // Handle auto/race specs
-  if (/^(?:auto|race|ccb-main)(?:\/|$)/i.test(modelSpec)) {
-    if (config.serverSideRouting) {
-      // OmniRoute handles routing server-side
-      return [
-        {
-          providerId: 'omniroute',
-          baseURL: config.baseUrl,
-          model: modelSpec,
-          apiKey: config.apiKey,
-          headers: { 'x-omniroute-client': 'ccb' },
-          kind: 'provider',
-        },
-      ]
-    }
-    // Client-side: return the spec as-is and let the caller iterate
-    return [
-      {
-        providerId: 'omniroute',
-        baseURL: config.baseUrl,
-        model: modelSpec,
-        apiKey: config.apiKey,
-        headers: { 'x-omniroute-client': 'ccb' },
-        kind: 'provider',
-      },
-    ]
-  }
-
-  // Regular provider/model — pass through to OmniRoute
-  return [
-    {
-      providerId: 'omniroute',
-      baseURL: config.baseUrl,
-      model: modelSpec,
-      apiKey: config.apiKey,
-      headers: { 'x-omniroute-client': 'ccb' },
-      kind: 'provider',
-    },
-  ]
-=======
-  if (/^omniroute\/9router$/i.test(trimmed)) {
-    return [resolveOmniRoute9RouterRoute(config)]
-  }
-  if (/^9router\/direct$/i.test(trimmed)) {
-    return [resolveDirect9RouterRoute(config)]
-  }
-  if (!isCcbPrefixed) {
-    const explicitRoutes = resolveExplicitProviderRoutes(stripped)
-    if (explicitRoutes) return explicitRoutes
-  }
-  const modelSpec = /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
-    ? 'ccb-plan'
-    : /^(?:review)$/i.test(stripped)
-      ? 'ccb-review'
-      : /^(?:work)$/i.test(stripped)
-        ? 'ccb-coding'
-        : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
-          ? 'ccb-chat'
-          : stripped
+    : /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
+      ? 'ccb-plan'
+      : /^review$/i.test(stripped)
+        ? 'ccb-review'
+        : /^work$/i.test(stripped)
+          ? 'ccb-coding'
+          : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
+            ? 'ccb-chat'
+            : stripped
 
   const route: DirectRoute = {
     providerId: 'omniroute',
@@ -653,73 +609,12 @@ function resolveViaOmniRoute(
     kind: 'provider',
   }
 
-  // Handle auto/race specs
-  if (
-    /^ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score)$/i.test(
-      modelSpec,
-    )
-  ) {
-    if (config.serverSideRouting) {
-      // OmniRoute handles routing server-side
-      return [route]
-    }
-    // Client-side: return the spec as-is and let the caller iterate
+  if (/^(?:auto\/|race\/|auto\/smart$|ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score))/.test(modelSpec)) {
     return [route]
   }
 
-  // Regular provider/model — pass through to OmniRoute
   return [route]
->>>>>>> Stashed changes
-=======
-  if (/^omniroute\/9router$/i.test(trimmed)) {
-    return [resolveOmniRoute9RouterRoute(config)]
-  }
-  if (/^9router\/direct$/i.test(trimmed)) {
-    return [resolveDirect9RouterRoute(config)]
-  }
-  if (!isCcbPrefixed) {
-    const explicitRoutes = resolveExplicitProviderRoutes(stripped)
-    if (explicitRoutes) return explicitRoutes
-  }
-  const modelSpec = /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
-    ? 'ccb-plan'
-    : /^(?:review)$/i.test(stripped)
-      ? 'ccb-review'
-      : /^(?:work)$/i.test(stripped)
-        ? 'ccb-coding'
-        : /^(?:auto|race|hermes-score|chat)(?:\/|$)/i.test(stripped)
-          ? 'ccb-chat'
-          : stripped
-
-  const route: DirectRoute = {
-    providerId: 'omniroute',
-    baseURL: config.baseUrl,
-    model: modelSpec,
-    apiKey: config.apiKey,
-    routeId: 'omniroute/ccb-chat',
-    receiptPolicy: 'omniroute',
-    headers: buildOmniRouteRequestHeaders(),
-    kind: 'provider',
-  }
-
-  // Handle auto/race specs
-  if (
-    /^ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score)$/i.test(
-      modelSpec,
-    )
-  ) {
-    if (config.serverSideRouting) {
-      // OmniRoute handles routing server-side
-      return [route]
-    }
-    // Client-side: return the spec as-is and let the caller iterate
-    return [route]
-  }
-
-  // Regular provider/model — pass through to OmniRoute
-  return [route]
->>>>>>> Stashed changes
-}
+}}
 
 // ── Provider Model Listing ─────────────────────────────────────────
 

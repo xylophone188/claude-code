@@ -127,6 +127,26 @@ describe('describeUpstreamFailure', () => {
     expect(failure.content).toContain('Bearer <redacted>')
   })
 
+  test('redacts hyphenated sk- keys and userinfo creds from upstream text', () => {
+    const key = 'sk-live-9f81e3d2c4b5a67890abcdef'
+    const failure = describeUpstreamFailure({
+      status: 500,
+      message: `500 key=${key} https://alice:secret@api.example.com/v1`,
+    })
+    expect(failure.content).not.toContain(key)
+    expect(failure.content).not.toContain('alice:secret')
+    expect(failure.content).toContain('sk-<redacted>')
+    expect(failure.content).toContain('https://<redacted>@api.example.com/v1')
+  })
+
+  test('leaves non-credential URL authorities intact', () => {
+    const failure = describeUpstreamFailure({
+      status: 500,
+      message: '500 get https://api.example.com/v1 failed',
+    })
+    expect(failure.content).toContain('https://api.example.com/v1')
+  })
+
   test('caps untrusted upstream text so it cannot flood the transcript', () => {
     const failure = describeUpstreamFailure({
       status: 500,

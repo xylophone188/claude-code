@@ -548,10 +548,16 @@ function hasMeaningfulContent(text: string): boolean {
   return text.trim().length > 0 && !isInvalidProviderText(text)
 }
 
-/** Strip bearer tokens from an upstream error before it reaches the UI or the
- *  conversation history (which may be re-sent to a model). */
+/** Strip credentials from an untrusted upstream error before it reaches the UI
+ *  or the conversation history (which may be re-sent to a model). Upstream text
+ *  may embed raw API keys or userinfo credentials, not just Authorization
+ *  headers, so scrub key-shaped tokens and userinfo too. */
 function redactErrorText(text: string): string {
-  return text.replace(/Bearer\s+\S+/gi, 'Bearer <redacted>').slice(0, 200)
+  return text
+    .replace(/Bearer\s+\S+/gi, 'Bearer <redacted>')
+    .replace(/\bsk[-_][A-Za-z0-9_-]*[A-Za-z0-9]{8}\b/g, 'sk-<redacted>')
+    .replace(/([a-z]+:\/\/)[\w.-]+:[^\s@]+@/gi, '$1<redacted>@')
+    .slice(0, 200)
 }
 
 export function describeUpstreamFailure(error: unknown): {

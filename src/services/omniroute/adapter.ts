@@ -41,6 +41,16 @@ export interface DirectRoute {
  * Identity CCB can safely provide to OmniRoute. Project and context-provider
  * choice deliberately do not belong here: OmniRoute owns both decisions.
  */
+export type OmniRouteIntent =
+  | 'auto'
+  | 'chat'
+  | 'coding'
+  | 'plan'
+  | 'review'
+  | 'advisor'
+
+export type OmniRouteCostTier = 'economy' | 'balanced' | 'quality'
+
 export interface OmniRouteRequestMetadata {
   workspace?: string
   gitRemote?: string
@@ -48,6 +58,10 @@ export interface OmniRouteRequestMetadata {
   repo?: string
   mission?: string
   sessionId?: string
+  requestId?: string
+  intent?: OmniRouteIntent
+  deadlineMs?: number
+  costTier?: OmniRouteCostTier
 }
 
 const gitRemoteCache = new Map<string, string | null>()
@@ -228,6 +242,62 @@ function getGitRemoteForWorkspace(workspace: string): string | undefined {
   return remote
 }
 
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/
+const MIN_DEADLINE_MS = 1_000
+const MAX_DEADLINE_MS = 600_000
+const OMNIROUTE_INTENTS = new Set<OmniRouteIntent>([
+  'auto',
+  'chat',
+  'coding',
+  'plan',
+  'review',
+  'advisor',
+])
+const OMNIROUTE_COST_TIERS = new Set<OmniRouteCostTier>([
+  'economy',
+  'balanced',
+  'quality',
+])
+
+function normalizeRequestId(value: string | undefined): string | undefined {
+  const requestId = value?.trim()
+  return requestId && REQUEST_ID_PATTERN.test(requestId) ? requestId : undefined
+}
+
+function normalizeDeadlineMs(value: unknown): number | undefined {
+  const deadlineMs = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(deadlineMs) &&
+    deadlineMs >= MIN_DEADLINE_MS &&
+    deadlineMs <= MAX_DEADLINE_MS
+    ? deadlineMs
+    : undefined
+}
+
+function normalizeCostTier(
+  value: string | undefined,
+): OmniRouteCostTier | undefined {
+  const costTier = value?.trim().toLowerCase() as OmniRouteCostTier | undefined
+  return costTier && OMNIROUTE_COST_TIERS.has(costTier) ? costTier : undefined
+}
+
+function normalizeIntent(
+  value: string | undefined,
+): OmniRouteIntent | undefined {
+  const intent = value?.trim().toLowerCase() as OmniRouteIntent | undefined
+  return intent && OMNIROUTE_INTENTS.has(intent) ? intent : undefined
+}
+
+function getIntentForModel(spec: string): OmniRouteIntent | undefined {
+  const stripped = spec.trim().replace(/^ccb\//i, '')
+  if (/^advisor$/i.test(stripped)) return 'advisor'
+  if (/^(?:ccb-plan|plan|ultra|smart|opus)$/i.test(stripped)) return 'plan'
+  if (/^(?:ccb-review|review)$/i.test(stripped)) return 'review'
+  if (/^(?:ccb-coding|work)$/i.test(stripped)) return 'coding'
+  if (/^ccb-main$/i.test(stripped)) return 'auto'
+  if (/^(?:ccb-chat|auto|race|chat)(?:\/|$)/i.test(stripped)) return 'chat'
+  return undefined
+}
+
 /** Collect request-scoped identity without resolving a Context project. */
 export function getOmniRouteRequestMetadata(): OmniRouteRequestMetadata {
   let workspace: string | undefined
@@ -259,6 +329,8 @@ export function getOmniRouteRequestMetadata(): OmniRouteRequestMetadata {
     ),
     mission,
     sessionId,
+    deadlineMs: normalizeDeadlineMs(process.env.CCB_REQUEST_DEADLINE_MS),
+    costTier: normalizeCostTier(process.env.CCB_COST_TIER),
   }
 }
 
@@ -289,6 +361,13 @@ export function buildOmniRouteRequestHeaders(
     ['X-OmniRoute-Repo', headerValue(metadata.repo)],
     ['X-OmniRoute-Mission', encodeMissionHeader(metadata.mission)],
     ['X-OmniRoute-Session-Id', headerValue(metadata.sessionId)],
+    ['X-OmniRoute-Request-Id', normalizeRequestId(metadata.requestId)],
+    ['X-OmniRoute-Intent', normalizeIntent(metadata.intent)],
+    [
+      'X-OmniRoute-Deadline-Ms',
+      normalizeDeadlineMs(metadata.deadlineMs)?.toString(),
+    ],
+    ['X-OmniRoute-Cost-Tier', normalizeCostTier(metadata.costTier)],
   ]
   for (const [name, value] of values) {
     if (value) headers[name] = value
@@ -302,8 +381,17 @@ export function buildOmniRouteRequestHeaders(
  * Label CCB sends to OmniRoute for its main (bare/profile) entry. Configurable
  * via CCB_ROUTE_NAME; defaults to ccb-main so no route label is hardcoded.
  */
+const HERMES_SCORE_ROUTE = 'hermes-score'
+
+function isHermesScoreRoute(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === HERMES_SCORE_ROUTE
+}
+
 export function getCcbRouteName(): string {
-  return process.env.CCB_ROUTE_NAME?.trim() || 'ccb-main'
+  const configuredRoute = process.env.CCB_ROUTE_NAME?.trim()
+  return configuredRoute && !isHermesScoreRoute(configuredRoute)
+    ? configuredRoute
+    : 'ccb-main'
 }
 
 export interface OmniRouteConfig {
@@ -313,7 +401,34 @@ export interface OmniRouteConfig {
   serverSideRouting: boolean
 }
 
+export interface LocalFallbackConfig {
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
 let cachedConfig: OmniRouteConfig | null | undefined
+let cachedFallbackConfig: LocalFallbackConfig | null | undefined
+
+export function getLocalFallbackConfig(): LocalFallbackConfig | null {
+  if (cachedFallbackConfig !== undefined) return cachedFallbackConfig
+  const baseUrl = process.env.CCB_FALLBACK_BASE_URL?.trim()
+  const apiKey = process.env.CCB_FALLBACK_API_KEY?.trim()
+  if (!baseUrl || !apiKey) {
+    cachedFallbackConfig = null
+    return cachedFallbackConfig
+  }
+  const fallbackModel = process.env.CCB_FALLBACK_MODEL?.trim()
+  cachedFallbackConfig = {
+    baseUrl: baseUrl.replace(/\/+$/, ''),
+    apiKey,
+    model:
+      fallbackModel && !isHermesScoreRoute(fallbackModel)
+        ? fallbackModel
+        : 'ccb-main',
+  }
+  return cachedFallbackConfig
+}
 
 export function getOmniRouteConfig(): OmniRouteConfig | null {
   if (cachedConfig !== undefined) return cachedConfig
@@ -341,6 +456,7 @@ export function getOmniRouteConfig(): OmniRouteConfig | null {
 /** Reset cached config (for tests). */
 export function resetOmniRouteConfig(): void {
   cachedConfig = undefined
+  cachedFallbackConfig = undefined
 }
 
 // ── Route Resolution ───────────────────────────────────────────────
@@ -361,7 +477,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|advisor$|review$|ultra$|smart$|opus$)/i.test(
+    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|chat(?:\/|$)|advisor$|plan$|review$|work$|ultra$|smart$|opus$)/i.test(
       raw,
     ) ||
     /^(?:ccb\/|ccb-main$)/i.test(raw) ||
@@ -594,17 +710,22 @@ function resolveViaOmniRoute(
     const explicitRoutes = resolveExplicitProviderRoutes(stripped)
     if (explicitRoutes) return explicitRoutes
   }
-  const modelSpec = /^(?:ccb-main|auto|race)$/i.test(stripped)
-    ? getCcbRouteName()
-    : /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
-      ? 'ccb-plan'
-      : /^review$/i.test(stripped)
-        ? 'ccb-review'
-        : /^work$/i.test(stripped)
-          ? 'ccb-coding'
-          : /^(?:auto|race|chat)(?:\/|$)/i.test(stripped)
-            ? 'ccb-chat'
-            : stripped
+  // Strip the ccb/ prefix, then normalize the route label. hermes-score must
+  // never reach OmniRoute even via a ccb/ prefix.
+  if (isHermesScoreRoute(stripped)) return []
+  const modelSpec = /^ccb-main$/i.test(stripped)
+    ? 'ccb-main'
+    : /^(?:auto|race)$/i.test(stripped)
+      ? getCcbRouteName()
+      : /^(?:advisor|plan|ultra|smart|opus)$/i.test(stripped)
+        ? 'ccb-plan'
+        : /^review$/i.test(stripped)
+          ? 'ccb-review'
+          : /^work$/i.test(stripped)
+            ? 'ccb-coding'
+            : /^(?:auto|race|chat)(?:\/|$)/i.test(stripped)
+              ? 'ccb-chat'
+              : stripped
 
   const route: DirectRoute = {
     providerId: 'omniroute',
@@ -613,7 +734,11 @@ function resolveViaOmniRoute(
     apiKey: config.apiKey,
     routeId: 'omniroute/ccb-chat',
     receiptPolicy: 'omniroute',
-    headers: buildOmniRouteRequestHeaders(),
+    headers: buildOmniRouteRequestHeaders({
+      ...getOmniRouteRequestMetadata(),
+      requestId: crypto.randomUUID(),
+      intent: getIntentForModel(trimmed),
+    }),
     kind: 'provider',
   }
 
@@ -721,6 +846,18 @@ export type RaceErrorCategory =
   | 'timeout'
   | 'unknown'
 
+function isCreditExhausted401(
+  status: number | undefined,
+  message: string,
+): boolean {
+  return (
+    status === 401 &&
+    /credits?\s+exhausted|quota\s+exhausted|all\s+\d+\s+connection/i.test(
+      message,
+    )
+  )
+}
+
 export function classifyErrorStatus(
   status: number | undefined,
   aborted = false,
@@ -728,12 +865,7 @@ export function classifyErrorStatus(
 ): RaceErrorCategory {
   if (aborted) return 'transient'
   if (status === undefined) return 'unknown'
-  if (
-    status === 401 &&
-    /credits?\s+exhausted|quota\s+exhausted|all\s+\d+\s+connection/i.test(
-      errorMessage,
-    )
-  ) {
+  if (isCreditExhausted401(status, errorMessage)) {
     return 'rate_limit'
   }
   if (status === 429) return 'rate_limit'
@@ -990,11 +1122,13 @@ export interface ErrorClassification {
 
 export function isGatewayUnavailable(error: unknown): boolean {
   const status = (error as { status?: number } | undefined)?.status
-  if (status !== 502) return false
+  if (status !== 502 && status !== 503 && status !== 504) return false
   const message = String(
     (error as { message?: string } | undefined)?.message ?? '',
   )
-  return /all gateway backends unavailable|gateway_unavailable/i.test(message)
+  return /all gateway backends unavailable|gateway_unavailable|all configured gateway backends failed/i.test(
+    message,
+  )
 }
 
 export function classifyError(error: unknown): ErrorClassification {
@@ -1004,8 +1138,10 @@ export function classifyError(error: unknown): ErrorClassification {
   ).toLowerCase()
   const name = (error as { name?: string } | undefined)?.name ?? ''
 
-  if (/provideroutputerror|invalid provider text|empty stream/i.test(name))
+  if (name === 'ProviderOutputError')
     return { reason: 'model_output', retryable: false, scope: 'model' }
+  if (isCreditExhausted401(status, message))
+    return { reason: 'rate_limit', status, retryable: true, scope: 'account' }
   if (status === 401 || status === 403)
     return {
       reason: 'auth_invalid',

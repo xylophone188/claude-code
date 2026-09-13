@@ -239,7 +239,7 @@ test('limits OmniRoute transient failures to six attempts', async () => {
   expect(attempts).toBe(6)
 })
 
-test('does not retry a non-OmniRoute route after a 502', async () => {
+test('does not retry a non-OmniRoute route after a bare 502', async () => {
   const route: DirectRoute = {
     providerId: 'another-provider',
     baseURL: 'https://example.test/v1',
@@ -261,6 +261,26 @@ test('does not retry a non-OmniRoute route after a 502', async () => {
     ),
   ).rejects.toThrow('Bad Gateway')
   expect(attempts).toBe(1)
+})
+
+test('retries OmniRoute after an empty stream before output', async () => {
+  await withFakeTimers(async () => {
+    let attempts = 0
+    const events = await Array.fromAsync(
+      retryDirectProviderStream(
+        [omnirouteRoute()],
+        async () => {
+          attempts++
+          if (attempts === 1) return streamOf(finishChunk)
+          return streamOf(textChunk('ok'), finishChunk)
+        },
+        new AbortController().signal,
+      ),
+    )
+
+    expect(attempts).toBe(2)
+    expect(events).toEqual([textChunk('ok'), finishChunk])
+  })
 })
 
 test('does not retry OmniRoute 4xx errors', async () => {
@@ -351,7 +371,7 @@ test('skips sibling accounts after a provider-wide failure', async () => {
   )
 
   expect(await Array.fromAsync(stream)).toHaveLength(1)
-  expect(calls).toEqual(['failed/one', 'failed/one', 'failed/one', 'next/one'])
+  expect(calls).toEqual(['failed/one', 'next/one'])
 })
 
 test('delegates cross-request cooldown to OmniRoute', async () => {

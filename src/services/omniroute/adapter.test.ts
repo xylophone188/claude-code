@@ -5,8 +5,11 @@ import { join } from 'path'
 import {
   buildOmniRouteRequestHeaders,
   chooseAccounts,
+  classifyError,
   classifyErrorStatus,
   getActiveCcbRoute,
+  getCcbRouteName,
+  getLocalFallbackConfig,
   getLastOmniRouteReceipt,
   parseOmniRouteReceipt,
   resetOmniRouteConfig,
@@ -53,6 +56,57 @@ describe('classifyErrorStatus', () => {
     expect(classifyErrorStatus(429)).toBe('rate_limit')
     expect(classifyErrorStatus(401, true, CREDITS_EXHAUSTED)).toBe('transient')
   })
+
+  it('uses rate-limit semantics for exhausted-credit 401 fallback', () => {
+    expect(classifyError({ status: 401, message: CREDITS_EXHAUSTED })).toEqual({
+      reason: 'rate_limit',
+      status: 401,
+      retryable: true,
+      scope: 'account',
+    })
+  })
+
+  it('keeps invalid credentials and forbidden responses as authentication failures', () => {
+    expect(
+      classifyError({ status: 401, message: 'invalid api key' }),
+    ).toMatchObject({
+      reason: 'auth_invalid',
+      retryable: false,
+      scope: 'account',
+    })
+    expect(classifyError({ status: 403, message: 'forbidden' })).toMatchObject({
+      reason: 'auth_invalid',
+      retryable: false,
+      scope: 'account',
+    })
+  })
+
+  it('keeps transient upstream errors retryable when their message mentions empty streams', () => {
+    expect(
+      classifyError({
+        name: 'Error',
+        status: 503,
+        message: 'upstream returned an empty stream while unavailable',
+      }),
+    ).toMatchObject({
+      reason: 'server_error',
+      retryable: true,
+      scope: 'provider',
+    })
+  })
+
+  it('treats ProviderOutputError as a model-scoped failure', () => {
+    expect(
+      classifyError({
+        name: 'ProviderOutputError',
+        message: 'model returned an empty stream',
+      }),
+    ).toMatchObject({
+      reason: 'model_output',
+      retryable: false,
+      scope: 'model',
+    })
+  })
 })
 
 describe('OmniRoute receipt', () => {
@@ -71,7 +125,7 @@ describe('OmniRoute receipt', () => {
         expect.objectContaining({
           providerId: 'omniroute',
           baseURL: 'http://127.0.0.1:8787/v1',
-          model: 'custom-ccb-route',
+          model: 'ccb-main',
           routeId: 'omniroute/ccb-chat',
           receiptPolicy: 'omniroute',
           headers: expect.objectContaining({ 'X-OmniRoute-Client': 'ccb' }),
@@ -92,6 +146,10 @@ describe('OmniRoute receipt', () => {
         repo: 'ccb',
         mission: 'modify CCB source',
         sessionId: 'session-1',
+        requestId: 'request:1',
+        intent: 'coding',
+        deadlineMs: 12_000,
+        costTier: 'balanced',
       }),
     ).toEqual({
       'X-OmniRoute-Client': 'ccb',
@@ -101,7 +159,62 @@ describe('OmniRoute receipt', () => {
       'X-OmniRoute-Repo': 'ccb',
       'X-OmniRoute-Mission': 'uri:modify%20CCB%20source',
       'X-OmniRoute-Session-Id': 'session-1',
+      'X-OmniRoute-Request-Id': 'request:1',
+      'X-OmniRoute-Intent': 'coding',
+      'X-OmniRoute-Deadline-Ms': '12000',
+      'X-OmniRoute-Cost-Tier': 'balanced',
     })
+  })
+
+  it('omits invalid routing metadata and accepts deadline boundaries', () => {
+    const invalid = buildOmniRouteRequestHeaders({
+      requestId: 'request id\ninvalid',
+      deadlineMs: 999,
+      costTier: 'unlimited' as 'balanced',
+    })
+    expect(invalid).not.toHaveProperty('X-OmniRoute-Request-Id')
+    expect(invalid).not.toHaveProperty('X-OmniRoute-Deadline-Ms')
+    expect(invalid).not.toHaveProperty('X-OmniRoute-Cost-Tier')
+
+    expect(buildOmniRouteRequestHeaders({ deadlineMs: 1_000 })).toHaveProperty(
+      'X-OmniRoute-Deadline-Ms',
+      '1000',
+    )
+    expect(
+      buildOmniRouteRequestHeaders({ deadlineMs: 600_000 }),
+    ).toHaveProperty('X-OmniRoute-Deadline-Ms', '600000')
+    expect(
+      buildOmniRouteRequestHeaders({ deadlineMs: 600_001 }),
+    ).not.toHaveProperty('X-OmniRoute-Deadline-Ms')
+  })
+
+  it('adds a distinct request ID and intent for each gateway route', () => {
+    const first = resolveDirectRoutes('ccb-main')[0]
+    const second = resolveDirectRoutes('ccb-main')[0]
+    const firstRequestId = first.headers?.['X-OmniRoute-Request-Id']
+    const secondRequestId = second.headers?.['X-OmniRoute-Request-Id']
+
+    expect(first.headers?.['X-OmniRoute-Intent']).toBe('auto')
+    expect(firstRequestId).toBeTruthy()
+    expect(firstRequestId).not.toBe(first.headers?.['X-OmniRoute-Session-Id'])
+    expect(firstRequestId).not.toBe(secondRequestId)
+  })
+
+  it('maps virtual model aliases to route intents', () => {
+    for (const [model, intent] of [
+      ['auto', 'chat'],
+      ['race', 'chat'],
+      ['chat/fast', 'chat'],
+      ['work', 'coding'],
+      ['plan', 'plan'],
+      ['advisor', 'advisor'],
+      ['review', 'review'],
+    ] as const) {
+      expect(resolveDirectRoutes(model)[0].headers).toHaveProperty(
+        'X-OmniRoute-Intent',
+        intent,
+      )
+    }
   })
 
   it('omits malformed Git revisions', () => {
@@ -127,6 +240,17 @@ describe('OmniRoute receipt', () => {
       'X-OmniRoute-Workspace',
       'uri:%2Fhome%2Fmelody%2F%E6%96%87%E6%A1%A3',
     )
+  })
+
+  it('rejects hermes-score as a CCB route label', () => {
+    const previous = process.env.CCB_ROUTE_NAME
+    process.env.CCB_ROUTE_NAME = ' Hermes-Score '
+    try {
+      expect(getCcbRouteName()).toBe('ccb-main')
+    } finally {
+      if (previous === undefined) delete process.env.CCB_ROUTE_NAME
+      else process.env.CCB_ROUTE_NAME = previous
+    }
   })
 
   it('maps CCB aliases to their current OmniRoute route labels', () => {
@@ -159,6 +283,7 @@ describe('OmniRoute receipt', () => {
         ])
       }
       expect(resolveDirectRoutes('hermes-score')).toEqual([])
+      expect(resolveDirectRoutes('ccb/hermes-score')).toEqual([])
     } finally {
       restoreRouteEnv(previous)
     }
@@ -212,6 +337,52 @@ describe('OmniRoute receipt', () => {
         receiptPolicy: 'none',
       })
       expect(directRoute.headers).toBeUndefined()
+    } finally {
+      restoreRouteEnv(previous)
+    }
+  })
+
+  it('returns a local fallback only from its dedicated configuration', () => {
+    const previous = {
+      CCB_FALLBACK_BASE_URL: process.env.CCB_FALLBACK_BASE_URL,
+      CCB_FALLBACK_API_KEY: process.env.CCB_FALLBACK_API_KEY,
+      CCB_FALLBACK_MODEL: process.env.CCB_FALLBACK_MODEL,
+      OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    }
+    try {
+      process.env.CCB_FALLBACK_BASE_URL = 'https://generic.example.test/v1'
+      process.env.OPENAI_BASE_URL = 'https://openai.example.test/v1'
+      process.env.OPENAI_API_KEY = 'openai-key'
+      delete process.env.CCB_FALLBACK_API_KEY
+      delete process.env.CCB_FALLBACK_MODEL
+      resetOmniRouteConfig()
+      expect(getLocalFallbackConfig()).toBeNull()
+
+      process.env.CCB_FALLBACK_API_KEY = 'fallback-key'
+      resetOmniRouteConfig()
+      expect(getLocalFallbackConfig()).toEqual({
+        baseUrl: 'https://generic.example.test/v1',
+        apiKey: 'fallback-key',
+        model: 'ccb-main',
+      })
+
+      process.env.CCB_FALLBACK_BASE_URL = 'https://fallback.example.test/v1///'
+      process.env.CCB_FALLBACK_MODEL = 'fallback-model'
+      resetOmniRouteConfig()
+      expect(getLocalFallbackConfig()).toEqual({
+        baseUrl: 'https://fallback.example.test/v1',
+        apiKey: 'fallback-key',
+        model: 'fallback-model',
+      })
+
+      process.env.CCB_FALLBACK_MODEL = 'hermes-score'
+      resetOmniRouteConfig()
+      expect(getLocalFallbackConfig()).toEqual({
+        baseUrl: 'https://fallback.example.test/v1',
+        apiKey: 'fallback-key',
+        model: 'ccb-main',
+      })
     } finally {
       restoreRouteEnv(previous)
     }

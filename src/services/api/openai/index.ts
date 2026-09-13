@@ -35,6 +35,7 @@ import {
 } from '../../../utils/model/chatgptModels.js'
 import { getOpenAIClient } from './client.js'
 import {
+  getLocalFallbackConfig,
   getOmniRouteConfig,
   resolveDirectRoutes,
   type DirectRoute,
@@ -42,7 +43,6 @@ import {
 import {
   clearAccountFailure,
   clearModelFailure,
-  isGatewayUnavailable,
   isProviderFailure,
   isModelFailure,
   markAccountFailure,
@@ -50,13 +50,15 @@ import {
   markProviderFailure,
   waitForProviderRequestSlot,
 } from '../../omniroute/adapter.js'
+import { API_ERROR_MESSAGE_PREFIX } from '../errors.js'
 import {
   beginCcbRoute,
+  classifyError,
   classifyErrorStatus,
+  isGatewayUnavailable,
   recordRaceMetric,
   setActiveCcbRoute,
 } from '../../omniroute/adapter.js'
-import { classifyError, isGatewayUnavailable } from '../../omniroute/adapter.js'
 import { fuseAnswers, type PanelAnswer } from '../../routing/fusion.js'
 import {
   invalidateOpenCodeModelsCache,
@@ -64,14 +66,7 @@ import {
   currentFreeOpenCodeModels,
 } from '../../routing/autoScoring.js'
 import { applyCompatRule } from '../../providerRegistry/providerCompatMatrix.js'
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
 import { buildDirectRacePool } from '../../routing/directRacePool.js'
->>>>>>> Stashed changes
-=======
-import { buildDirectRacePool } from '../../routing/directRacePool.js'
->>>>>>> Stashed changes
 import { routeError, routeLog } from '../../routing/stageLog.js'
 import {
   isJunkContent,
@@ -158,7 +153,6 @@ import { randomUUID } from 'crypto'
 import {
   createAssistantAPIErrorMessage,
   createUserMessage,
-  NO_RESPONSE_REQUESTED,
   normalizeContentFromAPI,
 } from '../../../utils/messages.js'
 import type { SDKAssistantMessageError } from '../../../entrypoints/agentSdkTypes.js'
@@ -281,19 +275,11 @@ const OPENCODE_FREE_BASE_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
 const OPENCODE_FREE_RETRIES = 11 // 1 initial + 10 immediate retries
 const DIRECT_ROUTE_RETRIES = 11 // 1 initial + 10 retries for transient upstream failures
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 const OMNIROUTE_RETRIES = 6 // 1 initial + 5 retries
 const OMNIROUTE_INITIAL_BACKOFF_MS = 1_000
 const OMNIROUTE_MAX_BACKOFF_MS = 16_000
-=======
 const CUSTOM_ROUTE_RETRIES = 3 // Safe: events are buffered until the stream completes.
 const GATEWAY_RETRIES = 6 // 1 initial + 5 slow retries (~31s) for gateway-wide outages
->>>>>>> Stashed changes
-=======
-const CUSTOM_ROUTE_RETRIES = 3 // Safe: events are buffered until the stream completes.
-const GATEWAY_RETRIES = 6 // 1 initial + 5 slow retries (~31s) for gateway-wide outages
->>>>>>> Stashed changes
 const ADVISOR_AUTO_MAX_TOKENS = 8_192
 const AUTO_TIER_TTFS_TIMEOUT_MS = [
   4_000, 8_000, 12_000, 16_000, 20_000, 24_000,
@@ -436,7 +422,9 @@ function normalizeDsmlEvents(
   ]
 }
 
-class ProviderOutputError extends Error {}
+class ProviderOutputError extends Error {
+  override name = 'ProviderOutputError'
+}
 
 export async function* retryOpencodeFreeStream(
   createStream: () => Promise<AsyncIterable<ChatCompletionChunk>>,
@@ -485,45 +473,153 @@ function routeFailureScope(error: unknown): 'provider' | 'model' | 'account' {
   return scope
 }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+export function isLocalFallbackEligible(error: unknown): boolean {
+  if (error instanceof ProviderOutputError) return false
+  const status = (error as { status?: number } | undefined)?.status
+  if (status === 502 || status === 503 || status === 504) return true
+  if (status !== undefined) return false
+  const details = [
+    (error as { code?: string } | undefined)?.code,
+    (error as { name?: string } | undefined)?.name,
+    (error as { message?: string } | undefined)?.message,
+  ].join(' ')
+  if (/quota|balance|credits?|insufficient|rate.?limit/i.test(details))
+    return false
+  return /ECONNREFUSED|ECONNRESET|ENETUNREACH|EAI_AGAIN|ETIMEDOUT|timeout|deadline|network error|connection error/i.test(
+    details,
+  )
+}
+
 function isOmniRouteTransientError(error: unknown): boolean {
   if (error instanceof ProviderOutputError) return false
   const status = (error as { status?: number } | undefined)?.status
+  // Gateway capacity exhaustion is advisory: the pool restores itself once the
+  // upstream accounts recover, so treat it like the 502 gateway outage path.
+  if (status === 429) return true
   if (status !== undefined && status < 500) return false
-  if (status === 502 || isGatewayUnavailable(error)) return true
+  if (status !== undefined && status >= 500) return true
   const errorDetails = [
     (error as { code?: string } | undefined)?.code,
     (error as { message?: string } | undefined)?.message,
   ].join(' ')
-  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENETUNREACH/i.test(
+  return /connection error|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENETUNREACH/i.test(
     errorDetails,
   )
 }
 
-function omniRouteBackoffMs(error: unknown, attempt: number): number {
-  const fallback = Math.min(
+function omniRouteBackoffMs(attempt: number): number {
+  return Math.min(
     OMNIROUTE_MAX_BACKOFF_MS,
     OMNIROUTE_INITIAL_BACKOFF_MS * 2 ** (attempt - 1),
   )
-  const headers = (error as { headers?: unknown } | undefined)?.headers
-  const retryAfter =
-    headers && typeof (headers as { get?: unknown }).get === 'function'
-      ? (headers as { get(name: string): string | null }).get('retry-after')
-      : undefined
-  const retryAfterMs =
-    retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter)
-      ? Number(retryAfter) * 1_000
-      : undefined
-  const delay = Math.min(retryAfterMs ?? fallback, OMNIROUTE_MAX_BACKOFF_MS)
-  return Math.floor(delay * (0.75 + Math.random() * 0.5))
 }
-=======
+
 type RetryBackoff = (delayMs: number, signal: AbortSignal) => Promise<void>
->>>>>>> Stashed changes
-=======
-type RetryBackoff = (delayMs: number, signal: AbortSignal) => Promise<void>
->>>>>>> Stashed changes
+
+/** Retry delay in ms, honoring the `retry-after` header (seconds or HTTP
+ *  date) and clamping to the gateway backoff ceiling so a stale or adversarial
+ *  value cannot stall the whole request for minutes. */
+function retryAfterMs(error: unknown): number | undefined {
+  const headers = (
+    error as {
+      headers?: {
+        get?: (name: string) => string | null
+        'retry-after'?: string
+      }
+    }
+  ).headers
+  const retryAfter = headers?.['retry-after'] ?? headers?.get?.('retry-after')
+  if (retryAfter == null) return undefined
+
+  const seconds = Number(retryAfter)
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.min(seconds * 1000, OMNIROUTE_MAX_BACKOFF_MS)
+
+  const retryAt = Date.parse(retryAfter)
+  if (Number.isNaN(retryAt)) return undefined
+  return Math.min(Math.max(0, retryAt - Date.now()), OMNIROUTE_MAX_BACKOFF_MS)
+}
+
+function isInvalidProviderText(text: string): boolean {
+  return isFakeSuccessBody(text) || isJunkContent(text)
+}
+
+function hasMeaningfulContent(text: string): boolean {
+  return text.trim().length > 0 && !isInvalidProviderText(text)
+}
+
+/** Strip bearer tokens from an upstream error before it reaches the UI or the
+ *  conversation history (which may be re-sent to a model). */
+function redactErrorText(text: string): string {
+  return text.replace(/Bearer\s+\S+/gi, 'Bearer <redacted>').slice(0, 200)
+}
+
+export function describeUpstreamFailure(error: unknown): {
+  content: string
+  error: SDKAssistantMessageError
+} {
+  // Upstream gateway errors are frequently plain objects shaped like
+  // { status, message } rather than Error instances.
+  const rawMessage =
+    typeof (error as { message?: unknown } | null)?.message === 'string'
+      ? (error as { message: string }).message
+      : String(error)
+  if (
+    isGatewayUnavailable(error) ||
+    /all gateway backends unavailable|gateway_unavailable|all configured gateway backends failed/i.test(
+      rawMessage,
+    )
+  ) {
+    return {
+      content: `${API_ERROR_MESSAGE_PREFIX}: Gateway is unavailable — all backend accounts are exhausted. Wait for capacity to recover and retry.`,
+      error: 'server_error',
+    }
+  }
+  const classification = classifyError(error)
+  const status = classification.status
+  const statusSuffix = status !== undefined ? ` (HTTP ${status})` : ''
+  switch (classification.reason) {
+    case 'rate_limit':
+    case 'quota_exceeded':
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: Request rate limited${statusSuffix} — upstream quota exhausted. Retry later.`,
+        error: 'rate_limit',
+      }
+    case 'auth_invalid':
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: Upstream credentials rejected${statusSuffix}.`,
+        error: 'authentication_failed',
+      }
+    case 'timeout':
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: Request timed out — no response from the upstream provider.`,
+        error: 'server_error',
+      }
+    case 'network':
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: Network error reaching the upstream provider.`,
+        error: 'server_error',
+      }
+    case 'model_output':
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: Upstream returned unusable output.`,
+        error: 'invalid_request',
+      }
+    default: {
+      const errorMessage = redactErrorText(rawMessage)
+      if (classification.reason === 'server_error') {
+        return {
+          content: `${API_ERROR_MESSAGE_PREFIX}: Upstream provider returned HTTP ${status ?? 'error'}${errorMessage ? ` — ${errorMessage}` : ''}`,
+          error: 'server_error',
+        }
+      }
+      return {
+        content: `${API_ERROR_MESSAGE_PREFIX}: ${errorMessage || 'upstream request failed'}`,
+        error: 'unknown',
+      }
+    }
+  }
+}
 
 export async function* retryDirectProviderStream(
   routes: DirectRoute[],
@@ -532,15 +628,8 @@ export async function* retryDirectProviderStream(
   ) => Promise<AsyncIterable<ChatCompletionChunk>>,
   signal: AbortSignal,
   onFirstMeaningful?: () => void,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
   isVisionRequest = false,
-=======
   waitForBackoff: RetryBackoff = waitForRaceDelay,
->>>>>>> Stashed changes
-=======
-  waitForBackoff: RetryBackoff = waitForRaceDelay,
->>>>>>> Stashed changes
 ): AsyncGenerator<ChatCompletionChunk, void> {
   let lastError: unknown
   const skippedProviders = new Set<string>()
@@ -586,53 +675,32 @@ export async function* retryDirectProviderStream(
       model: route.model,
       ...(route.accountId ? { account: route.accountId } : {}),
     })
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     const isOmniRoute = route.providerId === 'omniroute'
+    // Only custom routes get a retry budget; plain provider routes try once
+    // and advance to the next route (a failing upstream is unlikely to heal
+    // within seconds, and retrying it just delays the fallback).
     const attempts =
       route.kind === 'opencode'
         ? DIRECT_ROUTE_RETRIES
         : isOmniRoute
           ? OMNIROUTE_RETRIES
-          : 1
-    let meaningful = false
-    for (let attempt = 1; attempt <= attempts; attempt++) {
+          : route.kind === 'custom'
+            ? CUSTOM_ROUTE_RETRIES
+            : 1
+    // Keep enough loop capacity for gateway_unavailable, whose 6-attempt
+    // budget is selected only after the request error is classified.
+    const maxAttempts = Math.max(attempts, GATEWAY_RETRIES)
+    let streamMeaningful = false
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const events: ChatCompletionChunk[] = []
-        meaningful = false
         let hasToolCalls = false
-=======
-    const attempts =
-      route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : CUSTOM_ROUTE_RETRIES
-    // The loop bound must allow the gateway retry cap; each branch keeps its
-    // own upper bound below, so the loop length alone never widens retries.
-    const loopAttempts =
-      route.kind === 'opencode'
-        ? attempts
-        : Math.max(CUSTOM_ROUTE_RETRIES, GATEWAY_RETRIES)
-    for (let attempt = 1; attempt <= loopAttempts; attempt++) {
-      let streamMeaningful = false
-      try {
-        const events: ChatCompletionChunk[] = []
->>>>>>> Stashed changes
-=======
-    const attempts =
-      route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : CUSTOM_ROUTE_RETRIES
-    // The loop bound must allow the gateway retry cap; each branch keeps its
-    // own upper bound below, so the loop length alone never widens retries.
-    const loopAttempts =
-      route.kind === 'opencode'
-        ? attempts
-        : Math.max(CUSTOM_ROUTE_RETRIES, GATEWAY_RETRIES)
-    for (let attempt = 1; attempt <= loopAttempts; attempt++) {
-      let streamMeaningful = false
-      try {
-        const events: ChatCompletionChunk[] = []
->>>>>>> Stashed changes
         const streamText = { text: '' }
+        let dsml = false
         for await (const event of await createStream(route)) {
           events.push(event)
           hasToolCalls ||= eventToolCalls(event) > 0
+          dsml ||= isDsmlStart(streamText.text)
           const eventMeaningful = isMeaningfulOpenAIEvent(event)
           if (!streamMeaningful && eventMeaningful) {
             streamMeaningful = true
@@ -645,7 +713,11 @@ export async function* retryDirectProviderStream(
           throw new ProviderOutputError(
             `${route.providerId} returned an empty stream`,
           )
-        if (isFakeSuccessBody(streamText.text)) {
+        if (
+          route.providerId !== 'omniroute' &&
+          !dsml &&
+          isFakeSuccessBody(streamText.text)
+        ) {
           throw new ProviderOutputError(
             `${route.providerId} returned a fake-success body`,
           )
@@ -658,7 +730,12 @@ export async function* retryDirectProviderStream(
             `${route.providerId} returned a vision fake-success body`,
           )
         }
-        if (!hasToolCalls && isJunkContent(streamText.text)) {
+        if (
+          route.providerId !== 'omniroute' &&
+          !dsml &&
+          !hasToolCalls &&
+          isJunkContent(streamText.text)
+        ) {
           throw new ProviderOutputError(
             `${route.providerId} returned invalid provider text`,
           )
@@ -684,23 +761,18 @@ export async function* retryDirectProviderStream(
         return
       } catch (error) {
         if (signal.aborted) throw new APIUserAbortError()
-        if (meaningful) throw error
+        if (streamMeaningful) throw error
         const status = (error as { status?: number } | undefined)?.status
         if (route.kind === 'opencode' && status === 404) {
           invalidateOpenCodeModelsCache()
           void refreshAutoHealth()
         }
-        // A stream that already produced meaningful output must never be
-        // replayed: any retry would regenerate the whole assistant turn and
-        // its tool side effects instead of resuming the failed stream.
-        if (streamMeaningful) throw error
         // OpenCode free endpoint is volatile: retry every failed attempt
         // (non-2xx, empty stream, blocked/custom error, invalid output).
         if (
           route.kind === 'opencode' &&
           status !== 404 &&
           attempt < attempts &&
-          !meaningful &&
           !isGatewayUnavailable(error)
         ) {
           routeLog('retry', `${route.providerId}/${route.model} retry`, {
@@ -715,7 +787,7 @@ export async function* retryDirectProviderStream(
         // pool is down; it self-recovers once the backends restart. Give it a
         // longer bounded window than generic transient errors.
         if (isGatewayUnavailable(error) && attempt < GATEWAY_RETRIES) {
-          const delayMs = 1000 * 2 ** (attempt - 1)
+          const delayMs = retryAfterMs(error) ?? omniRouteBackoffMs(attempt)
           routeLog('retry', `${route.providerId}/${route.model} retry`, {
             attempt,
             maxAttempts: GATEWAY_RETRIES,
@@ -726,37 +798,33 @@ export async function* retryDirectProviderStream(
           await waitForBackoff(delayMs, signal)
           continue
         }
+        // Custom routes buffer output before yielding it, so retry transient
+        // failures on their bounded budget. Plain provider routes still move
+        // directly to the next fallback after one failed attempt.
         const transient =
           status == null || status === 408 || status === 425 || status >= 500
-        if (route.kind !== 'opencode' && transient && attempt < attempts) {
-          const delayMs = 250 * 2 ** (attempt - 1)
+        const retryLimit =
+          isOmniRoute && status === 500
+            ? CUSTOM_ROUTE_RETRIES
+            : route.kind === 'custom'
+              ? CUSTOM_ROUTE_RETRIES
+              : attempts
+        if (
+          route.kind !== 'opencode' &&
+          !isGatewayUnavailable(error) &&
+          ((isOmniRoute && isOmniRouteTransientError(error)) || transient) &&
+          attempt < retryLimit
+        ) {
+          const delayMs = isOmniRoute
+            ? (retryAfterMs(error) ?? omniRouteBackoffMs(attempt))
+            : 250 * 2 ** (attempt - 1)
           routeLog('retry', `${route.providerId}/${route.model} retry`, {
             attempt,
-            maxAttempts: attempts,
+            maxAttempts: retryLimit,
             delayMs,
             status,
           })
           await waitForBackoff(delayMs, signal)
-<<<<<<< Updated upstream
-          continue
-        }
-        if (
-          isOmniRoute &&
-          attempt < attempts &&
-          isOmniRouteTransientError(error)
-        ) {
-          routeLog(
-            'retry',
-            `${route.providerId}/${route.model} gateway retry`,
-            {
-              attempt,
-              maxAttempts: attempts,
-              status,
-            },
-          )
-          await waitForBackoff(omniRouteBackoffMs(error, attempt), signal)
-=======
->>>>>>> Stashed changes
           continue
         }
         const scope = routeFailureScope(error)
@@ -899,7 +967,11 @@ export async function* raceDirectProviderStream(
       if (events.length === 0) {
         throw new ProviderOutputError(`${route.model} returned an empty stream`)
       }
-      if (isInvalidProviderText(streamText.text)) {
+      if (
+        route.providerId !== 'omniroute' &&
+        !dsml &&
+        isInvalidProviderText(streamText.text)
+      ) {
         throw new ProviderOutputError(
           `${route.model} returned invalid provider text`,
         )
@@ -1287,16 +1359,8 @@ async function* allOfRaceStream(
       model: c.route.model,
       text: c.fullText,
     }))
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    const fused = fuseAnswers(answers, RACE_ALL_OF)
-    if (!fused || isJunkContent(fused))
-=======
-=======
->>>>>>> Stashed changes
     const fused = fuseAnswers(answers, mode)
     if (!fused || !hasMeaningfulContent(fused))
->>>>>>> Stashed changes
       throw new ProviderOutputError('allOf: fusion returned low-quality output')
     onSelected?.()
     routeLog('race', `allOf fused ${completed.length} responses -> ${mode}`, {
@@ -1367,16 +1431,8 @@ export async function* raceThenFallbackStream(
         downgradeRoutes,
         route => createStream(route, l1Controller.signal),
         l1Controller.signal,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        undefined,
+        markStreamMeaningful,
         isVisionRequest,
-=======
-        markStreamMeaningful,
->>>>>>> Stashed changes
-=======
-        markStreamMeaningful,
->>>>>>> Stashed changes
       )
   } catch (error) {
     if (signal.aborted || streamMeaningful) throw error
@@ -1395,16 +1451,8 @@ export async function* raceThenFallbackStream(
           downgradeRoutes,
           route => createStream(route, l1Controller.signal),
           l1Controller.signal,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-          undefined,
+          markStreamMeaningful,
           isVisionRequest,
-=======
-          markStreamMeaningful,
->>>>>>> Stashed changes
-=======
-          markStreamMeaningful,
->>>>>>> Stashed changes
         )
         return
       } catch (downgradeError) {
@@ -1431,16 +1479,8 @@ export async function* raceThenFallbackStream(
           group,
           route => createStream(route, signal),
           signal,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-          undefined,
+          markStreamMeaningful,
           isVisionRequest,
-=======
-          markStreamMeaningful,
->>>>>>> Stashed changes
-=======
-          markStreamMeaningful,
->>>>>>> Stashed changes
         )
         return
       } catch (tierError) {
@@ -1598,14 +1638,39 @@ export async function* queryModelOpenAI(
     // server-side routing decisions). The race pool below must not leak into
     // these reads — dispatch uses effectiveDirectRoutes instead.
     const originalDirectRoute: DirectRoute | undefined = originalDirectRoutes[0]
+    const localFallbackConfig =
+      originalDirectRoutes.length === 1 &&
+      originalDirectRoute?.providerId === 'omniroute'
+        ? getLocalFallbackConfig()
+        : null
+    const localFallbackRoute: DirectRoute | undefined = localFallbackConfig
+      ? {
+          providerId: 'ccb-local-fallback',
+          baseURL: localFallbackConfig.baseUrl,
+          model: localFallbackConfig.model,
+          apiKey: localFallbackConfig.apiKey,
+          kind: 'provider',
+        }
+      : undefined
     const isOmniRouteServerRouting =
       originalDirectRoute?.providerId === 'omniroute' &&
       getOmniRouteConfig()?.serverSideRouting === true
+    const useGatewayPrimary =
+      isOmniRouteServerRouting &&
+      process.env.CCB_GATEWAY_PRIMARY !== '0' &&
+      process.env.CCB_ROUTE_TIER_ORDER !== '1'
 
-    // L1 direct race pool: OpenCode free + NVIDIA models race concurrently
-    // in front of the resolved routes; the OmniRoute gateway drops to L2
-    // fallback. An empty pool leaves the routes untouched.
-    const effectiveDirectRoutes = buildDirectRacePool(originalDirectRoutes)
+    // Server-side routing owns scoring and races while the gateway is primary.
+    // Retain the direct tier pool only for an explicitly requested legacy path.
+    const effectiveDirectRoutes = useGatewayPrimary
+      ? originalDirectRoutes
+      : buildDirectRacePool(originalDirectRoutes)
+    const gatewayFallbackRoutes = useGatewayPrimary
+      ? buildDirectRacePool(originalDirectRoutes)
+          .filter(route => route.providerId !== 'omniroute')
+          .slice(0, 2)
+      : []
+    if (localFallbackRoute) gatewayFallbackRoutes.push(localFallbackRoute)
 
     // Provider-prefixed models use CCB's direct transport; ChatGPT Responses
     // must not receive those ids.
@@ -1911,6 +1976,53 @@ export async function* queryModelOpenAI(
     const useCodexFallback =
       useChatGPTResponses || effectiveDirectRoutes.length > 0
 
+    const runOmniRouteWithLocalFallback =
+      async function* (): AsyncGenerator<ChatCompletionChunk> {
+        try {
+          yield* retryDirectProviderStream(
+            effectiveDirectRoutes,
+            route =>
+              createRouteStream(route, signal, {
+                messages: openaiMessages,
+                tools: openaiTools,
+                toolChoice: openaiToolChoice,
+                enableThinking,
+                maxTokens,
+                reasoningEffort: reasoningEffortParam,
+                temperatureOverride: options.temperatureOverride,
+                fetchOverride: options.fetchOverride as unknown as typeof fetch,
+                source: options.querySource,
+                allowReasoningStrip: true,
+              }),
+            signal,
+            undefined,
+            isVisionRequest,
+          )
+        } catch (error) {
+          if (!localFallbackRoute || !isLocalFallbackEligible(error))
+            throw error
+          yield* retryDirectProviderStream(
+            [localFallbackRoute],
+            route =>
+              createRouteStream(route, signal, {
+                messages: openaiMessages,
+                tools: openaiTools,
+                toolChoice: openaiToolChoice,
+                enableThinking,
+                maxTokens,
+                reasoningEffort: reasoningEffortParam,
+                temperatureOverride: options.temperatureOverride,
+                fetchOverride: options.fetchOverride as unknown as typeof fetch,
+                source: options.querySource,
+                allowReasoningStrip: true,
+              }),
+            signal,
+            undefined,
+            isVisionRequest,
+          )
+        }
+      }
+
     const rawStream:
       | AsyncIterable<ChatCompletionChunk>
       | AsyncIterable<Record<string, unknown>> = useChatGPTResponses
@@ -1974,26 +2086,30 @@ export async function* queryModelOpenAI(
               isVisionRequest,
             )
           : effectiveDirectRoutes.length > 0
-            ? retryDirectProviderStream(
-                effectiveDirectRoutes,
-                route =>
-                  createRouteStream(route, signal, {
-                    messages: openaiMessages,
-                    tools: openaiTools,
-                    toolChoice: openaiToolChoice,
-                    enableThinking,
-                    maxTokens,
-                    reasoningEffort: reasoningEffortParam,
-                    temperatureOverride: options.temperatureOverride,
-                    fetchOverride:
-                      options.fetchOverride as unknown as typeof fetch,
-                    source: options.querySource,
-                    allowReasoningStrip: true,
-                  }),
-                signal,
-                undefined,
-                isVisionRequest,
-              )
+            ? originalDirectRoute?.providerId === 'omniroute' &&
+              localFallbackRoute &&
+              effectiveDirectRoutes.length === 1
+              ? runOmniRouteWithLocalFallback()
+              : retryDirectProviderStream(
+                  effectiveDirectRoutes,
+                  route =>
+                    createRouteStream(route, signal, {
+                      messages: openaiMessages,
+                      tools: openaiTools,
+                      toolChoice: openaiToolChoice,
+                      enableThinking,
+                      maxTokens,
+                      reasoningEffort: reasoningEffortParam,
+                      temperatureOverride: options.temperatureOverride,
+                      fetchOverride:
+                        options.fetchOverride as unknown as typeof fetch,
+                      source: options.querySource,
+                      allowReasoningStrip: true,
+                    }),
+                  signal,
+                  undefined,
+                  isVisionRequest,
+                )
             : isOpencodeFree
               ? retryOpencodeFreeStream(() => createDirectRequest(), signal)
               : getOpenAIClient({
@@ -2202,18 +2318,22 @@ export async function* queryModelOpenAI(
       error instanceof Error ? error.message : String(error),
     )
     logForDebugging(`[OpenAI] Error: ${errorMessage}`, { level: 'error' })
-    // This is an internal fallback-chain sentinel, not user-facing API text.
+    // This is an internal fallback-chain sentinel: every route failed without
+    // a classifiable cause. Name the condition instead of staying silent.
     if (errorMessage === 'all direct providers failed') {
+      const failure = describeUpstreamFailure(error)
       yield createAssistantAPIErrorMessage({
-        content: NO_RESPONSE_REQUESTED,
+        content: failure.content,
         apiError: 'api_error',
-        error: 'unknown',
+        error: failure.error,
+        errorDetails: redactErrorText(errorMessage),
       })
       return
     }
-    // CCB is already a fallback chain. Once every route is exhausted, expose
-    // no upstream error text to the CLI; the caller records the failed turn
-    // without rendering provider-specific 429/timeout details.
+    // CCB is already a fallback chain: every route has been exhausted. Still
+    // report the concrete cause (gateway pool exhausted, 429, timeout, ...)
+    // rather than a bare "No response requested.", or there is nothing left to
+    // triage by hand. Upstream text is redacted before it reaches the UI.
     if (
       isCCBModel(options.model) ||
       isCCBRoutingModel(options.model) ||
@@ -2221,10 +2341,12 @@ export async function* queryModelOpenAI(
         options.model.trim(),
       )
     ) {
+      const failure = describeUpstreamFailure(error)
       yield createAssistantAPIErrorMessage({
-        content: NO_RESPONSE_REQUESTED,
+        content: failure.content,
         apiError: 'api_error',
-        error: 'unknown',
+        error: failure.error,
+        errorDetails: redactErrorText(errorMessage),
       })
       return
     }

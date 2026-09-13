@@ -6,9 +6,11 @@ import {
   raceDirectProviderStream,
 } from '../openai/index.js'
 import { isGatewayUnavailable } from '../../omniroute/adapter.js'
+import { resetCircuitBreaker } from '../../routing/circuitBreaker.js'
 
 beforeEach(() => {
   mock.restore()
+  resetCircuitBreaker()
 })
 
 type TestDirectRoute = {
@@ -83,7 +85,7 @@ const noopBackoff = async () => {}
 describe('retryDirectProviderStream scope routing', () => {
   test('connection error retries the same custom route with backoff', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const chunks = await drainGen(
       retryDirectProviderStream(
         [route] as never,
@@ -92,16 +94,12 @@ describe('retryDirectProviderStream scope routing', () => {
             (async function* () {
               attempt++
               if (attempt === 1) throw new Error('Connection error')
-              yield meaningfulChunk(
-                'omniroute',
-                'hermes-score',
-                'gateway',
-                'ok',
-              )
+              yield meaningfulChunk('omniroute', 'ccb-main', 'gateway', 'ok')
             })(),
           ),
         new AbortController().signal,
         undefined,
+        false,
         noopBackoff,
       ),
     )
@@ -111,7 +109,7 @@ describe('retryDirectProviderStream scope routing', () => {
 
   test('non-retryable 400 does not replay the custom route', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -177,6 +175,7 @@ describe('retryDirectProviderStream scope routing', () => {
           ),
         new AbortController().signal,
         undefined,
+        false,
         noopBackoff,
       ),
     )
@@ -187,7 +186,7 @@ describe('retryDirectProviderStream scope routing', () => {
 
   test('gateway 502 retries with slow backoff then succeeds after recovery', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const chunks = await drainGen(
       retryDirectProviderStream(
         [route] as never,
@@ -200,16 +199,12 @@ describe('retryDirectProviderStream scope routing', () => {
                   status: 502,
                   message: 'all gateway backends unavailable',
                 }
-              yield meaningfulChunk(
-                'omniroute',
-                'hermes-score',
-                'gateway',
-                'ok',
-              )
+              yield meaningfulChunk('omniroute', 'ccb-main', 'gateway', 'ok')
             })(),
           ),
         new AbortController().signal,
         undefined,
+        false,
         noopBackoff,
       ),
     )
@@ -219,7 +214,7 @@ describe('retryDirectProviderStream scope routing', () => {
 
   test('gateway 502 exhausts its retries then throws the original error', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -236,6 +231,7 @@ describe('retryDirectProviderStream scope routing', () => {
           ),
         new AbortController().signal,
         undefined,
+        false,
         noopBackoff,
       ),
     )
@@ -245,9 +241,69 @@ describe('retryDirectProviderStream scope routing', () => {
     expect((result.error as { status?: number }).status).toBe(502)
   })
 
-  test('gateway 502 after meaningful output throws without replay', async () => {
+  test('gateway-wide 503 exhausts the same six-attempt retry budget', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
+    const result = await drainGenCatch(
+      retryDirectProviderStream(
+        [route] as never,
+        () =>
+          Promise.resolve(
+            // biome-ignore lint/correctness/useYield: generator always throws
+            (async function* () {
+              attempt++
+              throw {
+                status: 503,
+                message:
+                  'upstream HTTP 503; all configured gateway backends failed',
+              }
+            })(),
+          ),
+        new AbortController().signal,
+        undefined,
+        false,
+        noopBackoff,
+      ),
+    )
+    expect(result.ok).toBe(false)
+    expect(attempt).toBe(6)
+    expect((result.error as { status?: number }).status).toBe(503)
+  })
+
+  test('gateway-wide 503 uses the exact 1/2/4/8/16s backoff sequence', async () => {
+    let attempt = 0
+    const delays: number[] = []
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
+    const result = await drainGenCatch(
+      retryDirectProviderStream(
+        [route] as never,
+        () =>
+          Promise.resolve(
+            // biome-ignore lint/correctness/useYield: generator always throws
+            (async function* () {
+              attempt++
+              throw {
+                status: 503,
+                message: 'all configured gateway backends failed',
+              }
+            })(),
+          ),
+        new AbortController().signal,
+        undefined,
+        false,
+        async (ms: number) => {
+          delays.push(ms)
+        },
+      ),
+    )
+    expect(result.ok).toBe(false)
+    expect(attempt).toBe(6)
+    expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, 16_000])
+  })
+
+  test('gateway-wide 503 after meaningful output throws without replay', async () => {
+    let attempt = 0
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -257,7 +313,73 @@ describe('retryDirectProviderStream scope routing', () => {
               attempt++
               yield meaningfulChunk(
                 'omniroute',
-                'hermes-score',
+                'ccb-main',
+                'gateway',
+                'partial',
+              )
+              throw {
+                status: 503,
+                message: 'all configured gateway backends failed',
+              }
+            })(),
+          ),
+        new AbortController().signal,
+      ),
+    )
+    expect(result.ok).toBe(false)
+    expect(attempt).toBe(1)
+    expect((result.error as { status?: number }).status).toBe(503)
+  })
+
+  test('empty stream skips only its model and continues to a sibling model', async () => {
+    const routes = [
+      makeRoute('omniroute', 'empty-model', 'gateway'),
+      makeRoute('omniroute', 'healthy-model', 'gateway'),
+    ]
+    const attemptedModels: string[] = []
+    const chunks = await drainGen(
+      retryDirectProviderStream(
+        routes as never,
+        current =>
+          Promise.resolve(
+            (async function* () {
+              attemptedModels.push(current.model)
+              if (current.model === 'empty-model') return
+              yield meaningfulChunk('omniroute', current.model, 'gateway', 'ok')
+            })(),
+          ),
+        new AbortController().signal,
+        undefined,
+        false,
+        noopBackoff,
+      ),
+    )
+    expect(attemptedModels).toEqual([
+      'empty-model',
+      'empty-model',
+      'empty-model',
+      'empty-model',
+      'empty-model',
+      'empty-model',
+      'healthy-model',
+    ])
+    expect(chunks).toHaveLength(1)
+    expect((chunks[0] as ChatCompletionChunk).model).toBe('healthy-model')
+  })
+
+  test('gateway 502 after meaningful output throws without replay', async () => {
+    let attempt = 0
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
+    const result = await drainGenCatch(
+      retryDirectProviderStream(
+        [route] as never,
+        () =>
+          Promise.resolve(
+            (async function* () {
+              attempt++
+              yield meaningfulChunk(
+                'omniroute',
+                'ccb-main',
                 'gateway',
                 'partial',
               )
@@ -284,7 +406,7 @@ describe('retryDirectProviderStream scope routing', () => {
       status: 502,
       message: 'all gateway backends unavailable',
     }
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -298,6 +420,7 @@ describe('retryDirectProviderStream scope routing', () => {
           ),
         new AbortController().signal,
         undefined,
+        false,
         async (ms: number) => {
           delays.push(ms)
         },
@@ -308,6 +431,71 @@ describe('retryDirectProviderStream scope routing', () => {
     expect(attempt).toBe(6)
     expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, 16_000])
     expect(result.error).toBe(originalError)
+  })
+
+  test('429 gateway capacity exhaustion retries with retry-after then succeeds', async () => {
+    let attempt = 0
+    const delays: number[] = []
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
+    const chunks = await drainGen(
+      retryDirectProviderStream(
+        [route] as never,
+        () =>
+          Promise.resolve(
+            (async function* () {
+              attempt++
+              if (attempt === 1)
+                throw {
+                  status: 429,
+                  message: 'gateway capacity exhausted',
+                  headers: { get: () => '335' },
+                }
+              yield meaningfulChunk('omniroute', 'ccb-main', 'gateway', 'ok')
+            })(),
+          ),
+        new AbortController().signal,
+        undefined,
+        false,
+        async (ms: number) => {
+          delays.push(ms)
+        },
+      ),
+    )
+    expect(attempt).toBe(2)
+    expect(chunks).toHaveLength(1)
+    // retry-after is honored but clamped to the gateway backoff ceiling.
+    expect(delays).toEqual([16_000])
+  })
+
+  test('custom-route gateway 502 still gets the full 6-attempt gateway budget', async () => {
+    let attempt = 0
+    const delays: number[] = []
+    const route = makeRoute('9router', 'gpt-5.6-sol', 'gateway')
+    const result = await drainGenCatch(
+      retryDirectProviderStream(
+        [route] as never,
+        () =>
+          Promise.resolve(
+            // biome-ignore lint/correctness/useYield: generator always throws
+            (async function* () {
+              attempt++
+              throw {
+                status: 502,
+                message: 'all gateway backends unavailable',
+              }
+            })(),
+          ),
+        new AbortController().signal,
+        undefined,
+        false,
+        async (ms: number) => {
+          delays.push(ms)
+        },
+      ),
+    )
+    expect(result.ok).toBe(false)
+    expect(attempt).toBe(6)
+    expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, 16_000])
   })
 
   test('opencode meaningful output is never replayed on failure', async () => {
@@ -348,7 +536,7 @@ describe('retryDirectProviderStream scope routing', () => {
 
   test('generic 500 after meaningful output also throws without replay', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -358,7 +546,7 @@ describe('retryDirectProviderStream scope routing', () => {
               attempt++
               yield meaningfulChunk(
                 'omniroute',
-                'hermes-score',
+                'ccb-main',
                 'gateway',
                 'partial',
               )
@@ -376,7 +564,7 @@ describe('retryDirectProviderStream scope routing', () => {
 
   test('non-gateway 500 keeps the generic fast retry budget', async () => {
     let attempt = 0
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const result = await drainGenCatch(
       retryDirectProviderStream(
         [route] as never,
@@ -390,6 +578,7 @@ describe('retryDirectProviderStream scope routing', () => {
           ),
         new AbortController().signal,
         undefined,
+        false,
         noopBackoff,
       ),
     )
@@ -400,7 +589,7 @@ describe('retryDirectProviderStream scope routing', () => {
   test('gateway backoff stays abort-aware while waiting', async () => {
     let attempt = 0
     const controller = new AbortController()
-    const route = makeRoute('omniroute', 'hermes-score', 'gateway')
+    const route = makeRoute('omniroute', 'ccb-main', 'gateway')
     const gen = retryDirectProviderStream(
       [route] as never,
       () =>
@@ -445,16 +634,19 @@ describe('isGatewayUnavailable', () => {
     ).toBe(true)
   })
 
-  test('rejects non-gateway and non-502 errors', () => {
+  test('rejects bare or unrelated errors', () => {
     expect(isGatewayUnavailable({ status: 502, message: 'Bad Gateway' })).toBe(
       false,
     )
+    expect(
+      isGatewayUnavailable({ status: 503, message: 'Service Unavailable' }),
+    ).toBe(false)
     expect(
       isGatewayUnavailable({
         status: 503,
         message: 'all gateway backends unavailable',
       }),
-    ).toBe(false)
+    ).toBe(true)
     expect(isGatewayUnavailable({ status: 400, message: 'bad request' })).toBe(
       false,
     )

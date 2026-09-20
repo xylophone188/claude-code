@@ -58,6 +58,7 @@ import {
   resolveSystemPromptSections,
 } from './systemPromptSections.js'
 import { SLEEP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SleepTool/prompt.js'
+import { getAndroidPrivilegedEnvPrompt } from '../utils/androidPrivilegedEnv.js'
 import { TICK_TAG } from './xml.js'
 import { logForDebugging } from '../utils/debug.js'
 import { loadMemoryPrompt } from '../memdir/memdir.js'
@@ -609,7 +610,7 @@ Working directory: ${getCwd()}
 Is directory a git repo: ${isGit ? 'Yes' : 'No'}
 ${additionalDirsInfo}Platform: ${env.platform}
 ${getShellInfoLine()}
-OS Version: ${unameSR}
+OS Version: ${unameSR}${getAndroidPrivilegedEnvPrompt() ? '\n' + getAndroidPrivilegedEnvPrompt() : ''}
 </env>
 ${modelDescription}${knowledgeCutoffMessage}`
 }
@@ -655,6 +656,7 @@ export async function computeSimpleEnvInfo(
     `Platform: ${env.platform}`,
     getShellInfoLine(),
     `OS Version: ${unameSR}`,
+    getAndroidPrivilegedEnvPrompt(),
     modelDescription,
     knowledgeCutoffMessage,
     process.env.USER_TYPE === 'ant' && isUndercover()

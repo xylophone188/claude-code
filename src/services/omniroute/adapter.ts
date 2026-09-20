@@ -62,6 +62,7 @@ export interface OmniRouteRequestMetadata {
   intent?: OmniRouteIntent
   deadlineMs?: number
   costTier?: OmniRouteCostTier
+  compression?: string
 }
 
 const gitRemoteCache = new Map<string, string | null>()
@@ -331,6 +332,7 @@ export function getOmniRouteRequestMetadata(): OmniRouteRequestMetadata {
     sessionId,
     deadlineMs: normalizeDeadlineMs(process.env.CCB_REQUEST_DEADLINE_MS),
     costTier: normalizeCostTier(process.env.CCB_COST_TIER),
+    compression: headerValue(process.env.OMNIROUTE_COMPRESSION),
   }
 }
 
@@ -368,6 +370,10 @@ export function buildOmniRouteRequestHeaders(
       normalizeDeadlineMs(metadata.deadlineMs)?.toString(),
     ],
     ['X-OmniRoute-Cost-Tier', normalizeCostTier(metadata.costTier)],
+    [
+      'X-OmniRoute-Compression',
+      headerValue(metadata.compression ?? process.env.OMNIROUTE_COMPRESSION),
+    ],
   ]
   for (const [name, value] of values) {
     if (value) headers[name] = value
@@ -477,7 +483,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|chat(?:\/|$)|advisor$|plan$|review$|work$|ultra$|smart$|opus$)/i.test(
+    /^(?:ccb(?:-|\/)|auto(?:\/|$)|race(?:\/|$)|(?:chat|worker|advisor|code|review)(?:-pool|\/|$)|[a-z0-9_-]+-pool$|advisor$|plan$|review$|work$|ultra$|smart$|opus$)/i.test(
       raw,
     ) ||
     /^(?:ccb\/|ccb-main$)/i.test(raw) ||
@@ -871,7 +877,7 @@ export function classifyErrorStatus(
   if (status === 429) return 'rate_limit'
   if (status === 401 || status === 403) return 'auth'
   if (status === 503 || status === 502 || status === 504) return 'transient'
-  if (status === 404 || status === 400) return 'permanent'
+  if (status === 404 || status === 410 || status === 400) return 'permanent'
   return 'unknown'
 }
 
@@ -1158,6 +1164,13 @@ export function classifyError(error: unknown): ErrorClassification {
     }
   if (status === 429 || /rate.?limit/i.test(message))
     return { reason: 'rate_limit', status, retryable: true, scope: 'account' }
+  if (status === 404 || status === 410)
+    return {
+      reason: 'model_output',
+      status,
+      retryable: false,
+      scope: 'model',
+    }
   if (status && status >= 500)
     return {
       reason: 'server_error',

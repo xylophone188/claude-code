@@ -30,6 +30,7 @@ import login from './commands/login/index.js'
 import logout from './commands/logout/index.js'
 import installGitHubApp from './commands/install-github-app/index.js'
 import installSlackApp from './commands/install-slack-app/index.js'
+import installApk from './commands/install-apk/index.js'
 import breakCache, {
   breakCacheNonInteractive,
 } from './commands/break-cache/index.js'
@@ -225,6 +226,7 @@ import advisor from './commands/advisor.js'
 import autonomy from './commands/autonomy.js'
 import provider from './commands/provider.js'
 import router from './commands/router.js'
+import { pool, poolNonInteractive } from './commands/pool/index.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -332,6 +334,8 @@ const COMMANDS = memoize((): Command[] => [
   autonomy,
   provider,
   router,
+  pool,
+  poolNonInteractive,
   artifacts,
   agents,
   branch,
@@ -357,6 +361,7 @@ const COMMANDS = memoize((): Command[] => [
   init,
   keybindings,
   lang,
+  installApk,
   installGitHubApp,
   installSlackApp,
   mcp,

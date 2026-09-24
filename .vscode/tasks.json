@@ -4,23 +4,12 @@
 		{
 			"label": "Start Claude Code TUI",
 			"type": "shell",
-			"command": "bun run dev:inspect",
-			"isBackground": true,
+			"command": "bun run build && bun dist/cli-bun.js",
 			"presentation": {
 				"reveal": "always",
 				"focus": true,
 				"panel": "dedicated",
 				"clear": true
-			},
-			"problemMatcher": {
-				"pattern": {
-					"regexp": "^$"
-				},
-				"background": {
-					"activeOnStart": true,
-					"beginsPattern": ".*Bun Inspector.*",
-					"endsPattern": ".*Listening:.*"
-				}
 			}
 		}
 	]

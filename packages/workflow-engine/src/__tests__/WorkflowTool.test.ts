@@ -93,9 +93,8 @@ test('advisor mode starts the built-in plan, execute, review workflow', async ()
       join(dir, '.claude', 'workflow-runs', 'run-x', 'script.js'),
       'utf-8',
     )
-    expect(script).toContain("model: 'ccb-plan'")
-    expect(script).toContain("model: 'ccb-coding'")
-    expect(script).toContain("model: 'ccb-review'")
+    expect(script).toContain("model: 'advisor'")
+    expect(script).toContain("model: 'auto'")
     expect(script).toContain("agentType: 'workflow-advisor'")
     expect(script).toContain("phase('Acceptance')")
   } finally {

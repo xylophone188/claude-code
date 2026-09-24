@@ -215,20 +215,6 @@ export class WebSocketTransport implements Transport {
     logForDiagnosticsNoPII('info', 'cli_websocket_message_received', {
       length: message.length,
     })
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    if (message.trim() === KEEP_ALIVE_FRAME.trim()) {
-      this.ws?.send(KEEP_ALIVE_FRAME)
-=======
-    if (message === KEEP_ALIVE_FRAME) {
-      this.echoKeepAlive(this.ws)
->>>>>>> Stashed changes
-=======
-    if (message === KEEP_ALIVE_FRAME) {
-      this.echoKeepAlive(this.ws)
->>>>>>> Stashed changes
-      return
-    }
     if (this.onData) {
       this.onData(message)
     }
@@ -279,20 +265,6 @@ export class WebSocketTransport implements Transport {
     logForDiagnosticsNoPII('info', 'cli_websocket_message_received', {
       length: message.length,
     })
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    if (message.trim() === KEEP_ALIVE_FRAME.trim()) {
-      this.ws?.send(KEEP_ALIVE_FRAME)
-=======
-    if (message === KEEP_ALIVE_FRAME) {
-      this.echoKeepAlive(this.ws)
->>>>>>> Stashed changes
-=======
-    if (message === KEEP_ALIVE_FRAME) {
-      this.echoKeepAlive(this.ws)
->>>>>>> Stashed changes
-      return
-    }
     if (this.onData) {
       this.onData(message)
     }
@@ -314,20 +286,6 @@ export class WebSocketTransport implements Transport {
     )
     logForDiagnosticsNoPII('error', 'cli_websocket_connect_closed')
     this.handleConnectionError(code)
-  }
-
-  private echoKeepAlive(ws: WebSocketLike | null): void {
-    if (!ws) return
-
-    try {
-      ws.send(KEEP_ALIVE_FRAME)
-      this.lastActivityTime = Date.now()
-    } catch (error) {
-      logForDebugging(`WebSocketTransport: Keep_alive echo failed: ${error}`, {
-        level: 'error',
-      })
-      logForDiagnosticsNoPII('error', 'cli_websocket_keepalive_failed')
-    }
   }
 
   // --- Shared handlers ---

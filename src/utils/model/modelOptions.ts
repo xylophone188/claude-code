@@ -38,9 +38,7 @@ import {
   CHATGPT_CODEX_MODEL_OPTIONS,
   isChatGPTAuthMode,
 } from './chatgptModels.js'
-import { currentFreeOpenCodeModels } from '../../services/routing/autoScoring.js'
 import { getProviderList as getOpenCodeFreeProviderList } from './opencodeFree.js'
-import { currentFreeOpenCodeModels } from '../../services/routing/autoScoring.js'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -336,23 +334,8 @@ const MaxHaiku45Option: ModelOption = {
   description: 'Haiku 4.5 · Fastest for quick answers',
 }
 
-function getOpencodeFreeOption(): ModelOption | undefined {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const models = currentFreeOpenCodeModels()
-  if (models.length === 0) {
-    return undefined
-  }
-  // Use the first available free model (alphabetically sorted in currentFreeOpenCodeModels)
-  const model = models[0]
-=======
-  const model = currentFreeOpenCodeModels()[0]
-  if (!model) return undefined
->>>>>>> Stashed changes
-=======
-  const model = currentFreeOpenCodeModels()[0]
-  if (!model) return undefined
->>>>>>> Stashed changes
+function getOpencodeFreeOption(): ModelOption {
+  const model = process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'
   const value = `opencode/${model}`
   return {
     value,
@@ -582,99 +565,8 @@ function getKnownModelOption(model: string): ModelOption | null {
 }
 
 export function getModelOptions(fastMode = false): ModelOption[] {
-  // In AgentOS mode `auto` is a routing capability, not a selectable model.
-  // Keep the legacy provider/model catalog available only for the explicit
-  // local fallback so stale Hermes/CX entries cannot pin a CCB session.
-  if (
-    process.env.CCB_ENV === '1' &&
-    process.env.OMNIROUTE_SERVER_ROUTING !== '0'
-  ) {
-    return [
-      {
-        value: 'ccb-chat',
-        label: 'CCB · 对话',
-        description: '高可用主会话池',
-      },
-      {
-        value: 'ccb-research',
-        label: 'CCB · 研究',
-        description: '调研与证据收集',
-      },
-      {
-        value: 'ccb-coding',
-        label: 'CCB · 编码',
-        description: '实现、测试与修订',
-      },
-      {
-        value: 'ccb-plan',
-        label: 'CCB · 规划',
-        description: '计划与架构方案',
-      },
-      {
-        value: 'ccb-review',
-        label: 'CCB · 审核',
-        description: '独立审查与验收',
-      },
-      {
-        value: 'ccb-vision',
-        label: 'CCB · 视图',
-        description: '截图、图像与 UI 分析',
-      },
-      {
-        value: 'ccb-crawl',
-        label: 'CCB · 爬取',
-        description: '网页抓取与正文提取',
-      },
-      {
-        value: 'ccb-search',
-        label: 'CCB · 搜索',
-        description: '检索、排序与来源发现',
-      },
-    ]
-  }
   const options = getModelOptionsBase(fastMode)
-  const opencodeFreeOption = getOpencodeFreeOption()
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  if (opencodeFreeOption) {
-    options.splice(1, 0, opencodeFreeOption)
-=======
-=======
->>>>>>> Stashed changes
-  if (opencodeFreeOption) options.splice(1, 0, opencodeFreeOption)
-
-  if (
-    process.env.HERMES_SCORE_DEFAULT === '1' ||
-    process.env.OMNIRUTE_URL ||
-    process.env.OMNIROUTE_BASE_URL
-  ) {
-    options.push(
-      {
-        value: 'hermes-score',
-        label: 'Hermes-Score (自动)',
-        description: 'OmniRoute 自动评分选模',
-      },
-      {
-        value: 'cx/gpt-5.6-luna',
-        label: 'CX · gpt-5.6-luna',
-        description: 'OmniRoute CX Luna',
-      },
-      {
-        value: 'cx/gpt-5.6-terra',
-        label: 'CX · gpt-5.6-terra',
-        description: 'OmniRoute CX Terra',
-      },
-      {
-        value: 'cx/gpt-5.6-sol',
-        label: 'CX · gpt-5.6-sol',
-        description: 'OmniRoute CX Sol',
-      },
-    )
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-  }
+  options.splice(1, 0, getOpencodeFreeOption())
 
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var
   const envCustomModel = process.env.ANTHROPIC_CUSTOM_MODEL_OPTION

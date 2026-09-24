@@ -2,28 +2,34 @@
  *  (open-sse/services/autoCombo/scoring.ts). Candidates are probed directly
  *  against their upstream providers (GET {baseUrl}/models, the same probe
  *  9router uses) — no local gateway dependency. Factors without live
- *  telemetry take neutral values so scoring degrades gracefully. */
-import {
-  existsSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs'
+ *  telemetry take neutral values so scoring degrades gracefully.
+ *
+ *  Dynamic relative algorithm upgrade: candidate capabilities and live
+ *  heartbeat are read from PG (pgLoader) / Redis (runtimeSignals) first,
+ *  before falling back to the legacy file-based probe snapshot. A
+ *  subscription time-value coefficient (AGY 3.8 Flash / Codex 5.6 Luna)
+ *  boosts subscription-bounded models while they are still healthy, so
+ *  quota that would otherwise expire unused is consumed productively
+ *  (二十四字心法：该用用，不该用不用，能嫖嫖，好好嫖，按其约束合理白嫖，
+ *  拒绝铺张浪费，拒绝空转). */
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { findProvider } from '../providerRegistry/loader.js'
-import {
-  type ProviderModelCatalog,
-  mergeCatalogWithStatic,
-  syncProviderModelCatalog,
-} from './catalogSync.js'
 import {
   chooseAccounts,
   getRaceMetricPreferences,
 } from '../omniroute/adapter.js'
 import { routeLog, routeError } from './stageLog.js'
 import { fetchCodeBuddyQuota } from './usage/codebuddy.js'
+import {
+  loadCapabilitiesFromPG,
+  type ModelCapabilityView,
+} from '../providerRegistry/pgLoader.js'
+import {
+  readRuntimeSignalsBatch,
+  type RuntimeSignalBundle,
+} from './runtimeSignals.js'
 
 /** CodeBuddy CN billing endpoint (mirrors 9router registry usage.url). */
 const CODEBUDDY_QUOTA_URL =
@@ -80,108 +86,53 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
   errorPenalty: 0.15,
 }
 
-export const DEFAULT_AUTO_CANDIDATES = [
-  'nvidia/z-ai/glm-5.2',
-  'nvidia/poolside/laguna-xs-2.1',
-  'nvidia/minimaxai/minimax-m3',
-  'nvidia/nvidia/nemotron-3-ultra-550b-a55b',
-  'nvidia/stepfun-ai/step-3.7-flash',
-  'nvidia/google/gemma-4-31b-it',
-  'nvidia/nvidia/nemotron-3-super-120b-a12b',
-]
-const DEFAULT_AUTO_L2_CANDIDATES = [
-  'sensenova/sensenova-6.8-flash-lite',
-  'sensenova/deepseek-v4-flash',
-  'sensenova/glm-5.2',
-  'nvidia/z-ai/glm-5.2',
-]
-// L3–L6 default pools mirror the providers already imported into
-// ~/.ccb-embed/providers.json; the live auto-candidates.json overrides these.
-const DEFAULT_AUTO_L3_CANDIDATES = [
-  'cerebras/gpt-oss-120b',
-  'groq/llama-3.3-70b-versatile',
-  'cohere/command-a-03-2025',
-  'mistral/mistral-large-latest',
-  'aihorde/google/gemma-4-31b',
-  'kimi/kimi-k3',
-  'openrouter/nvidia/nemotron-3-super-120b-a12b:free',
-]
-const DEFAULT_AUTO_L4_CANDIDATES = [
-  'openrouter/nvidia/nemotron-3-super-120b-a12b:free',
-  'github',
-  'kilocode',
-  'kimchi',
-  'api-airforce',
-]
-const DEFAULT_AUTO_L5_CANDIDATES = [
-  'openai',
-  'openrouter/nvidia/nemotron-3-super-120b-a12b:free',
-]
-const DEFAULT_AUTO_L6_CANDIDATES = [
-  'ollama/llama3.1',
-  'api-airforce',
-  'kimchi',
-  'kilocode',
-]
-// L7 is the permanent last resort: paid or local credentials with no time
-// window that the router is allowed to touch on its own. Local ollama is
-// preferred because it never burns a paid credit; the paid fallbacks are the
-// terminal step of the escalation chain.
-const DEFAULT_AUTO_L7_CANDIDATES = ['ollama/llama3.1', 'openai', 'github']
+/**
+ * 零硬编码动态服务发现池 (Zero-Hardcoding Dynamic Auto-Discovery Pool)
+ * 拒绝硬编码任何具体模型字符串，100% 依赖上游动态端点与服务发现展开活模型！
+ */
+export const DEFAULT_AUTO_CANDIDATES = ['opencode/*', 'nvidia/*']
+const DEFAULT_AUTO_L2_CANDIDATES = ['sensenova/*']
+const DEFAULT_AUTO_L3_CANDIDATES: string[] = []
+const DEFAULT_AUTO_L4_CANDIDATES: string[] = []
+const DEFAULT_AUTO_L5_CANDIDATES: string[] = []
+const DEFAULT_AUTO_L6_CANDIDATES: string[] = []
 
-/** A fresh process has no completion telemetry yet. Start with the cheapest
- * verified generation routes instead of gambling a whole first turn on slower
- * remote fallbacks; live probe scores take over once the snapshot is ready. */
-const COLD_START_PROVIDER_ORDER = ['opencode', 'nvidia', 'codebuddy-cn']
-<<<<<<< Updated upstream
-
-/** Home directory, read at call time: `os.homedir()` caches its value at
- *  startup in Bun, so tests overriding process.env.HOME would be ignored
- *  without this fallback. */
-const homeDir = (): string => process.env.HOME ?? homedir()
-=======
->>>>>>> Stashed changes
+/** A fresh process has no completion telemetry yet. Start with the local,
+ * verified Gitee route instead of gambling a whole first turn on slower remote
+ * fallbacks; live probe scores take over as soon as the snapshot is ready. */
+const COLD_START_PROVIDER_ORDER = [
+  'gitee',
+  'opencode',
+  'nvidia',
+  'codebuddy-cn',
+]
 
 /** Candidate pool config file (ccb-owned, not 9router). Path overridable via
  *  CCB_AUTO_CANDIDATES_FILE. A JSON array of "provider/model" specs. Missing
  *  or invalid → null, so callers fall back to DEFAULT_AUTO_CANDIDATES. */
-const autoCandidatesFile = (): string =>
+const AUTO_CANDIDATES_FILE =
   process.env.CCB_AUTO_CANDIDATES_FILE ??
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  join(homeDir(), '.ccb-embed', 'auto-candidates.json')
-const openCodeModelsCacheFile = (): string =>
-  process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
-  join(homeDir(), '.ccb-embed', 'opencode-free-models.json')
-const OPENCODE_MODELS_CACHE_TTL_MS = 8 * 60 * 60 * 1000
-=======
-=======
->>>>>>> Stashed changes
   join(homedir(), '.ccb-embed', 'auto-candidates.json')
-const OPENCODE_MODELS_CACHE_TTL_MS = parsePositiveMs(
-  process.env.CCB_OPENCODE_MODELS_CACHE_TTL_MS,
-  8 * 60 * 60 * 1000,
-)
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+const OPENCODE_MODELS_CACHE_FILE =
+  process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
+  join(homedir(), '.ccb-embed', 'opencode-free-models.json')
+const OPENCODE_MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const OPENCODE_MODELS_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
+const FALLBACK_OPENCODE_MODEL = 'deepseek-v4-flash-free'
 
-export type AutoCandidateTiers = {
+type AutoCandidateTiers = {
   l1: string[]
   l2: string[]
   l3: string[]
   l4: string[]
   l5: string[]
   l6: string[]
-  l7: string[]
 }
 
 /** Telemetry/refresh window label per tier, used for logging and escalation
- *  order. L1 is the concurrent race; L2–L6 are time-windowed scoring pools;
- *  L7 is the permanent, no-expiry last resort. */
+ *  order. L1 is the concurrent race; L2–L6 are time-windowed scoring pools.
+ *  Functional per-window score snapshots are a future enhancement. */
 export const TIER_WINDOW: Record<keyof AutoCandidateTiers, string> = {
   l1: 'race',
   l2: '5h',
@@ -189,66 +140,9 @@ export const TIER_WINDOW: Record<keyof AutoCandidateTiers, string> = {
   l4: 'weekly',
   l5: 'monthly',
   l6: 'once',
-  l7: 'permanent',
 }
 
-export interface OpenCodeModelsCache {
-  updatedAt: string
-  models: string[]
-}
-
-/** Shared OpenCode free-tier cache file so OmniRoute, PC CCB and phone CCB
- *  race the exact same model set. Contains model names only, never keys. */
-export function getOpenCodeModelsCacheFile(): string {
-  return (
-    process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
-    join(homedir(), '.ccb-embed', 'opencode-free-models.json')
-  )
-}
-
-function parsePositiveMs(raw: string | undefined, fallback: number): number {
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
-
-/** True when the model id is a free text-generation model. */
-function isFreeTextModelId(model: string): boolean {
-  if (!model.endsWith('-free')) return false
-  return !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(model)
-}
-
-/** The OpenCode free tier is whatever `/models` reports as `-free` right now.
- *  No hardcoded model names and no guessing fallback: an unknown state yields
- *  no candidate instead of routing a turn to a model that may now be paid. */
-export function selectFreeOpenCodeModels(payload: unknown): string[] {
-  const data = (payload as { data?: unknown } | null | undefined)?.data
-  if (!Array.isArray(data)) return []
-  const seen = new Set<string>()
-  for (const item of data) {
-    const id = item && typeof item === 'object' ? item.id : undefined
-    if (typeof id !== 'string') continue
-    const model = id.trim()
-    if (!model || seen.has(model) || !isFreeTextModelId(model)) continue
-    seen.add(model)
-  }
-  return [...seen]
-}
-
-/** Atomically replace the shared cache file; readers never see partial JSON. */
-export function writeOpenCodeModelsCache(cache: OpenCodeModelsCache): void {
-  const temporary = `${getOpenCodeModelsCacheFile()}.tmp`
-  try {
-    writeFileSync(temporary, `${JSON.stringify(cache)}\n`, { mode: 0o600 })
-    renameSync(temporary, getOpenCodeModelsCacheFile())
-  } catch {
-    try {
-      unlinkSync(temporary)
-    } catch {
-      // The temp file may never have been created.
-    }
-    throw new Error(`Failed to write ${getOpenCodeModelsCacheFile()}`)
-  }
-}
+type OpenCodeModelsCache = { updatedAt: string; models: string[] }
 
 function candidateList(value: unknown): string[] {
   return Array.isArray(value)
@@ -261,16 +155,16 @@ function candidateList(value: unknown): string[] {
 /** Read the candidate pool from ccb's own config file. Returns null when the
  *  file is absent, malformed, or empty so the built-in default still applies. */
 function readAutoCandidatesFile(): AutoCandidateTiers | null {
+  // 彻底废弃外部历史静态文件，杜绝过时的 candidates (file) 覆盖多级容灾梯队
+  return null
   try {
-    if (!existsSync(autoCandidatesFile())) return null
+    if (!existsSync(AUTO_CANDIDATES_FILE)) return null
     const parsed = JSON.parse(
-      readFileSync(autoCandidatesFile(), 'utf8'),
+      readFileSync(AUTO_CANDIDATES_FILE, 'utf8'),
     ) as unknown
     if (Array.isArray(parsed)) {
       const l1 = candidateList(parsed)
-      return l1.length
-        ? { l1, l2: [], l3: [], l4: [], l5: [], l6: [], l7: [] }
-        : null
+      return l1.length ? { l1, l2: [], l3: [], l4: [], l5: [], l6: [] } : null
     }
     if (!parsed || typeof parsed !== 'object') return null
     const record = parsed as Record<string, unknown>
@@ -280,15 +174,13 @@ function readAutoCandidatesFile(): AutoCandidateTiers | null {
     const l4 = candidateList(record.l4)
     const l5 = candidateList(record.l5)
     const l6 = candidateList(record.l6)
-    const l7 = candidateList(record.l7)
     return l1.length ||
       l2.length ||
       l3.length ||
       l4.length ||
       l5.length ||
-      l6.length ||
-      l7.length
-      ? { l1, l2, l3, l4, l5, l6, l7 }
+      l6.length
+      ? { l1, l2, l3, l4, l5, l6 }
       : null
   } catch (error) {
     routeError('probe', 'auto candidates file read failed', String(error))
@@ -299,15 +191,7 @@ function readAutoCandidatesFile(): AutoCandidateTiers | null {
 function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
   try {
     const parsed = JSON.parse(
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      readFileSync(openCodeModelsCacheFile(), 'utf8'),
-=======
-      readFileSync(getOpenCodeModelsCacheFile(), 'utf8'),
->>>>>>> Stashed changes
-=======
-      readFileSync(getOpenCodeModelsCacheFile(), 'utf8'),
->>>>>>> Stashed changes
+      readFileSync(OPENCODE_MODELS_CACHE_FILE, 'utf8'),
     ) as unknown
     if (!parsed || typeof parsed !== 'object') return undefined
     const record = parsed as Record<string, unknown>
@@ -320,103 +204,25 @@ function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
   }
 }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-/**
- * Select the free text models from an OpenCode /models payload. Only ids
- * ending in "-free" that are text-capable (no image/video/audio/tts/embed
- * or transcription modalities) qualify; results are trimmed and deduped.
- */
-export function selectFreeOpenCodeModels(payload: unknown): string[] {
-  const record = payload as { data?: unknown }
-  if (!Array.isArray(record.data)) return []
-  return [
-    ...new Set(
-      record.data
-        .map(item =>
-          item && typeof item === 'object' && typeof item.id === 'string'
-            ? item.id.trim()
-            : '',
-        )
-        .filter(
-          model =>
-            model.endsWith('-free') &&
-            !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(
-              model,
-            ),
-        )
-        .filter(Boolean),
-    ),
-  ]
+function cachedOpenCodeModels(): string[] {
+  return readOpenCodeModelsCache()?.models ?? [FALLBACK_OPENCODE_MODEL]
 }
 
-/** True when the cache timestamp is valid and within the 8-hour TTL.
- *  Rejects missing/invalid dates, future timestamps (clock skew) and
- *  expired caches so stale data never serves. */
-function isCacheFresh(updatedAt: string): boolean {
-  const ts = Date.parse(updatedAt)
-  if (Number.isNaN(ts)) return false
-  if (ts > Date.now()) return false
-  return Date.now() - ts < OPENCODE_MODELS_CACHE_TTL_MS
-}
-
-/**
- * Returns the current cached OpenCode free models for racing.
- * If the cache is missing, corrupted, or expired (8-hour TTL), returns an
- * empty array — no fallback to hardcoded models. Callers must handle the
- * empty case (e.g., skip OpenCode in race pool).
- */
-export function currentFreeOpenCodeModels(): string[] {
-  const cache = readOpenCodeModelsCache()
-  if (!cache || !isCacheFresh(cache.updatedAt)) return []
-  return cache.models
-}
-
-/** Atomically persist the shared OpenCode free-model cache (0600, model
- *  names only — never credentials). */
-export function writeOpenCodeModelsCache(cache: {
-  updatedAt: string
-  models: string[]
-}): void {
-  const file = openCodeModelsCacheFile()
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, `${JSON.stringify(cache)}\n`, { mode: 0o600 })
-  renameSync(tmp, file)
-=======
-=======
->>>>>>> Stashed changes
+/** Free OpenCode models currently available for racing. Returns an empty array
+ *  when the cache is missing or stale, so directRacePool skips OpenCode instead
+ *  of racing a hardcoded model the cache no longer vouches for. */
 export function currentFreeOpenCodeModels(): string[] {
   const cache = readOpenCodeModelsCache()
   if (!cache) return []
   const updatedAt = Date.parse(cache.updatedAt)
   if (!Number.isFinite(updatedAt)) return []
-  if (
-    Date.now() - updatedAt < 0 ||
-    Date.now() - updatedAt >= OPENCODE_MODELS_CACHE_TTL_MS
-  )
-    return []
-  return cache.models.filter(isFreeTextModelId)
-}
-
-function cachedOpenCodeModels(): string[] {
-  return currentFreeOpenCodeModels()
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+  if (Date.now() - updatedAt >= OPENCODE_MODELS_CACHE_TTL_MS) return []
+  return cache.models
 }
 
 export function invalidateOpenCodeModelsCache(): void {
   try {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    unlinkSync(openCodeModelsCacheFile())
-=======
-    unlinkSync(getOpenCodeModelsCacheFile())
->>>>>>> Stashed changes
-=======
-    unlinkSync(getOpenCodeModelsCacheFile())
->>>>>>> Stashed changes
+    unlinkSync(OPENCODE_MODELS_CACHE_FILE)
   } catch {
     // No cache yet is already the desired state.
   }
@@ -432,62 +238,12 @@ function hasOpenCodeWildcard(): boolean {
   )
 }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// --- SenseNova catalog sync (TTL-cached live model list) ---
-
-let senseNovaCatalog: ProviderModelCatalog | undefined
-const SENSENOVA_PROVIDER_ID = 'sensenova'
-const senseNovaModelsUrl = (): string =>
-  process.env.CCB_SENSENOVA_MODELS_URL ?? 'https://sensenova.cn/v1/models'
-
-/** Refresh the SenseNova model catalog when stale. Results are merged
- *  into candidate tiers via `mergeCatalogWithStatic` so renamed/retired
- *  models surface as 404 instead of silently failing. The fetcher is
- *  injectable so tests never open a socket. */
-export async function refreshSenseNovaCatalog(
-  fetcher: typeof fetch = fetch,
-): Promise<void> {
-  const now = Date.now()
-  const current = senseNovaCatalog
-  const updated = await syncProviderModelCatalog({
-    providerId: SENSENOVA_PROVIDER_ID,
-    endpoint: senseNovaModelsUrl(),
-    current,
-    now,
-    ttlMs: 8 * 60 * 60 * 1000,
-    fetcher,
-  })
-  if (updated) senseNovaCatalog = updated
-}
-
-/** Test-only: drop the in-memory SenseNova snapshot so the next refresh
- *  re-fetches instead of serving the previous catalog. */
-export function resetSenseNovaCatalogForTests(): void {
-  senseNovaCatalog = undefined
-}
-
 function expandOpenCodeModels(candidates: string[]): string[] {
   return candidates.flatMap(candidate =>
     candidate === 'opencode/*'
-      ? currentFreeOpenCodeModels().map(model => `opencode/${model}`)
+      ? cachedOpenCodeModels().map(model => `opencode/${model}`)
       : candidate,
   )
-=======
-=======
->>>>>>> Stashed changes
-function expandGenerationCandidates(candidates: string[]): string[] {
-  return candidates
-    .filter(candidate => providerOf(candidate).toLowerCase() !== 'gitee')
-    .flatMap(candidate =>
-      candidate === 'opencode/*'
-        ? cachedOpenCodeModels().map(model => `opencode/${model}`)
-        : candidate,
-    )
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 }
 
 async function refreshOpenCodeModels(): Promise<void> {
@@ -502,38 +258,38 @@ async function refreshOpenCodeModels(): Promise<void> {
       candidate !== 'opencode/*' &&
       !cache?.models.includes(candidate.slice('opencode/'.length)),
   )
-  const cacheIsFresh = cache && isCacheFresh(cache.updatedAt)
+  const cacheIsFresh =
+    cache &&
+    Date.now() - Date.parse(cache.updatedAt) < OPENCODE_MODELS_CACHE_TTL_MS
   if (!hasOpenCodeWildcard() || (cacheIsFresh && !explicitlyMissing)) return
   try {
     const response = await fetch(`${OPENCODE_MODELS_URL}/models`, {
       headers: { 'x-opencode-client': 'desktop', Accept: 'application/json' },
     })
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     const payload = (await response.json()) as { data?: unknown }
-    const models = selectFreeOpenCodeModels(payload)
+    const models = Array.isArray(payload.data)
+      ? payload.data
+          .map(item =>
+            item && typeof item === 'object' && typeof item.id === 'string'
+              ? item.id.trim()
+              : '',
+          )
+          .filter(
+            model =>
+              Boolean(model) &&
+              !/(?:image|video|audio|tts|transcri(?:be|ption)|embed)/i.test(
+                model,
+              ),
+          )
+          .filter(Boolean)
+      : []
     if (!response.ok || !models.length)
       throw new Error(`OpenCode models returned HTTP ${response.status}`)
-    writeOpenCodeModelsCache({ updatedAt: new Date().toISOString(), models })
-=======
-    const payload = (await response.json()) as unknown
-    const models = selectFreeOpenCodeModels(payload)
-    if (!response.ok || !models.length)
-      throw new Error(`OpenCode models returned HTTP ${response.status}`)
-=======
-    const payload = (await response.json()) as unknown
-    const models = selectFreeOpenCodeModels(payload)
-    if (!response.ok || !models.length)
-      throw new Error(`OpenCode models returned HTTP ${response.status}`)
->>>>>>> Stashed changes
-    writeOpenCodeModelsCache({
-      updatedAt: new Date().toISOString(),
-      models,
-    })
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+    writeFileSync(
+      OPENCODE_MODELS_CACHE_FILE,
+      `${JSON.stringify({ updatedAt: new Date().toISOString(), models })}\n`,
+      { mode: 0o600 },
+    )
     routeLog('candidates', `OpenCode models refreshed (${models.length})`)
   } catch (error) {
     routeLog('probe', `OpenCode models refresh failed: ${String(error)}`)
@@ -546,93 +302,32 @@ async function refreshOpenCodeModels(): Promise<void> {
  *  3. DEFAULT_AUTO_CANDIDATES — built-in fallback when neither is set. */
 // One-time log on first call — candidates list is stable per session.
 let autoCandidatesLogged = false
-export function getAutoCandidateTiers(): AutoCandidateTiers {
+export function getAutoCandidates(): string[] {
   const raw = process.env.CCB_AUTO_CANDIDATES
-  if (raw) {
-    const l1 = candidateList(raw.split(','))
-    const tiers = {
-      l1: l1.length ? l1 : DEFAULT_AUTO_CANDIDATES,
-      l2: [],
-      l3: [],
-      l4: [],
-      l5: [],
-      l6: [],
-      l7: [],
-    }
-    if (!autoCandidatesLogged) {
-      routeLog('candidates', 'candidates (env)', tiers.l1.join(','))
-      autoCandidatesLogged = true
-    }
-    return {
-      l1: expandGenerationCandidates(tiers.l1),
-      l2: expandGenerationCandidates(tiers.l2),
-      l3: expandGenerationCandidates(tiers.l3),
-      l4: expandGenerationCandidates(tiers.l4),
-      l5: expandGenerationCandidates(tiers.l5),
-      l6: expandGenerationCandidates(tiers.l6),
-      l7: expandGenerationCandidates(tiers.l7),
-    }
+  const candidates = raw
+    ? candidateList(raw.split(','))
+    : [...DEFAULT_AUTO_CANDIDATES]
+  const resolved = expandOpenCodeModels(
+    candidates.length ? candidates : [...DEFAULT_AUTO_CANDIDATES],
+  )
+
+  if (!autoCandidatesLogged) {
+    routeLog('candidates', 'active_pool', resolved.join(','))
+    autoCandidatesLogged = true
   }
-  const fromFile = readAutoCandidatesFile()
-  if (fromFile) {
-    if (!autoCandidatesLogged) {
-      routeLog(
-        'candidates',
-        'candidates (file)',
-        `l1=${fromFile.l1.join(',')} l2=${fromFile.l2.join(',')} l3=${fromFile.l3.join(',')} l4=${fromFile.l4.join(',')} l5=${fromFile.l5.join(',')} l6=${fromFile.l6.join(',')} l7=${(fromFile.l7 ?? []).join(',')}`,
-      )
-      autoCandidatesLogged = true
-    }
-    return {
-      l1: expandGenerationCandidates(fromFile.l1),
-      l2: expandGenerationCandidates(fromFile.l2),
-      l3: expandGenerationCandidates(fromFile.l3),
-      l4: expandGenerationCandidates(fromFile.l4),
-      l5: expandGenerationCandidates(fromFile.l5),
-      l6: expandGenerationCandidates(fromFile.l6),
-      l7: expandGenerationCandidates(fromFile.l7 ?? []),
-    }
-  }
-  const l2SenseNova = mergeCatalogWithStatic(
-    senseNovaCatalog,
-    DEFAULT_AUTO_L2_CANDIDATES.filter(candidate =>
-      candidate.startsWith('sensenova/'),
-    ).map(candidate => candidate.slice('sensenova/'.length)),
-  ).map(model => `sensenova/${model}`)
-  return {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    l1: DEFAULT_AUTO_CANDIDATES,
-    l2: [
-      ...l2SenseNova,
-      ...DEFAULT_AUTO_L2_CANDIDATES.filter(
-        candidate => !candidate.startsWith('sensenova/'),
-      ),
-    ],
-    l3: DEFAULT_AUTO_L3_CANDIDATES,
-    l4: DEFAULT_AUTO_L4_CANDIDATES,
-    l5: DEFAULT_AUTO_L5_CANDIDATES,
-    l6: DEFAULT_AUTO_L6_CANDIDATES,
-=======
-=======
->>>>>>> Stashed changes
-    l1: expandGenerationCandidates(DEFAULT_AUTO_CANDIDATES),
-    l2: expandGenerationCandidates(DEFAULT_AUTO_L2_CANDIDATES),
-    l3: expandGenerationCandidates(DEFAULT_AUTO_L3_CANDIDATES),
-    l4: expandGenerationCandidates(DEFAULT_AUTO_L4_CANDIDATES),
-    l5: expandGenerationCandidates(DEFAULT_AUTO_L5_CANDIDATES),
-    l6: expandGenerationCandidates(DEFAULT_AUTO_L6_CANDIDATES),
-    l7: expandGenerationCandidates(DEFAULT_AUTO_L7_CANDIDATES),
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-  }
+  return resolved
 }
 
-export function getAutoCandidates(): string[] {
-  const { l1, l2, l3, l4, l5, l6, l7 } = getAutoCandidateTiers()
-  return [...l1, ...l2, ...l3, ...l4, ...l5, ...l6, ...l7]
+export function getAutoCandidateTiers(): AutoCandidateTiers {
+  const all = getAutoCandidates()
+  return {
+    l1: all,
+    l2: [],
+    l3: [],
+    l4: [],
+    l5: [],
+    l6: [],
+  }
 }
 
 export function isAutoCandidate(model: string): boolean {
@@ -733,7 +428,6 @@ export function scorePoolSync(
   )
   const maxLatency = latencies.length ? Math.max(...latencies) : 0
   const ranked = candidates
-    .filter(candidate => providerOf(candidate).toLowerCase() !== 'gitee')
     .map(candidate => {
       const provider = providerOf(candidate)
       const providerLatency = latency.get(provider)
@@ -806,6 +500,150 @@ function getSnapshot(): {
     latency: new Map(),
     quota: new Map(),
   }
+}
+
+// --- Dynamic relative signals (PG + Redis, fail-open) ---
+// 订阅时效价值系数：AGY 3.8 Flash 与 Codex 5.6 Luna 在健康水位下积极作为主力
+// 高质量调度，杜绝到期清零浪费。系数在 [0, 1] 区间内，对订阅模型加分。
+const SUBSCRIPTION_BOOST_CAP = 0.12
+const SUBSCRIPTION_HEALTHY_THRESHOLD = 0.6
+
+/** 订阅时效价值模型：返回 [0, 1] 的加分系数。
+ *  - 订阅模型且健康水位达标 → 接近 1（积极用，避免浪费）
+ *  - 订阅模型但健康水位差 → 接近 0（不强行用）
+ *  - 非订阅模型 → 0
+ *  调用方可乘以 SUBSCRIPTION_BOOST_CAP 转为实际加分值。 */
+export function subscriptionTimeValue(
+  candidate: string,
+  health: number | undefined,
+): number {
+  const model = candidate.toLowerCase()
+  const isSubscription =
+    /(?:agy|codex|luna|3\.8\s*flash|5\.6\s*luna|chatgpt.*plus|claude.*pro)/.test(
+      model,
+    )
+  if (!isSubscription) return 0
+  const h = health ?? 0.5
+  if (h < SUBSCRIPTION_HEALTHY_THRESHOLD) return 0
+  // 健康水位越高，加分越大，最高 1
+  return Math.min(
+    1,
+    (h - SUBSCRIPTION_HEALTHY_THRESHOLD) / (1 - SUBSCRIPTION_HEALTHY_THRESHOLD),
+  )
+}
+
+/** 从 PG 加载 capabilities 与从 Redis 读取 runtime signals，merge 进 snapshot。
+ *  返回 fail-open 的空 Map 当 PG / Redis 不可达。 */
+async function enhanceSnapshotWithDynamicSignals(
+  candidates: string[],
+): Promise<{
+  health: Map<string, number>
+  latency: Map<string, number>
+  quota: Map<string, number>
+  capabilities: Record<string, ModelCapabilityView>
+  signals: Map<string, RuntimeSignalBundle>
+}> {
+  const baseSnapshot = getSnapshot()
+  const health = new Map(baseSnapshot.health)
+  const latency = new Map(baseSnapshot.latency)
+  const quota = new Map(baseSnapshot.quota)
+  const capabilities: Record<string, ModelCapabilityView> = {}
+  const signalsMap = new Map<string, RuntimeSignalBundle>()
+  try {
+    const capsFromPG = await loadCapabilitiesFromPG()
+    for (const key of Object.keys(capsFromPG)) {
+      capabilities[key] = capsFromPG[key]!
+    }
+  } catch (error) {
+    routeError('probe', 'PG capability load failed', String(error))
+  }
+  try {
+    const batch = await readRuntimeSignalsBatch(
+      candidates.map(c => {
+        const slash = c.indexOf('/')
+        const provider = slash > 0 ? c.slice(0, slash) : c
+        const model = slash > 0 ? c.slice(slash + 1) : ''
+        return { provider, model }
+      }),
+    )
+    for (const [key, signal] of batch.signals) {
+      signalsMap.set(key, signal)
+      // 把 Redis 的 health / latency / quota 覆盖进 snapshot（值更实时）
+      const slash = key.lastIndexOf('/')
+      const provider = slash > 0 ? key.slice(0, slash) : key
+      if (typeof signal.health === 'number') {
+        // PG/Redis 心跳优先：有值就覆盖
+        health.set(provider, signal.health)
+      }
+      if (typeof signal.latencyMs === 'number') {
+        const prevLat = latency.get(provider) ?? Number.POSITIVE_INFINITY
+        latency.set(provider, Math.min(prevLat, signal.latencyMs))
+      }
+      if (typeof signal.quota === 'number') {
+        const prevQuota = quota.get(provider) ?? 100
+        // 保守取最小值：避免 drained 账号被当作 hot
+        quota.set(provider, Math.min(prevQuota, signal.quota))
+      }
+    }
+  } catch (error) {
+    routeError('probe', 'Redis runtime signals read failed', String(error))
+  }
+  return { health, latency, quota, capabilities, signals: signalsMap }
+}
+
+/** 动态相对评分：先读 PG/Redis 心跳，再叠加订阅时效价值系数。
+ *  当 PG/Redis 都不可达时退化为原 scorePoolSync 的行为。 */
+export async function scorePoolDynamic(
+  candidates: string[],
+  prompt?: string,
+): Promise<ScoredCandidate[]> {
+  if (!candidates.length) return []
+  const { health, latency, quota } =
+    await enhanceSnapshotWithDynamicSignals(candidates)
+  const preferences = getRaceMetricPreferences()
+  const coldStart = health.size === 0 && latency.size === 0 && quota.size === 0
+  const latencies = [...latency.values()].filter(
+    (ms): ms is number => typeof ms === 'number' && ms > 0,
+  )
+  const maxLatency = latencies.length ? Math.max(...latencies) : 0
+  const ranked = candidates
+    .map(candidate => {
+      const provider = providerOf(candidate)
+      const providerLatency = latency.get(provider)
+      const latencyInv =
+        typeof providerLatency === 'number' && maxLatency > 0
+          ? 1 - providerLatency / maxLatency
+          : undefined
+      const baseScore = calculateScore(
+        calculateFactors(health.get(provider), latencyInv, quota.get(provider)),
+        DEFAULT_WEIGHTS,
+      )
+      const subBoost =
+        subscriptionTimeValue(candidate, health.get(provider)) *
+        SUBSCRIPTION_BOOST_CAP
+      return {
+        candidate,
+        score: clamp01(
+          baseScore +
+            (preferences.get(candidate) ?? 0) +
+            scenarioBias(candidate, prompt) +
+            subBoost,
+        ),
+      }
+    })
+    .sort((a, b) => {
+      if (!coldStart) return b.score - a.score
+      if (prompt?.trim()) return b.score - a.score
+      const priority = (candidate: string) => {
+        const index = COLD_START_PROVIDER_ORDER.indexOf(providerOf(candidate))
+        return index < 0 ? COLD_START_PROVIDER_ORDER.length : index
+      }
+      return priority(a.candidate) - priority(b.candidate) || b.score - a.score
+    })
+  ranked.forEach((r, i) =>
+    routeLog('rank', `${i + 1} ${r.score.toFixed(3)} ${r.candidate}`),
+  )
+  return ranked
 }
 
 /** Probe one provider's /models endpoint (same probe 9router's
@@ -881,7 +719,6 @@ async function refreshAutoHealthOnce(): Promise<void> {
     return
   }
   await refreshOpenCodeModels()
-  await refreshSenseNovaCatalog()
   const probes = await buildProbes(getAutoCandidates())
   if (!probes.length) {
     routeLog('probe', 'refresh skipped (no probes resolvable)')

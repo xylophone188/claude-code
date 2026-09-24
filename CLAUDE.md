@@ -209,7 +209,6 @@ bun run docs:dev
 
 - **`src/context.ts`** — Builds system/user context for the API call (git status, date, CLAUDE.md contents, memory files).
 - **`src/utils/claudemd.ts`** — Discovers and loads CLAUDE.md files from project hierarchy.
-- **Context boundary** — CCB (PC and phone) owns filesystem, git, shell, edits, and tests, and manages its own MCP context providers (codebase-memory, OpenViking, LLM-Wiki, Context7, Search, etc.). OmniRoute no longer handles these providers; each client manages them directly.
 
 ### Feature Flag System
 

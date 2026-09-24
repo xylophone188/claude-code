@@ -67,6 +67,8 @@ describe('CORE_TOOLS', () => {
       'Agent',
       'AskUserQuestion',
       'SearchExtraTools',
+      'WebSearch',
+      'WebFetch',
       'Sleep',
       'LSP',
       'Skill',

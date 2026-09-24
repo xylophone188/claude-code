@@ -20,7 +20,7 @@ beforeEach(() => {
 describe('isAdmitted', () => {
   it('always admits the race pool and the permanent tier', () => {
     for (const className of ['l1', 'l7'] as const) {
-      const state = isAdmitted('nvidia/z-ai/glm-5.2', className, {}, NOW)
+      const state = isAdmitted('nvidia/z-ai/glm-5.3', className, {}, NOW)
       expect(state.admitted).toBe(true)
       expect(state.exhausted).toBe(false)
     }
@@ -93,12 +93,12 @@ describe('rankQuotaCandidates', () => {
       [
         { provider: 'openai', className: 'l7' },
         { provider: 'github', className: 'l7' },
-        { provider: 'nvidia/z-ai/glm-5.2', className: 'l1' },
+        { provider: 'nvidia/z-ai/glm-5.3', className: 'l1' },
       ],
       {},
       NOW,
     )
-    expect(ranked[0].provider).toBe('nvidia/z-ai/glm-5.2')
+    expect(ranked[0].provider).toBe('nvidia/z-ai/glm-5.3')
     expect(ranked[ranked.length - 1].provider).toBe('github')
   })
 
@@ -132,7 +132,7 @@ describe('rankQuotaCandidates', () => {
 
 describe('recordConsumption', () => {
   it('ignores l1 and l7 consumption', () => {
-    recordConsumption('nvidia/z-ai/glm-5.2', 'l1', 50, {}, NOW)
+    recordConsumption('nvidia/z-ai/glm-5.3', 'l1', 50, {}, NOW)
     recordConsumption('ollama/llama3.1', 'l7', 50, {}, NOW)
     expect(snapshotQuotaGate()).toEqual({
       windows: {},

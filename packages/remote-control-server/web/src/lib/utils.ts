@@ -34,17 +34,7 @@ export function statusClass(status: string | null | undefined): string {
 export function isClosedSessionStatus(
   status: string | null | undefined,
 ): boolean {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-  // Only 'archived' is terminal. 'inactive' is a recoverable liveness
-  // timeout — mirror the server so the input isn't locked out on reconnect.
->>>>>>> Stashed changes
-=======
-  // Only 'archived' is terminal. 'inactive' is a recoverable liveness
-  // timeout — mirror the server so the input isn't locked out on reconnect.
->>>>>>> Stashed changes
-  return status === 'archived'
+  return status === 'archived' || status === 'inactive'
 }
 
 export function truncate(str: string | null | undefined, max: number): string {

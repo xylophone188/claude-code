@@ -43,7 +43,7 @@ describe('COMPAT_PROFILES', () => {
 describe('applyCompatRule - stream_options stripping', () => {
   test('strips stream_options.include_usage for cerebras', () => {
     const body = {
-      model: 'gpt-oss-120b',
+      model: 'llama-3.3-70b',
       messages: [],
       stream: true,
       stream_options: { include_usage: true },

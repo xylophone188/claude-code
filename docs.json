@@ -46,7 +46,6 @@
         "pages": [
           "docs/context/system-prompt",
           "docs/context/project-memory",
-          "docs/context/omniroute-context-boundary",
           "docs/context/compaction",
           "docs/context/token-budget"
         ]

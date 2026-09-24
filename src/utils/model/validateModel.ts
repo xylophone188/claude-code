@@ -36,14 +36,6 @@ export async function validateModel(
     }
   }
 
-  // Gateway ids are validated by OmniRoute at request time.
-  if (
-    normalizedModel.toLowerCase() === 'hermes-score' ||
-    /^cx\/gpt-5\.6-(?:luna|terra|sol)$/i.test(normalizedModel)
-  ) {
-    return { valid: true }
-  }
-
   // Check if it's a known alias (these are always valid)
   const lowerModel = normalizedModel.toLowerCase()
   if ((MODEL_ALIASES as readonly string[]).includes(lowerModel)) {

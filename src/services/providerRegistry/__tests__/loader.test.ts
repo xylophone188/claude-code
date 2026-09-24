@@ -47,7 +47,7 @@ describe('loadProviders', () => {
           {
             id: 'sensenova',
             baseUrl: 'https://token.sensenova.cn/v1',
-            autoModel: 'sensenova-6.8-flash-lite',
+            autoModel: 'sensenova-6.7-flash-lite',
             autoModels: ['glm-5.2'],
             keys: ['secret-one'],
           },
@@ -58,8 +58,8 @@ describe('loadProviders', () => {
     const provider = loadCcbEmbedProviders()[0]
     expect(provider).toMatchObject({
       id: 'sensenova',
-      defaultModel: 'sensenova-6.8-flash-lite',
-      models: ['sensenova-6.8-flash-lite', 'glm-5.2'],
+      defaultModel: 'sensenova-6.7-flash-lite',
+      models: ['sensenova-6.7-flash-lite', 'glm-5.2'],
     })
     expect(provider?.accounts?.[0]?.apiKey).toBe('secret-one')
     delete process.env.CCB_EMBED_PROVIDERS_FILE
@@ -134,7 +134,7 @@ describe('loadProviders', () => {
       kind: 'openai-compat',
       baseUrl: 'https://custom-cerebras.example.com/v1',
       apiKeyEnv: 'CEREBRAS_API_KEY',
-      defaultModel: 'gpt-oss-120b',
+      defaultModel: 'llama-3.3-70b',
       compatRule: 'cerebras',
     }
     writeFileSync(

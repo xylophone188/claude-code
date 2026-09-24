@@ -4,35 +4,25 @@ let ffiShouldThrow = false
 let nativeFlags = 0
 let dlopenCalls = 0
 
-// mock.module is process-global and last-write-wins; other suites in this repo
-// mock `bun:ffi` for unrelated reasons. Register lazily so this file's FFI
-// surface is installed at load time instead of contaminating test discovery.
-let ffiMockInstalled = false
-function installFFIMock() {
-  if (ffiMockInstalled) return
-  ffiMockInstalled = true
-  mock.module('bun:ffi', () => ({
-    FFIType: {
-      i32: 0,
-      u64: 0,
-    },
-    dlopen: () => {
-      dlopenCalls++
-      if (ffiShouldThrow) {
-        throw new Error('ffi load failed')
-      }
-      return {
-        symbols: {
-          CGEventSourceFlagsState: () => nativeFlags,
-        },
-      }
-    },
-  }))
-}
+mock.module('bun:ffi', () => ({
+  FFIType: {
+    i32: 0,
+    u64: 0,
+  },
+  dlopen: () => {
+    dlopenCalls++
+    if (ffiShouldThrow) {
+      throw new Error('ffi load failed')
+    }
+    return {
+      symbols: {
+        CGEventSourceFlagsState: () => nativeFlags,
+      },
+    }
+  },
+}))
 
 const originalPlatform = process.platform
-
-installFFIMock()
 
 async function loadModule() {
   return import(`../index.ts?case=${Math.random()}`)

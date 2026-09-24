@@ -16,11 +16,7 @@ import {
   handleWebSocketClose,
   ingestBridgeMessage,
 } from '../../transport/ws-handler'
-import {
-  getSession,
-  resolveExistingSessionId,
-  touchSession,
-} from '../../services/session'
+import { getSession, resolveExistingSessionId } from '../../services/session'
 
 const app = new Hono()
 
@@ -93,20 +89,6 @@ app.post('/session/:sessionId/events', async c => {
     count++
   }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  touchSession(sessionId)
-=======
-=======
->>>>>>> Stashed changes
-  // Successful HTTP ingress is liveness evidence — reset the disconnect
-  // monitor timer for workers that report via HTTP instead of WS.
-  touchSession(sessionId)
-
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   return c.json({ status: 'ok' }, 200)
 })
 

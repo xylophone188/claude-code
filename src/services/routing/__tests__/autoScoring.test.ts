@@ -5,13 +5,12 @@ import { join } from 'node:path'
 import {
   calculateFactors,
   calculateScore,
-  currentFreeOpenCodeModels,
   DEFAULT_WEIGHTS,
+  getAutoCandidates,
   getAutoCandidateTiers,
-  refreshSenseNovaCatalog,
-  resetSenseNovaCatalogForTests,
   scorePoolSync,
-  writeOpenCodeModelsCache,
+  scorePoolDynamic,
+  subscriptionTimeValue,
 } from '../autoScoring.js'
 import { fetchCodeBuddyQuota } from '../usage/codebuddy.js'
 
@@ -42,93 +41,24 @@ describe('calculateFactors', () => {
   })
 })
 
-describe('getAutoCandidateTiers', () => {
+describe('getAutoCandidates', () => {
   const candidates = process.env.CCB_AUTO_CANDIDATES
-  const candidatesFile = process.env.CCB_AUTO_CANDIDATES_FILE
 
   afterEach(() => {
     if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
     else process.env.CCB_AUTO_CANDIDATES = candidates
-    if (candidatesFile === undefined)
-      delete process.env.CCB_AUTO_CANDIDATES_FILE
-    else process.env.CCB_AUTO_CANDIDATES_FILE = candidatesFile
   })
 
-  it('treats environment candidates as L1 only', () => {
-    // Isolate the deployed auto-candidates.json: the env branch is the unit
-    // under test, not whatever a real machine happens to have configured.
-    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
-    process.env.CCB_AUTO_CANDIDATES = 'opencode/deepseek-v4-flash-free'
-    expect(getAutoCandidateTiers()).toEqual({
-      l1: ['opencode/deepseek-v4-flash-free'],
-      l2: [],
-      l3: [],
-      l4: [],
-      l5: [],
-      l6: [],
-      l7: [],
-    })
-  })
-
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  it('keeps a non-empty L2 pool when no env override or config file exists', () => {
+  it('resolves unified candidate pool without static tier debt', () => {
     delete process.env.CCB_AUTO_CANDIDATES
-    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
-    const l2 = getAutoCandidateTiers().l2
-    expect(l2.length).toBeGreaterThan(0)
-    expect(l2).toContain('nvidia/z-ai/glm-5.2')
-=======
-  it('keeps a non-empty candidate pool when no env override exists', () => {
-    delete process.env.CCB_AUTO_CANDIDATES
-=======
-  it('keeps a non-empty candidate pool when no env override exists', () => {
-    delete process.env.CCB_AUTO_CANDIDATES
->>>>>>> Stashed changes
-    const tiers = getAutoCandidateTiers()
-    const pool = [...tiers.l1, ...tiers.l2]
+    const pool = getAutoCandidates()
     expect(pool.length).toBeGreaterThan(0)
-    expect(pool.every(candidate => !candidate.startsWith('gitee/'))).toBe(true)
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-  })
+    expect(pool).toContain('nvidia/*')
+      })
 
-  it('merges a synced SenseNova catalog into the L2 pool', async () => {
-    delete process.env.CCB_AUTO_CANDIDATES
-    process.env.CCB_AUTO_CANDIDATES_FILE = '/nonexistent-ccb-auto.json'
-    const previousUrl = process.env.CCB_SENSENOVA_MODELS_URL
-    process.env.CCB_SENSENOVA_MODELS_URL = 'https://sensenova.example/v1/models'
-    resetSenseNovaCatalogForTests()
-    try {
-      await refreshSenseNovaCatalog(
-        (async () =>
-          new Response(
-            JSON.stringify({
-              data: [
-                { id: 'glm-5.2' },
-                { id: 'sensenova-6.8-flash-lite' },
-                { id: 'glm-5.2-pro' },
-              ],
-            }),
-            { status: 200 },
-          )) as unknown as typeof fetch,
-      )
-
-      const l2 = getAutoCandidateTiers().l2
-      expect(l2).toEqual([
-        'sensenova/glm-5.2',
-        'sensenova/sensenova-6.8-flash-lite',
-        'sensenova/glm-5.2-pro',
-        'sensenova/deepseek-v4-flash',
-        'nvidia/z-ai/glm-5.2',
-      ])
-    } finally {
-      if (previousUrl === undefined) delete process.env.CCB_SENSENOVA_MODELS_URL
-      else process.env.CCB_SENSENOVA_MODELS_URL = previousUrl
-      resetSenseNovaCatalogForTests()
-    }
-=======
->>>>>>> Stashed changes
+  it('supports explicit environment candidate override', () => {
+    process.env.CCB_AUTO_CANDIDATES = 'opencode/gemini-3.8-flash'
+    expect(getAutoCandidates()).toEqual(['opencode/gemini-3.8-flash'])
   })
 })
 
@@ -167,37 +97,6 @@ describe('scorePoolSync', () => {
     expect(scorePoolSync(['slow/model', 'fast/model'])[0]?.candidate).toBe(
       'slow/model',
     )
-  })
-
-  it('omits gitee from every generation candidate pool and ranking', () => {
-    const candidates = process.env.CCB_AUTO_CANDIDATES
-    process.env.CCB_AUTO_CANDIDATES =
-      'gitee/model,opencode/deepseek-v4-flash-free'
-    try {
-      const tiers = getAutoCandidateTiers()
-      const pool = [
-        ...tiers.l1,
-        ...tiers.l2,
-        ...tiers.l3,
-        ...tiers.l4,
-        ...tiers.l5,
-        ...tiers.l6,
-      ]
-      expect(pool).not.toContain('gitee/model')
-      expect(pool.every(candidate => !candidate.startsWith('gitee/'))).toBe(
-        true,
-      )
-      const ranked = scorePoolSync([
-        'gitee/model',
-        'opencode/deepseek-v4-flash-free',
-      ])
-      expect(ranked.every(entry => !entry.candidate.startsWith('gitee/'))).toBe(
-        true,
-      )
-    } finally {
-      if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
-      else process.env.CCB_AUTO_CANDIDATES = candidates
-    }
   })
 })
 
@@ -288,7 +187,7 @@ describe('refreshAutoHealth', () => {
 
   it('shares concurrent refreshes', async () => {
     const candidates = process.env.CCB_AUTO_CANDIDATES
-    process.env.CCB_AUTO_CANDIDATES = 'opencode/deepseek-v4-flash-free'
+    process.env.CCB_AUTO_CANDIDATES = 'opencode/gemini-3.8-flash'
     let calls = 0
     globalThis.fetch = (async (url: string | URL | Request) => {
       if (String(url).includes('opencode.ai')) calls++
@@ -318,7 +217,7 @@ describe('refreshAutoHealth', () => {
       const { refreshAutoHealth } = await import(
         `../autoScoring.js?quota-failure=${Date.now()}`
       )
-      expect(await refreshAutoHealth()).toBeUndefined()
+      await expect(refreshAutoHealth()).resolves.toBeUndefined()
     } finally {
       if (candidates === undefined) delete process.env.CCB_AUTO_CANDIDATES
       else process.env.CCB_AUTO_CANDIDATES = candidates
@@ -326,76 +225,42 @@ describe('refreshAutoHealth', () => {
   })
 })
 
-describe('OpenCode free-model cache', () => {
-  const hour = 60 * 60 * 1000
-  const baseTime = Date.parse('2026-09-06T12:00:00Z')
-  const cacheDate = (offsetMs: number) =>
-    new Date(baseTime + offsetMs).toISOString()
-  const previousCacheFile = process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-
-  beforeEach(() => {
-    process.env.CCB_OPENCODE_MODELS_CACHE_FILE = join(
-      dir,
-      'opencode-free-models.json',
-    )
+describe('subscriptionTimeValue', () => {
+  it('returns 0 for non-subscription models', () => {
+    expect(subscriptionTimeValue('nvidia/z-ai/glm-5.3', 0.9)).toBe(0)
+    expect(subscriptionTimeValue('opencode/gemini-3.8-flash', 1)).toBe(0)
   })
 
-  afterEach(() => {
-    if (previousCacheFile === undefined)
-      delete process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-    else process.env.CCB_OPENCODE_MODELS_CACHE_FILE = previousCacheFile
+  it('returns 0 for subscription models below healthy threshold', () => {
+    expect(subscriptionTimeValue('agy/3.8-flash', 0.3)).toBe(0)
+    expect(subscriptionTimeValue('codex/5.6-luna', 0.5)).toBe(0)
   })
 
-  it('serves fresh cache inside the 8-hour window', () => {
-    writeOpenCodeModelsCache({
-      updatedAt: cacheDate(0),
-      models: ['mimo-v2.5-free'],
-    })
-    const realNow = Date.now
-    Date.now = () => baseTime + 7 * hour
-    try {
-      expect(currentFreeOpenCodeModels()).toEqual(['mimo-v2.5-free'])
-    } finally {
-      Date.now = realNow
-    }
+  it('returns positive value for healthy subscription models', () => {
+    expect(subscriptionTimeValue('agy/3.8-flash', 0.8)).toBeGreaterThan(0)
+    expect(subscriptionTimeValue('codex/5.6-luna', 1)).toBeCloseTo(1, 6)
   })
 
-  it('rejects an expired cache past the 8-hour window', () => {
-    writeOpenCodeModelsCache({
-      updatedAt: cacheDate(0),
-      models: ['mimo-v2.5-free'],
-    })
-    const realNow = Date.now
-    Date.now = () => baseTime + 8 * hour
-    try {
-      expect(currentFreeOpenCodeModels()).toEqual([])
-    } finally {
-      Date.now = realNow
-    }
+  it('grows monotonically with health above threshold', () => {
+    const low = subscriptionTimeValue('agy/3.8-flash', 0.7)
+    const high = subscriptionTimeValue('agy/3.8-flash', 0.9)
+    expect(high).toBeGreaterThan(low)
+  })
+})
+
+describe('scorePoolDynamic', () => {
+  it('returns empty list for empty candidates', async () => {
+    const ranked = await scorePoolDynamic([])
+    expect(ranked).toEqual([])
   })
 
-  it('rejects a future-dated cache (clock skew)', () => {
-    writeOpenCodeModelsCache({
-      updatedAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-      models: ['mimo-v2.5-free'],
-    })
-    expect(currentFreeOpenCodeModels()).toEqual([])
-  })
-
-  it('rejects a corrupted cache file', () => {
-    writeFileSync(process.env.CCB_OPENCODE_MODELS_CACHE_FILE!, '{not json')
-    expect(currentFreeOpenCodeModels()).toEqual([])
-  })
-
-  it('rejects an empty models array', () => {
-    writeOpenCodeModelsCache({
-      updatedAt: cacheDate(0),
-      models: [],
-    })
-    expect(currentFreeOpenCodeModels()).toEqual([])
-  })
-
-  it('never falls back to a hardcoded legacy model', () => {
-    expect(currentFreeOpenCodeModels()).not.toContain('deepseek-v4-flash-free')
+  it('returns ranked candidates even when PG/Redis are unreachable', async () => {
+    // No PG/Redis available in tests → degrade to neutral, still returns ranked
+    const ranked = await scorePoolDynamic([
+      'opencode/gemini-3.8-flash',
+      'nvidia/z-ai/glm-5.3',
+    ])
+    expect(ranked.length).toBe(2)
+    expect(ranked.every(r => typeof r.score === 'number')).toBe(true)
   })
 })

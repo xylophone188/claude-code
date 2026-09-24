@@ -19,7 +19,6 @@ export interface CacheHitRateInfo {
 interface CacheWarningState {
   lastHitRate: number | null
   lastTimestamp: number | null
-  belowThreshold: boolean
 }
 
 // 模块级状态，每个 querySource 独立跟踪
@@ -95,11 +94,7 @@ export function shouldShowCacheWarning(
   // 获取或初始化该 querySource 的状态
   let state = cacheWarningStateBySource.get(querySource)
   if (!state) {
-    state = {
-      lastHitRate: null,
-      lastTimestamp: null,
-      belowThreshold: false,
-    }
+    state = { lastHitRate: null, lastTimestamp: null }
     // Evict oldest entry when at capacity so the Map stays bounded
     if (cacheWarningStateBySource.size >= MAX_SOURCE_ENTRIES) {
       const oldestKey = cacheWarningStateBySource.keys().next().value
@@ -110,16 +105,22 @@ export function shouldShowCacheWarning(
     cacheWarningStateBySource.set(querySource, state)
   }
 
-  const now = Date.now()
-  const previousHitRate = state.lastHitRate
-  const trend = previousHitRate === null ? null : hitRate - previousHitRate
-  const wasBelowThreshold = state.belowThreshold
-  state.lastHitRate = hitRate
-  state.lastTimestamp = now
-  state.belowThreshold = hitRate < threshold
+  // 首次请求不显示警告
+  if (state.lastHitRate === null) {
+    state.lastHitRate = hitRate
+    state.lastTimestamp = Date.now()
+    return null
+  }
 
-  // 首次可观察到的低命中率，以及从正常跌破阈值时才提示；稳定低位不刷屏。
-  if (hitRate < threshold && (previousHitRate === null || !wasBelowThreshold)) {
+  // 计算趋势
+  const trend = hitRate - state.lastHitRate
+
+  // 更新状态
+  state.lastHitRate = hitRate
+  state.lastTimestamp = Date.now()
+
+  // 检查是否需要警告
+  if (hitRate < threshold) {
     return { hitRate, threshold, trend, shouldWarn: true }
   }
 

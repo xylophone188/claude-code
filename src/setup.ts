@@ -409,7 +409,6 @@ export async function setup(
       typeof process.getuid === 'function' &&
       process.getuid() === 0 &&
       process.env.IS_SANDBOX !== '1' &&
-      process.env.CCB_ANDROID_SYSTEM !== '1' &&
       !isEnvTruthy(process.env.CLAUDE_CODE_BUBBLEWRAP)
     ) {
       // Root + bypass = every tool call executes without review at uid 0.

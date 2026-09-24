@@ -119,19 +119,6 @@ const ENV_KEYS = [
   'OPENAI_AUTH_MODE',
   'OPENAI_API_KEY',
   'OPENAI_BASE_URL',
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  'CCB_HEADROOM_BASE_URL',
-=======
-  'OMNIRUTE_API_KEY',
-  'OMNIROUTE_API_KEY',
-  'CCB_CODEBUDDY_CN_KEY',
->>>>>>> Stashed changes
-=======
-  'OMNIRUTE_API_KEY',
-  'OMNIROUTE_API_KEY',
-  'CCB_CODEBUDDY_CN_KEY',
->>>>>>> Stashed changes
   'CCB_EMBED_ROUTE_FILE',
   'CLAUDE_CONFIG_DIR',
   'CCB_HEADROOM_TOKEN_BASE_URL',
@@ -216,19 +203,6 @@ beforeEach(() => {
   process.env.CCB_EMBED_PROVIDERS_FILE = join(directConfigDir, 'providers.json')
   delete process.env.CCB_HEADROOM_TOKEN_BASE_URL
   delete process.env.CCB_HEADROOM_CACHE_BASE_URL
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  delete process.env.CCB_HEADROOM_BASE_URL
-=======
-  delete process.env.OMNIRUTE_API_KEY
-  delete process.env.OMNIROUTE_API_KEY
-  delete process.env.CCB_CODEBUDDY_CN_KEY
->>>>>>> Stashed changes
-=======
-  delete process.env.OMNIRUTE_API_KEY
-  delete process.env.OMNIROUTE_API_KEY
-  delete process.env.CCB_CODEBUDDY_CN_KEY
->>>>>>> Stashed changes
   const token = chatGPTTestToken()
   writeFileSync(
     join(directConfigDir, 'openai-chatgpt-auth.json'),
@@ -410,18 +384,10 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
     })
 
     expect(lastOpenAIClientOptions).toMatchObject({
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      baseURL: 'http://127.0.0.1:8787/v1',
-=======
-      baseURL: 'http://127.0.0.1:20128/v1',
->>>>>>> Stashed changes
-=======
-      baseURL: 'http://127.0.0.1:20128/v1',
->>>>>>> Stashed changes
+      baseURL: 'http://127.0.0.1:20131/v1',
       providerId: 'omniroute',
     })
-    expect(lastChatCompletionsArgs?.model).toBe('ccb-chat')
+    expect(lastChatCompletionsArgs?.model).toBe('auto/smart')
     expect(result.content).toMatchObject([
       { type: 'tool_use', name: 'classify_result' },
     ])
@@ -509,17 +475,8 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
 
     expect(capturedFetch).toBeNull()
     expect(lastOpenAIClientOptions).toMatchObject({
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      baseURL: 'http://127.0.0.1:8787/v1',
-=======
-      baseURL: 'http://127.0.0.1:20128/v1',
-      apiKey: 'omniroute-local',
->>>>>>> Stashed changes
-=======
-      baseURL: 'http://127.0.0.1:20128/v1',
-      apiKey: 'omniroute-local',
->>>>>>> Stashed changes
+      baseURL: 'http://127.0.0.1:20131/v1',
+      apiKey: '',
       providerId: 'omniroute',
     })
     expect(lastChatCompletionsArgs?.model).toBe('codebuddy-cn/glm-5.2')
@@ -534,15 +491,7 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
     expect(resolveDirectRoutes('ccb/test-fallback/glm-5.2')).toEqual([
       expect.objectContaining({
         providerId: 'omniroute',
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        baseURL: 'http://127.0.0.1:8787/v1',
-=======
-        baseURL: 'http://127.0.0.1:20128/v1',
->>>>>>> Stashed changes
-=======
-        baseURL: 'http://127.0.0.1:20128/v1',
->>>>>>> Stashed changes
+        baseURL: 'http://127.0.0.1:20131/v1',
         model: 'test-fallback/glm-5.2',
       }),
     ])

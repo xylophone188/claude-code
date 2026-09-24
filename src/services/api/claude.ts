@@ -32,6 +32,7 @@ import {
 import {
   getEmptyToolPermissionContext,
   type QueryChainTracking,
+  type Tool,
   type ToolPermissionContext,
   type Tools,
   toolMatchesName,
@@ -197,6 +198,7 @@ import {
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
 } from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+import { count } from '../../utils/array.js'
 import { insertBlockAfterToolResults } from '../../utils/contentArray.js'
 import { validateBoundedIntEnvVar } from '../../utils/envValidation.js'
 import { safeParseJSON } from '../../utils/json.js'
@@ -207,7 +209,6 @@ import {
   parseUserSpecifiedModel,
 } from '../../utils/model/model.js'
 import { resolveDirectRoutes } from '../omniroute/adapter.js'
-import { compressMessagesForProvider } from '../context/runtime.js'
 import {
   startSessionActivity,
   stopSessionActivity,
@@ -229,6 +230,7 @@ import {
   markToolsSentToAPIState,
   pinCacheEdits,
 } from '../compact/microCompact.js'
+import { getInitializationStatus } from '../lsp/manager.js'
 import { isToolFromMcpServer } from '../mcp/utils.js'
 import { recordLLMObservation } from '../langfuse/index.js'
 import type { LangfuseSpan } from '../langfuse/index.js'
@@ -803,6 +805,19 @@ export async function* queryModelWithStreaming({
 }
 
 /**
+ * Determines if an LSP tool should be deferred (tool appears with defer_loading: true)
+ * because LSP initialization is not yet complete.
+ */
+function shouldDeferLspTool(tool: Tool): boolean {
+  if (!('isLsp' in tool) || !tool.isLsp) {
+    return false
+  }
+  const status = getInitializationStatus()
+  // Defer when pending or not started
+  return status.status === 'pending' || status.status === 'not-started'
+}
+
+/**
  * Per-attempt timeout for non-streaming fallback requests, in milliseconds.
  * Reads API_TIMEOUT_MS when set so slow backends and the streaming path
  * share the same ceiling.
@@ -1349,52 +1364,12 @@ async function* queryModel(
     API_MAX_MEDIA_PER_REQUEST,
   )
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  // Lightweight local context compression for direct providers. When the
-  // request is owned by the OmniRoute gateway, the gateway owns the context
-  // budget so the client must not compress twice.
-  const routedProviders = resolveDirectRoutes(options.model).map(
-    route => route.providerId,
-  )
-  const compressionResult = await compressMessagesForProvider(
-    messagesForAPI as unknown as Array<{
-      type: 'user' | 'assistant'
-      message: { content: unknown }
-    }>,
-    [getAPIProvider(), ...routedProviders],
-  )
-  if (compressionResult.source !== 'unchanged') {
-    messagesForAPI = compressionResult.messages.map(
-      message => message as unknown as AssistantMessage | UserMessage,
-=======
-=======
->>>>>>> Stashed changes
-  // Apply the lightweight CCB context pass after all message normalization and
-  // repair work, but before dispatching to a provider. OmniRoute routes opt out
-  // by default because the gateway owns context management for those requests.
-  const directRoutes = resolveDirectRoutes(options.model)
-  const compressionResult = await compressMessagesForProvider(messagesForAPI, [
-    getAPIProvider(),
-    ...directRoutes.map(route => route.providerId),
-  ])
-  messagesForAPI = compressionResult.messages
-  if (compressionResult.remoteError) {
-    logForDebugging(
-      `Remote context compression unavailable; using ${compressionResult.source} fallback: ${compressionResult.remoteError.message}`,
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-    )
-  }
-
   // OpenAI-compatible provider: delegate to the OpenAI adapter layer
   // after shared preprocessing (message normalization, tool filtering,
   // media stripping) but before Anthropic-specific logic (betas, thinking, caching).
   if (
     isOpencodeModel(options.model) ||
-    directRoutes.length > 0 ||
+    resolveDirectRoutes(options.model).length > 0 ||
     getAPIProvider() === 'openai' ||
     getAPIProvider() === 'opencode-free'
   ) {

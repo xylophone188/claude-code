@@ -22,25 +22,6 @@ export const config = {
     process.env.RCS_WS_KEEPALIVE_INTERVAL || '20',
     10,
   ),
-  /** Client-data silence before the server force-closes an idle WS (seconds).
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-   * Independent of wsKeepaliveInterval — server keep_alive frames are
-   * server→client only and prove nothing about client liveness.
-   * Default 360s (3× the bridge client's 120s cadence) covers clients
-   * without keep_alive echo; with the echo fix (5b) this timer never fires. */
-=======
-=======
->>>>>>> Stashed changes
-   *  Independent of wsKeepaliveInterval — server keep_alive frames are
-   *  server→client only and prove nothing about client liveness. Default 360s
-   *  (3× the bridge client's 120s cadence) covers clients without keep_alive
-   *  echo; with the echo fix this timer never fires anyway. */
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-  wsClientTimeout: parseInt(process.env.RCS_WS_CLIENT_TIMEOUT || '360', 10),
 } as const
 
 export function getBaseUrl(): string {

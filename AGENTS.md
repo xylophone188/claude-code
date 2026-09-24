@@ -4,14 +4,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) and other AI coding agents when working with code in this repository.
 
-## Context Routing Boundary
-
-CCB owns filesystem, git, shell, edits, and tests. It must not directly call,
-connect to, load skills from, or choose `codebase-memory`, OpenViking,
-LLM-Wiki, Context7, Search, or other Context providers. OmniRoute owns Context
-and model decisions, project resolution, provider selection, cache, and Context
-receipts.
-
 ## Project Overview
 
 This is a **reverse-engineered / decompiled** version of Anthropic's official Claude Code CLI tool. The goal is to restore core functionality while trimming secondary capabilities. Many modules are stubbed or feature-flagged off. TypeScript strict mode is enforced — **`bunx tsc --noEmit` must pass with zero errors**.

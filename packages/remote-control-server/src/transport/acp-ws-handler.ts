@@ -27,19 +27,7 @@ interface AcpConnectionEntry {
 const connections = new Map<string, AcpConnectionEntry>() // key: wsId
 
 const SERVER_KEEPALIVE_INTERVAL_MS = config.wsKeepaliveInterval * 1000
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// Independent of wsKeepaliveInterval — server keep_alive frames are
-// server→client only and prove nothing about client liveness.
-const CLIENT_ACTIVITY_TIMEOUT_MS = (config.wsClientTimeout ?? 360) * 1000
-=======
-// Keep client liveness independent from the server's outbound keepalive cadence.
-const CLIENT_ACTIVITY_TIMEOUT_MS = (config.wsClientTimeout || 360) * 1000
->>>>>>> Stashed changes
-=======
-// Keep client liveness independent from the server's outbound keepalive cadence.
-const CLIENT_ACTIVITY_TIMEOUT_MS = (config.wsClientTimeout || 360) * 1000
->>>>>>> Stashed changes
+const CLIENT_ACTIVITY_TIMEOUT_MS = SERVER_KEEPALIVE_INTERVAL_MS * 3
 
 /** Send a JSON message to a WS connection (NDJSON format) */
 function sendToWs(ws: WSContext, msg: object): void {

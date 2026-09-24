@@ -1048,48 +1048,12 @@ if (markerIdx !== -1) {
     }
     if (fnEnd !== -1) {
       let fn = s.substring(fnStart, fnEnd + 1)
-      // 这些 '${...}' 片段是对已编译产物时长模板做文本匹配，
-      // 并非真实的模板字符串插值（与下方 4b/4d 同类的产物字面量）。
       const pairs = [
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
         ['}d ${z}h ${Y}m ${$}s', '}天${z}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
         ['}d ${z}h ${Y}m', '}天${z}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
         ['}h ${Y}m ${$}s', '}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
         ['}d ${z}h', '}天${z}时'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
         ['}h ${Y}m', '}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
-=======
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h ${Y}m ${$}s', '}天${z}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h ${Y}m', '}天${z}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}h ${Y}m ${$}s', '}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h', '}天${z}时'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}h ${Y}m', '}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
-=======
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h ${Y}m ${$}s', '}天${z}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h ${Y}m', '}天${z}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}h ${Y}m ${$}s', '}时${Y}分${$}秒'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}d ${z}h', '}天${z}时'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-        ['}h ${Y}m', '}时${Y}分'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
         ['}m ${$}s', '}分${$}秒'],
         ['}d', '}天'],
         ['}h', '}时'],
@@ -1122,32 +1086,9 @@ tryReplace('"Idle for "', '"空闲 "')
 // 原: `${bL} Worked for ${w3(Date.now()-V.startTime)}` → "烘焙了 Worked for 27分26秒"
 // 修: `${bL} ${w3(Date.now()-V.startTime)}` → "烘焙了 27分26秒"
 tryReplace(
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
   ' Worked for ${w3(Date.now()-V.startTime)}',
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
   ' ${w3(Date.now()-V.startTime)}',
 )
-// 这些被搜索的 '${...}' 片段是对已编译产物的模板字面量做文本匹配，
-// 并非真实的模板字符串插值。
-// biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
-=======
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-  ' Worked for ${w3(Date.now()-V.startTime)}',
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-  ' ${w3(Date.now()-V.startTime)}',
-)
-// biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
-=======
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-  ' Worked for ${w3(Date.now()-V.startTime)}',
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
-  ' ${w3(Date.now()-V.startTime)}',
-)
-// biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
 tryReplace('${bL} Idle', '${bL} 空闲')
 
 // 4c. 同类 duration 模板的泛化匹配
@@ -1167,15 +1108,6 @@ tryRegexReplace(/\$\{[^}]+\}\s+Idle(?=[`"])/g, match =>
 // 4d. 消息完成后的状态行（显示 "翻搅了 for 51秒" 的地方）
 // 原: let G=H&&`${O} for ${M}`  （O=动词, M=时长）
 // 修: let G=H&&`${O} ${M}`     → "翻搅了 51秒"
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// biome-ignore lint/suspicious/noTemplateCurlyInString: literal template source text matched against a build artifact
-=======
-// biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
-=======
-// biome-ignore lint/suspicious/noTemplateCurlyInString: localization template strings
->>>>>>> Stashed changes
 tryReplace('`${O} for ${M}`', '`${O} ${M}`')
 tryRegexReplace(/&&`\$\{[^}]+\} for \$\{[^}]+\}`/g, match =>
   match.replace(' for ', ' '),

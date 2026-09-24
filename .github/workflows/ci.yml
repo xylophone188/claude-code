@@ -39,13 +39,9 @@ jobs:
         run: bun run typecheck
 
       - name: Test with Coverage
-        env:
-          NODE_ENV: test
         run: |
           # Tolerate pre-existing flaky tests (Bun mock pollution / order-dependent state).
           # We still require lcov.info to be generated and contain real coverage data.
-          # NODE_ENV=test matches package.json's test script so JSX/React test
-          # gates behave identically to local `bun run precheck`.
           set -o pipefail
           bun test --coverage --coverage-reporter lcov --coverage-dir coverage 2>&1 | grep -vE '^\s*(\(pass\)|\(skip\))' | sed '/^.*\/__tests__\/.*:$/d' | cat -s
           test -s coverage/lcov.info

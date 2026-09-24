@@ -281,15 +281,6 @@ export function getRuntimeMainLoopModel(params: {
  * @returns The default model setting to use
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
-  if (
-    process.env.HERMES_SCORE_DEFAULT !== '0' &&
-    (process.env.HERMES_SCORE_DEFAULT === '1' ||
-      process.env.OMNIRUTE_URL ||
-      process.env.OMNIROUTE_BASE_URL)
-  ) {
-    return 'auto'
-  }
-
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
   if (process.env.USER_TYPE === 'ant') {
     return (
@@ -450,40 +441,11 @@ export function isOpus1mMergeEnabled(): boolean {
 }
 
 export function renderModelSetting(setting: ModelName | ModelAlias): string {
+  if (setting === 'worker-pool' || setting === 'auto' || setting === 'v8' || setting === 'chat-pool') {
+    return 'v8·自主选模'
+  }
   if (setting === 'opusplan') {
     return 'Opus Plan'
-  }
-  if (
-    isEnvTruthy(process.env.CCB_ENV) &&
-    /^(?:auto|hermes-score|race|ccb-(?:chat|research|coding|plan|review|vision|crawl|search|score)|omniroute\/ccb-chat|omniroute\/9router|9router\/direct)$/i.test(
-      setting,
-    )
-  ) {
-    switch (setting) {
-      case 'ccb-chat':
-      case 'omniroute/ccb-chat':
-        return 'CCB · 对话'
-      case 'ccb-research':
-        return 'CCB · 研究'
-      case 'ccb-coding':
-        return 'CCB · 编码'
-      case 'ccb-plan':
-        return 'CCB · 规划'
-      case 'ccb-review':
-        return 'CCB · 审核'
-      case 'ccb-vision':
-        return 'CCB · 视图'
-      case 'ccb-crawl':
-        return 'CCB · 爬取'
-      case 'ccb-search':
-        return 'CCB · 搜索'
-      case 'omniroute/9router':
-        return 'OmniRoute → 9router'
-      case '9router/direct':
-        return '9router 直连'
-      default:
-        return 'OmniRoute 自动路由'
-    }
   }
   if (isModelAlias(setting)) {
     return capitalize(setting)

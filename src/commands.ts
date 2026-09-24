@@ -30,7 +30,6 @@ import login from './commands/login/index.js'
 import logout from './commands/logout/index.js'
 import installGitHubApp from './commands/install-github-app/index.js'
 import installSlackApp from './commands/install-slack-app/index.js'
-import installApk from './commands/install-apk/index.js'
 import breakCache, {
   breakCacheNonInteractive,
 } from './commands/break-cache/index.js'
@@ -174,10 +173,6 @@ const rtkCmd = feature('RTK')
       require('./commands/rtk/index.js') as typeof import('./commands/rtk/index.js')
     ).default
   : null
-// OmniRoute owns compression/style policy in CCB server-routing mode. Keep
-// local controls available only for the deliberate legacy embed fallback.
-const omniRouteOwnsAgentOS =
-  process.env.CCB_ENV === '1' && process.env.OMNIROUTE_SERVER_ROUTING !== '0'
 const poor = feature('POOR')
   ? (
       require('./commands/poor/index.js') as typeof import('./commands/poor/index.js')
@@ -226,7 +221,6 @@ import advisor from './commands/advisor.js'
 import autonomy from './commands/autonomy.js'
 import provider from './commands/provider.js'
 import router from './commands/router.js'
-import { pool, poolNonInteractive } from './commands/pool/index.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -334,8 +328,6 @@ const COMMANDS = memoize((): Command[] => [
   autonomy,
   provider,
   router,
-  pool,
-  poolNonInteractive,
   artifacts,
   agents,
   branch,
@@ -361,7 +353,6 @@ const COMMANDS = memoize((): Command[] => [
   init,
   keybindings,
   lang,
-  installApk,
   installGitHubApp,
   installSlackApp,
   mcp,
@@ -401,9 +392,9 @@ const COMMANDS = memoize((): Command[] => [
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(buddy ? [buddy] : []),
-  ...(caveman && !omniRouteOwnsAgentOS ? [caveman] : []),
-  ...(ponytail && !omniRouteOwnsAgentOS ? [ponytail] : []),
-  ...(rtkCmd && !omniRouteOwnsAgentOS ? [rtkCmd] : []),
+  ...(caveman ? [caveman] : []),
+  ...(ponytail ? [ponytail] : []),
+  ...(rtkCmd ? [rtkCmd] : []),
   ...(poor ? [poor] : []),
   ...(goalCmd ? [goalCmd] : []),
   ...(proactive ? [proactive] : []),

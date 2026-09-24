@@ -8,21 +8,6 @@ export * from './advisor'
 // ── Capacity / account fallback (ported ccb subsystems) ──────────
 export * from './capacity'
 export * from './accountFallback'
-export * from './quotaGate'
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-export * from './circuitBreaker'
-export * from './responseQuality'
-export * from './admission'
-export * from './catalogSync'
-export * from './visionQuality'
-export * from './scenarioCombos'
-=======
-export * from './responseQuality'
->>>>>>> Stashed changes
-=======
-export * from './responseQuality'
->>>>>>> Stashed changes
 
 // ── Intent routing & classification (L1 keyword + L2 embedding) ─────
 export * from './intentRouter'
@@ -48,3 +33,8 @@ export * from './providerCatalog'
 export * from './inspect'
 export * from './costEstimator'
 export * from './bootstrap'
+
+// ── Shadow receipt (package 1 observability) ──────────────────────────
+// Immutable multi-factor model-selection observation. Read-only w.r.t. the
+// dispatch decision; must never influence which route is chosen.
+export * from './shadowReceipt'

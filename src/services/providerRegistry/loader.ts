@@ -24,8 +24,7 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     kind: 'openai-compat',
     baseUrl: 'https://api.cerebras.ai/v1',
     apiKeyEnv: 'CEREBRAS_API_KEY',
-    defaultModel: 'gpt-oss-120b',
-    models: ['gpt-oss-120b', 'gemma-4-31b', 'qwen-3.8-27b'],
+    defaultModel: 'llama-3.3-70b',
     compatRule: 'cerebras',
   },
   {

@@ -24,12 +24,6 @@ describe('Tool chain: registration and discovery', () => {
     }
   })
 
-  test('does not expose direct Context acquisition tools', () => {
-    const names = new Set(getAllBaseTools().map(tool => tool.name))
-    expect(names.has('WebSearch')).toBe(false)
-    expect(names.has('WebFetch')).toBe(false)
-  })
-
   test('findToolByName finds core tools from the full list', () => {
     const tools = getAllBaseTools()
     const bash = findToolByName(tools, 'Bash')

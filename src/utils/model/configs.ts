@@ -1,23 +1,7 @@
 import type { ModelName } from './model.js'
 import type { APIProvider } from './providers.js'
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-type StaticAPIProvider = Exclude<APIProvider, 'opencode-free'>
-
-export type ModelConfig = Record<StaticAPIProvider, ModelName> & {
-  'opencode-free'?: ModelName
-}
-=======
-export type ModelConfig = {
-  [K in Exclude<APIProvider, 'opencode-free'>]: ModelName
-} & { 'opencode-free'?: ModelName }
->>>>>>> Stashed changes
-=======
-export type ModelConfig = {
-  [K in Exclude<APIProvider, 'opencode-free'>]: ModelName
-} & { 'opencode-free'?: ModelName }
->>>>>>> Stashed changes
+export type ModelConfig = Record<APIProvider, ModelName>
 
 // @[MODEL LAUNCH]: Add a new CLAUDE_*_CONFIG constant here. Double check the correct model strings
 // here since the pattern may change.
@@ -29,6 +13,7 @@ export const CLAUDE_3_7_SONNET_CONFIG = {
   foundry: 'claude-3-7-sonnet',
   openai: 'claude-3-7-sonnet-20250219',
   gemini: 'claude-3-7-sonnet-20250219',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-3-7-sonnet-20250219',
 } as const satisfies ModelConfig
 
@@ -39,6 +24,7 @@ export const CLAUDE_3_5_V2_SONNET_CONFIG = {
   foundry: 'claude-3-5-sonnet',
   openai: 'claude-3-5-sonnet-20241022',
   gemini: 'claude-3-5-sonnet-20241022',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-3-5-sonnet-20241022',
 } as const satisfies ModelConfig
 
@@ -49,6 +35,7 @@ export const CLAUDE_3_5_HAIKU_CONFIG = {
   foundry: 'claude-3-5-haiku',
   openai: 'claude-3-5-haiku-20241022',
   gemini: 'claude-3-5-haiku-20241022',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-3-5-haiku-20241022',
 } as const satisfies ModelConfig
 
@@ -59,6 +46,7 @@ export const CLAUDE_HAIKU_4_5_CONFIG = {
   foundry: 'claude-haiku-4-5',
   openai: 'claude-haiku-4-5-20251001',
   gemini: 'claude-haiku-4-5-20251001',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-haiku-4-5-20251001',
 } as const satisfies ModelConfig
 
@@ -69,6 +57,7 @@ export const CLAUDE_SONNET_4_CONFIG = {
   foundry: 'claude-sonnet-4',
   openai: 'claude-sonnet-4-20250514',
   gemini: 'claude-sonnet-4-20250514',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-sonnet-4-20250514',
 } as const satisfies ModelConfig
 
@@ -79,6 +68,7 @@ export const CLAUDE_SONNET_4_5_CONFIG = {
   foundry: 'claude-sonnet-4-5',
   openai: 'claude-sonnet-4-5-20250929',
   gemini: 'claude-sonnet-4-5-20250929',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-sonnet-4-5-20250929',
 } as const satisfies ModelConfig
 
@@ -89,6 +79,7 @@ export const CLAUDE_OPUS_4_CONFIG = {
   foundry: 'claude-opus-4',
   openai: 'claude-opus-4-20250514',
   gemini: 'claude-opus-4-20250514',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-opus-4-20250514',
 } as const satisfies ModelConfig
 
@@ -99,6 +90,7 @@ export const CLAUDE_OPUS_4_1_CONFIG = {
   foundry: 'claude-opus-4-1',
   openai: 'claude-opus-4-1-20250805',
   gemini: 'claude-opus-4-1-20250805',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-opus-4-1-20250805',
 } as const satisfies ModelConfig
 
@@ -109,6 +101,7 @@ export const CLAUDE_OPUS_4_5_CONFIG = {
   foundry: 'claude-opus-4-5',
   openai: 'claude-opus-4-5-20251101',
   gemini: 'claude-opus-4-5-20251101',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-opus-4-5-20251101',
 } as const satisfies ModelConfig
 
@@ -119,6 +112,7 @@ export const CLAUDE_OPUS_4_6_CONFIG = {
   foundry: 'claude-opus-4-6',
   openai: 'claude-opus-4-6',
   gemini: 'claude-opus-4-6',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-opus-4-6',
 } as const satisfies ModelConfig
 
@@ -129,6 +123,7 @@ export const CLAUDE_OPUS_4_7_CONFIG = {
   foundry: 'claude-opus-4-7',
   openai: 'claude-opus-4-7',
   gemini: 'claude-opus-4-7',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-opus-4-7',
 } as const satisfies ModelConfig
 
@@ -139,6 +134,7 @@ export const CLAUDE_SONNET_4_6_CONFIG = {
   foundry: 'claude-sonnet-4-6',
   openai: 'claude-sonnet-4-6',
   gemini: 'claude-sonnet-4-6',
+  'opencode-free': 'deepseek-v4-flash-free',
   grok: 'claude-sonnet-4-6',
 } as const satisfies ModelConfig
 

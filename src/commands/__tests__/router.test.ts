@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -9,11 +9,7 @@ let launchInput: unknown
 let configDirectory: string
 let previousConfigDirectory: string | undefined
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-// Mock the serviceRef seam (not service.js itself) so workflow tests
-// importing '../service.js' directly are not polluted process-globally.
-mock.module('src/workflow/serviceRef.js', () => ({
+mock.module('src/workflow/service.js', () => ({
   getWorkflowService: () => ({
     launch: async (input: unknown) => {
       launchInput = input
@@ -21,22 +17,8 @@ mock.module('src/workflow/serviceRef.js', () => ({
     },
   }),
 }))
-=======
-const { default: router, setWorkflowLauncherForTests } = await import(
-  '../router.js'
-)
->>>>>>> Stashed changes
-=======
-const { default: router, setWorkflowLauncherForTests } = await import(
-  '../router.js'
-)
->>>>>>> Stashed changes
 
-const fakeLauncher: Parameters<typeof setWorkflowLauncherForTests>[0] =
-  async input => {
-    launchInput = input
-    return { runId: 'advisor-run' }
-  }
+const router = (await import('../router.js')).default
 
 function token(accountId: string): string {
   return `x.${Buffer.from(
@@ -67,11 +49,9 @@ describe('/ccb', () => {
     configDirectory = await mkdtemp(join(tmpdir(), 'ccb-router-'))
     previousConfigDirectory = process.env.CLAUDE_CONFIG_DIR
     process.env.CLAUDE_CONFIG_DIR = configDirectory
-    setWorkflowLauncherForTests(fakeLauncher)
   })
 
   afterEach(async () => {
-    setWorkflowLauncherForTests(null)
     await removeChatGPTAuth()
     if (previousConfigDirectory === undefined)
       delete process.env.CLAUDE_CONFIG_DIR

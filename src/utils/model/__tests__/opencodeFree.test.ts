@@ -79,14 +79,14 @@ describe('buildGroups', () => {
 
   const groups = buildGroups(ids)
 
-  test('oc group contains only free models', () => {
+  test('oc group contains only free models with deepseek first', () => {
     const oc = groups.find(g => g.id === 'oc')
     expect(oc).toBeDefined()
-    expect(oc!.models.map(m => m.value)).toEqual([
-      'opencode/deepseek-v4-flash-free',
-      'opencode/ling-3.0-flash-free',
-      'opencode/nemotron-3-ultra-free',
-    ])
+    expect(oc!.models.length).toBe(3)
+    expect(oc!.models[0]!.value).toBe('opencode/deepseek-v4-flash-free')
+    // rest alphabetical by label
+    const rest = oc!.models.slice(1).map(m => m.value)
+    expect([...rest].sort()).toEqual(rest)
   })
 
   test('family keyword groups fold into anthropic/gemini/grok', () => {
@@ -131,47 +131,9 @@ describe('buildGroups', () => {
 
 describe('getProviderModelGroups resilience', () => {
   const prevBase = process.env.OPENCODE_FREE_BASE_URL
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const prevCache = process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-=======
-  const prevHome = process.env.HOME
-  const prevCacheFile = process.env.CCB_OPENCODE_MODELS_CACHE_FILE
->>>>>>> Stashed changes
-=======
-  const prevHome = process.env.HOME
-  const prevCacheFile = process.env.CCB_OPENCODE_MODELS_CACHE_FILE
->>>>>>> Stashed changes
   const realFetch = globalThis.fetch
-  let dir: string
 
   beforeEach(() => {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    // Point the cache reader at a non-existent file so the real
-    // ~/.ccb-embed/opencode-free-models.json cannot leak fresh models in.
-    process.env.CCB_OPENCODE_MODELS_CACHE_FILE =
-      '/nonexistent-ccb-oc-cache.json'
-=======
-=======
->>>>>>> Stashed changes
-    dir = mkdtempSync(join(tmpdir(), 'ccb-groups-'))
-    process.env.HOME = dir
-    const cacheFile = join(dir, '.ccb-embed', 'opencode-free-models.json')
-    mkdirSync(join(dir, '.ccb-embed'), { recursive: true })
-    process.env.CCB_OPENCODE_MODELS_CACHE_FILE = cacheFile
-    // Deterministic dynamic free-model cache inside the 8h TTL window.
-    writeFileSync(
-      cacheFile,
-      JSON.stringify({
-        updatedAt: new Date().toISOString(),
-        models: ['mimo-v2.5-free', 'ling-3.0-flash-fin-free'],
-      }),
-    )
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     // Deterministic stub: the local gateway's /api/v1/models can take >15s
     // live, which blows up the 5s default test timeout. The stub keeps the
     // test's point (direct CCB fetch still
@@ -189,59 +151,22 @@ describe('getProviderModelGroups resilience', () => {
 
   afterEach(() => {
     globalThis.fetch = realFetch
-    rmSync(dir, { recursive: true, force: true })
     if (prevBase === undefined) delete process.env.OPENCODE_FREE_BASE_URL
     else process.env.OPENCODE_FREE_BASE_URL = prevBase
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    if (prevCache === undefined)
-      delete process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-    else process.env.CCB_OPENCODE_MODELS_CACHE_FILE = prevCache
     resetProviderModelGroupsCache()
   })
 
   // The old dynamic catalog is unavailable in this standalone build; the
   // node undici), so the gateway is forced "down" with an unreachable URL. The
   // CCB source is fetched via undici (stubbed above) and stays live.
-  test('direct catalog surfaces CCB group but no OpenCode models when cache unavailable', async () => {
-    process.env.OPENCODE_FREE_BASE_URL = 'http://127.0.0.1:59999'
-    const groups = await getProviderModelGroups()
-    expect(groups.some(g => g.id === 'ccb')).toBe(true)
-    // When cache is unavailable (gateway down, no valid cache), no OpenCode
-    // models may be fabricated in any group.
-    const allValues = groups.flatMap(g => g.models.map(m => m.value ?? ''))
-    expect(allValues.filter(v => v.startsWith('opencode/'))).toEqual([])
-=======
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevCacheFile === undefined)
-      delete process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-    else process.env.CCB_OPENCODE_MODELS_CACHE_FILE = prevCacheFile
-    resetProviderModelGroupsCache()
-  })
-
-=======
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevCacheFile === undefined)
-      delete process.env.CCB_OPENCODE_MODELS_CACHE_FILE
-    else process.env.CCB_OPENCODE_MODELS_CACHE_FILE = prevCacheFile
-    resetProviderModelGroupsCache()
-  })
-
->>>>>>> Stashed changes
-  // The gateway is forced "down" with an unreachable URL. The CCB source is
-  // fetched via undici (stubbed above) and stays live.
   test('direct catalog still surfaces CCB group plus OpenCode fallback', async () => {
     process.env.OPENCODE_FREE_BASE_URL = 'http://127.0.0.1:59999'
     const groups = await getProviderModelGroups()
     expect(groups.some(g => g.id === 'ccb')).toBe(true)
     const oc = groups.find(g => g.id === 'oc')
     expect(oc?.models.map(m => m.value)).toEqual([
-      'opencode/ling-3.0-flash-fin-free',
-      'opencode/mimo-v2.5-free',
+      'opencode/deepseek-v4-flash-free',
     ])
->>>>>>> Stashed changes
   })
 })
 
@@ -354,7 +279,6 @@ describe('pure provider helpers', () => {
 
 describe('getProviderList / getProviderContent with stubbed gateway', () => {
   const prevHome = process.env.HOME
-  const prevRouting = process.env.OMNIROUTE_SERVER_ROUTING
   let dir: string
   const realFetch = globalThis.fetch
 
@@ -372,9 +296,6 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     dir = mkdtempSync(join(tmpdir(), 'ccb-home-'))
     process.env.HOME = dir
     resetProviderModelGroupsCache()
-    // These tests exercise the full model picker; disable OmniRoute server
-    // routing so the single-entry auto collapse does not hide it.
-    process.env.OMNIROUTE_SERVER_ROUTING = '0'
   })
 
   afterEach(() => {
@@ -382,15 +303,12 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     rmSync(dir, { recursive: true, force: true })
     if (prevHome === undefined) delete process.env.HOME
     else process.env.HOME = prevHome
-    if (prevRouting === undefined) delete process.env.OMNIROUTE_SERVER_ROUTING
-    else process.env.OMNIROUTE_SERVER_ROUTING = prevRouting
   })
 
   test('gateway down: default, switch, add, delete', async () => {
     stubGateway([], [])
     const list = await getProviderList()
     expect(list.map(o => o.value)).toEqual([
-      'auto',
       'default',
       'switch',
       'add-provider',
@@ -407,7 +325,6 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     )
     const list = await getProviderList()
     expect(list.map(o => o.value)).toEqual([
-      'auto',
       'default',
       'switch',
       'add-provider',
@@ -434,7 +351,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     expect(content.options.some(o => o.value === 'kiro')).toBe(true)
   })
 
-  test('ccb content lists direct providers plus the OmniRoute gateway', async () => {
+  test('ccb content lists OmniRoute as the single gateway', async () => {
     stubGateway(
       [
         { name: 'routeha' },
@@ -446,7 +363,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     const content = await getProviderContent('ccb')
     expect(content.kind).toBe('subproviders')
     expect(content.options.length).toBeGreaterThan(0)
-    expect(content.options.some(o => o.value === 'omniroute')).toBe(true)
+    expect(content.options.map(o => o.value)).toEqual(['omniroute'])
   })
 
   test('ccb content: no combos falls back to subproviders', async () => {
@@ -464,7 +381,7 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     expect(content.options.length).toBeGreaterThan(0)
   })
 
-  test('kimi content exposes CCB direct models under the ccb/kimi namespace', async () => {
+  test('legacy direct providers are not exposed after OmniRoute cutover', async () => {
     stubGateway(
       [],
       [
@@ -474,22 +391,14 @@ describe('getProviderList / getProviderContent with stubbed gateway', () => {
     )
     const content = await getProviderContent('kimi')
     expect(content.kind).toBe('models')
-    expect(content.options.length).toBeGreaterThan(0)
-    expect(
-      content.options.every(o => (o.value ?? '').startsWith('ccb/kimi/')),
-    ).toBe(true)
+    expect(content.options).toEqual([])
   })
 
-  test('auto content exposes automatic and explicit CX model choices', async () => {
+  test('auto content is a read-only info panel, not a model picker', async () => {
     stubGateway([], [])
     const content = await getProviderContent('auto')
-    expect(content.kind).toBe('models')
-    expect(content.options.map(option => option.value)).toEqual([
-      'hermes-score',
-      'cx/gpt-5.6-luna',
-      'cx/gpt-5.6-terra',
-      'cx/gpt-5.6-sol',
-    ])
+    expect(content.kind).toBe('info')
+    expect(content.options).toEqual([])
     expect(content.lines).toBeDefined()
     const lines = content.lines!
     expect(lines[0]).toContain('候选池')

@@ -16,6 +16,15 @@ const UPSTREAM_CUSTOM_ERROR_PATTERNS: RegExp[] = [
   /系统检测到.{0,30}(?:敏感|违规)内容.{0,40}(?:无法|拒绝)响应/,
   // Generic "cannot answer, please retry" refusal wording
   /无法响应(?:您|你)的请求.{0,20}(?:请.{0,10}(?:检查|重新输入|重试|稍后再试))/,
+  // Quota, Balance & Rate limit fake 200 errors
+  /(?:^|)(?:配额不足|余额不足|额度耗尽|账户余额不足|账户欠费|insufficient_quota|quota_exceeded|rate_limit_exceeded|TPM limit exceeded|RPM limit exceeded)(?:|[。！,.!])/i,
+  // Gateway JSON error objects masquerading as text completions
+  /^s*{s*"(?:error|errcode|error_code|status|code)"s*:s*(?:{|"[^"]+"|d+)/,
+  // Gateway HTML error pages served with HTTP 200
+  /^s*<!DOCTYPEs+html/i,
+  /^s*<html[s>]/i,
+  // Upstream bad gateway / timeout plain text errors
+  /^s*(?:502 Bad Gateway|503 Service Temporarily Unavailable|504 Gateway Time-out)/i,
 ]
 
 /** Thrown when a 200 response body matches an upstream custom-error pattern. */

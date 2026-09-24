@@ -295,29 +295,7 @@ async function getOrCreateWorktree(
     } else {
       const { code: fetchCode } = await execFileNoThrowWithCwd(
         gitExe(),
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        [
-          'fetch',
-          'origin',
-          `${defaultBranch}:refs/remotes/origin/${defaultBranch}`,
-=======
-=======
->>>>>>> Stashed changes
-        // An explicit refspec is required here. `git fetch origin <branch>`
-        // only updates FETCH_HEAD when the repository's fetch refspec does
-        // not track branches (for example, tag-only mirrors). We create the
-        // remote-tracking ref that is used below instead of depending on
-        // FETCH_HEAD, which is shared mutable state.
-        [
-          'fetch',
-          'origin',
-          `+refs/heads/${defaultBranch}:refs/remotes/origin/${defaultBranch}`,
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-        ],
+        ['fetch', 'origin', defaultBranch],
         { cwd: repoRoot, stdin: 'ignore', env: fetchEnv },
       )
       baseBranch = fetchCode === 0 ? originRef : 'HEAD'

@@ -9,7 +9,6 @@ import { normalizeOpenAIUsage } from './openaiUsage.js'
  * Mapping:
  *   First chunk              → message_start
  *   delta.reasoning_content  → content_block_start(thinking) + thinking_delta + content_block_stop
- *   delta.reasoning          → (fallback when reasoning_content is absent; same as above)
  *   delta.content            → content_block_start(text) + text_delta + content_block_stop
  *   delta.tool_calls         → content_block_start(tool_use) + input_json_delta + content_block_stop
  *   finish_reason            → message_delta(stop_reason) + message_stop
@@ -131,34 +130,13 @@ export async function* adaptOpenAIStreamToAnthropic(
     // Skip chunks that carry only usage data (no delta content)
     if (!delta) continue
 
-    // Handle reasoning → Anthropic thinking block.
-    //
-    // Two field names are accepted: DeepSeek/OpenCode-style providers emit
-    // `reasoning_content`, while others (e.g. SenseNova 6.8, some MiMo
-    // deployments) emit the equivalent `reasoning`. `reasoning_content` wins
-    // when both appear. The value is preserved verbatim — including the empty
-    // string — because DeepSeek v4 thinking mode sometimes returns
-    // `reasoning_content: ""` when the model answers directly, and that empty
-    // thinking block must round-trip on the next request or DeepSeek rejects
-    // with 400.
-    //
-    // Only the *leading* reasoning run maps to a thinking block. Once visible
-    // output (text or tool_use) has started, a later reasoning chunk
-    // must be IGNORED: DeepSeek-style providers keep sending
-    // `reasoning_content: ""` (or stray fragments) on every post-thinking
-    // chunk. Treating those as a fresh thinking block increments
-    // currentContentIndex while the text block stays open, so the following
-    // delta.content is appended to the *thinking* block's index and dropped at
-    // assembly — the user sees only the first 1-2 characters (e.g. "我先",
-    // "I", "Let") of the real answer.
-    const deltaWithReasoning = delta as {
-      reasoning_content?: string
-      reasoning?: string
-    }
-    const reasoningContent =
-      deltaWithReasoning.reasoning_content ?? deltaWithReasoning.reasoning
-    const contentAlreadyStarted = textBlockOpen || toolBlocks.size > 0
-    if (reasoningContent != null && !contentAlreadyStarted) {
+    // Handle reasoning_content → Anthropic thinking block.
+    // Empty string is a valid signal: DeepSeek v4 thinking mode sometimes
+    // returns reasoning_content: "" when the model answers directly. The
+    // empty thinking block must round-trip back to the API in subsequent
+    // requests, otherwise DeepSeek rejects with 400.
+    const reasoningContent = (delta as any).reasoning_content
+    if (reasoningContent != null) {
       if (!thinkingBlockOpen) {
         currentContentIndex++
         thinkingBlockOpen = true

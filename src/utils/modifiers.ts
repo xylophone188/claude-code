@@ -1,7 +1,4 @@
-import type { ModifierKey } from './modifiersNative'
-import { isNativeModifierPressed, prewarmNative } from './modifiersNative'
-
-export type { ModifierKey }
+export type ModifierKey = 'shift' | 'command' | 'control' | 'option'
 
 let prewarmed = false
 
@@ -14,7 +11,7 @@ export function prewarmModifiers(): void {
     return
   }
   prewarmed = true
-  void prewarmNative().catch(() => {})
+  void import('modifiers-napi').then(({ prewarm }) => prewarm()).catch(() => {})
 }
 
 /**
@@ -25,7 +22,10 @@ export function isModifierPressed(modifier: ModifierKey): boolean {
     return false
   }
   try {
-    return isNativeModifierPressed(modifier)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isModifierPressed: nativeIsModifierPressed } =
+      require('modifiers-napi') as { isModifierPressed: (m: string) => boolean }
+    return nativeIsModifierPressed(modifier)
   } catch {
     return false
   }

@@ -40,7 +40,7 @@ const inspectArgs = process.env.BUN_INSPECT
 
 const result = Bun.spawnSync(
   [
-    process.execPath,
+    'bun',
     ...inspectArgs,
     'run',
     ...defineArgs,
@@ -50,11 +50,7 @@ const result = Bun.spawnSync(
   ],
   {
     stdio: ['inherit', 'inherit', 'inherit'],
-    // Keep the caller's working directory. The entrypoint is resolved from
-    // this script's location, so dev mode does not need to chdir into the
-    // source tree. This matters for the global `ccb` wrapper: when launched
-    // from another project, that project must remain the active workspace.
-    cwd: process.cwd(),
+    cwd: projectRoot,
     // React production mode — prevents 6,889+ _debugStack Error objects
     // (12MB) from accumulating during long-running sessions.
     //

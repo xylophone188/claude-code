@@ -1,7 +1,7 @@
 {
   "name": "claude-code-best",
-  "version": "2.8.4+melody",
-  "description": "Reverse-engineered Anthropic Claude Code CLI — interactive AI coding assistant in the terminal",
+  "version": "2.8.4+melody-0.0.8",
+  "description": "Reverse-engineered Anthropic Claude Code CLI \u2014 interactive AI coding assistant in the terminal",
   "type": "module",
   "author": "claude-code-best <claude-code-best@proton.me>",
   "repository": {
@@ -65,13 +65,15 @@
     "postinstall": "node scripts/run-parallel.mjs scripts/postinstall.cjs scripts/setup-chrome-mcp.mjs",
     "docs:dev": "npx mintlify dev",
     "typecheck": "tsc --noEmit",
-    "precheck": "bun run typecheck && bun run check:fix && NODE_ENV=test bun test",
+    "precheck": "bun run typecheck && bun run check:fix && bun test",
     "rcs": "bun run scripts/rcs.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.19.0",
     "@claude-code-best/mcp-chrome-bridge": "^3.0.1",
     "highlight.js": "^11.11.1",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0",
     "ws": "^8.20.0"
   },
   "devDependencies": {
@@ -181,7 +183,6 @@
     "modifiers-napi": "workspace:*",
     "openai": "^6.34.0",
     "p-map": "^7.0.4",
-    "pg": "^8.23.0",
     "picomatch": "^4.0.4",
     "plist": "^3.1.0",
     "proper-lockfile": "^4.1.2",

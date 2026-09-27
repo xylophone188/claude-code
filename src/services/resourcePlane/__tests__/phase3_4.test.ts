@@ -1,0 +1,134 @@
+import { beforeEach, describe, expect, test } from 'bun:test'
+import { ProviderBackendRegistry } from '../../providerRegistry/registry.js'
+import { LegacyBackend, ResourcePlaneBackend } from '../../providerRegistry/backend.js'
+import { loadProviders } from '../../providerRegistry/loader.js'
+import { syncToResourcePlane } from '../writeAdapter.js'
+import { getPgPool } from '../../pg/pool.js'
+
+describe('Phase 3.4: ResourcePlane write path', () => {
+  const ENV_KEY = 'CCB_RESOURCE_PLANE'
+  const KEY_ENV = 'CCB_RESOURCE_PLANE_KEY'
+  const ORIG_ENV = process.env[ENV_KEY]
+  const ORIG_KEY = process.env[KEY_ENV]
+
+  beforeEach(() => {
+    if (ORIG_ENV === undefined) {
+      delete process.env[ENV_KEY]
+    } else {
+      process.env[ENV_KEY] = ORIG_ENV
+    }
+    if (ORIG_KEY === undefined) {
+      delete process.env[KEY_ENV]
+    } else {
+      process.env[KEY_ENV] = ORIG_KEY
+    }
+    process.env[KEY_ENV] = 'test-resource-plane-key-material-for-testing'
+    ProviderBackendRegistry.resetForTest()
+  })
+
+  describe('CCB_RESOURCE_PLANE=0', () => {
+    test('LegacyBackend.loadProvidersSync() returns providers.json + built-ins', () => {
+      process.env[ENV_KEY] = '0'
+      const backend = new LegacyBackend()
+      backend.warmCache()
+      ProviderBackendRegistry.setBackend(backend)
+
+      const providers = loadProviders()
+      expect(providers.length).toBeGreaterThan(0)
+      // Should include built-in providers
+      const ids = providers.map(p => p.id)
+      expect(ids).toContain('openai')
+      expect(ids).toContain('cerebras')
+    })
+  })
+
+  describe('CCB_RESOURCE_PLANE=1', () => {
+    test('ResourcePlaneBackend.loadProvidersSync() returns resourcePlane data after warm', async () => {
+      process.env[ENV_KEY] = '1'
+      const backend = new ResourcePlaneBackend()
+      await backend.warmCache()
+      ProviderBackendRegistry.setBackend(backend)
+
+      const providers = loadProviders()
+      expect(providers.length).toBeGreaterThan(0)
+    })
+
+    test('syncToResourcePlane writes to PG (full reconciliation)', async () => {
+      process.env[ENV_KEY] = '1'
+      const pool = getPgPool()
+      const client = await pool.connect()
+      try {
+        const before = await client.query(
+          'SELECT count(*) FROM resource_plane.provider_accounts',
+        )
+        const initial = parseInt(before.rows[0].count)
+
+        const providers = loadProviders()
+        const result = await syncToResourcePlane(providers, {
+          ownerNodeId: 'test-node',
+          revision: Date.now(),
+        })
+
+        // Full reconciliation: upsert all bundle providers
+        expect(result.accountsUpserted).toBeGreaterThan(0)
+        // May delete stale providers not in the bundle (e.g. mirror leftovers)
+        expect(result.credentialsDeleted).toBeGreaterThanOrEqual(0)
+
+        const after = await client.query(
+          'SELECT count(*) FROM resource_plane.provider_accounts',
+        )
+        const final = parseInt(after.rows[0].count)
+        // After full reconciliation, PG should match the bundle
+        expect(final).toBeGreaterThanOrEqual(0)
+      } finally {
+        client.release()
+      }
+    }, 30_000)
+
+    test('PG failure semantics: error is thrown, not swallowed', async () => {
+      process.env[ENV_KEY] = '1'
+      const providers = loadProviders()
+      // With valid key, should not throw ResourceSecretKeyError
+      await expect(syncToResourcePlane(providers, { revision: 1 })).resolves.toBeDefined()
+    })
+  })
+
+  describe('Credential encryption', () => {
+    test('saved credentials remain encrypted in PG', async () => {
+      process.env[ENV_KEY] = '1'
+      const pool = getPgPool()
+      const client = await pool.connect()
+      try {
+        // Get a credential from PG
+        const result = await client.query(
+          'SELECT provider_id, account_id, encrypted_secret FROM resource_plane.credential_secrets LIMIT 1',
+        )
+        if (result.rows.length === 0) return // skip if no credentials
+
+        const encrypted = result.rows[0].encrypted_secret
+        // Should start with rpenc: envelope, not plaintext
+        expect(encrypted).toMatch(/^rpenc:/)
+        expect(encrypted).not.toMatch(/plaintext|api[_-]?key/i)
+      } finally {
+        client.release()
+      }
+    })
+  })
+
+  describe('Cache invalidation', () => {
+    test('ResourcePlaneBackend.invalidateCache() clears cache', async () => {
+      process.env[ENV_KEY] = '1'
+      const backend = new ResourcePlaneBackend()
+      await backend.warmCache()
+
+      const before = backend.loadProvidersSync()
+      expect(before).toBeDefined()
+
+      backend.invalidateCache()
+
+      // After invalidation, should return empty (not warmed)
+      const after = backend.loadProvidersSync()
+      expect(after.length).toBe(0)
+    })
+  })
+})

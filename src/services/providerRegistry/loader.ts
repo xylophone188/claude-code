@@ -10,6 +10,7 @@ import { ProvidersFileSchema, type ProviderConfig } from './types.js'
 import { EMBEDDED_PROVIDERS } from './embeddedProviders.generated.js'
 import { CCB_ROUTING_PROVIDERS } from '../routing/registry.generated.js'
 import { readCodeBuddyCnPoolSync } from '../api/openai/codebuddyCnAuth.js'
+import { syncToResourcePlane } from '../resourcePlane/writeAdapter.js'
 import { ProviderBackendRegistry } from './registry.js'
 
 /**
@@ -517,7 +518,7 @@ function providerConfigEqual(a: ProviderConfig, b: ProviderConfig): boolean {
  *
  * Returns the final merged list that was written.
  */
-export function saveProviders(providers: ProviderConfig[]): ProviderConfig[] {
+export async function saveProviders(providers: ProviderConfig[]): Promise<ProviderConfig[]> {
   const filePath = getProvidersFilePath()
 
   // Build merged list (providers override defaults by id)
@@ -559,6 +560,17 @@ export function saveProviders(providers: ProviderConfig[]): ProviderConfig[] {
       /* ignore */
     }
     throw err
+  }
+
+  // Phase 3.4: sync to resourcePlane if feature flag enabled
+  if (process.env.CCB_RESOURCE_PLANE === '1') {
+    try {
+      await syncToResourcePlane(Array.from(merged.values()), { ownerNodeId: 'cli-save', revision: Date.now() })
+    } catch (err) {
+      // Log and re-throw - PG sync failure must not be silent
+      logError('[saveProviders] ResourcePlane sync failed:', err)
+      throw err
+    }
   }
 
   // J1: invalidate cache so next loadProviders() reads fresh data

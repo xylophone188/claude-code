@@ -2,6 +2,7 @@ import type {
   ChatCompletionChunk,
   ChatCompletionCreateParamsStreaming,
 } from 'openai/resources/chat/completions/completions.mjs'
+import { APIConnectionError, APIError } from 'openai'
 import type {
   BetaToolUnion,
   BetaMessage,
@@ -34,6 +35,16 @@ import {
   isChatGPTCodexReasoningModel,
 } from '../../../utils/model/chatgptModels.js'
 import { getOpenAIClient } from './client.js'
+import { isEnvTruthy } from '../../../utils/envUtils.js'
+import {
+  getRetryBaseMs,
+  getMaxRetryDelayMs,
+  getDefaultMaxRetries,
+  getRetryBudgetMs,
+  getRetryDelay,
+  parseEnvInt,
+  RetryBudgetExhaustedError,
+} from '../withRetry.js'
 import {
   resolveDirectRoutes,
   type DirectRoute,
@@ -108,6 +119,7 @@ import {
   toolMatchesName,
 } from '../../../Tool.js'
 import { logForDebugging } from '../../../utils/debug.js'
+import { sleep } from '../../../utils/sleep.js'
 import { addToTotalSessionCost } from '../../../cost-tracker.js'
 import { calculateUSDCost } from '../../../utils/modelCost.js'
 import {
@@ -436,6 +448,92 @@ export async function* retryOpencodeFreeStream(
   throw lastError
 }
 
+// Permanent 4xx never retries; everything else (429, 408, 5xx, other 4xx) is
+// transient when a user-managed aggregator sits in front of the OpenAI route.
+// Lives here (not withRetry) because OpenAI SDK errors are a different class
+// from the Anthropic SDK errors withRetry handles — cross-package `instanceof`
+// would fail and silently disable retries.
+const CCB_PERMANENT_4XX = new Set([400, 401, 403, 404, 409, 410, 413, 422])
+
+function isTransientCcbStatus(status: number): boolean {
+  if (status === 429 || status >= 500) return true
+  return status >= 400 && status < 500 && !CCB_PERMANENT_4XX.has(status)
+}
+
+function shouldRetryCcbOpenAIError(error: unknown): boolean {
+  if (!isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) return false
+  if (error instanceof APIConnectionError) return true
+  if (error instanceof APIError) return isTransientCcbStatus(error.status)
+  return false
+}
+
+function getCcbApiMaxRetries(): number {
+  return parseEnvInt(process.env.CCB_API_MAX_RETRIES, getDefaultMaxRetries())
+}
+
+export async function* retryCcbOpenAIStream(
+  createStream: () => Promise<AsyncIterable<ChatCompletionChunk>>,
+  signal: AbortSignal,
+  maxRetries: number = getCcbApiMaxRetries(),
+  retryBudgetMs: number = getRetryBudgetMs(),
+  sleepForRetry: (ms: number, signal: AbortSignal) => Promise<void> = (
+    ms,
+    signal,
+  ) => sleep(ms, signal, { abortError: () => new APIUserAbortError() }),
+): AsyncGenerator<ChatCompletionChunk, void> {
+  const deadlineMs = Date.now() + retryBudgetMs
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    throwIfAborted(signal)
+
+    try {
+      const events: ChatCompletionChunk[] = []
+      const streamText = { text: '' }
+
+      for await (const event of await createStream()) {
+        events.push(event)
+        throwIfUpstreamBlocked(event, streamText)
+      }
+      if (isInvalidProviderText(streamText.text)) {
+        throw new ProviderOutputError(
+          'OpenAI-compatible route returned invalid provider text',
+        )
+      }
+      yield* normalizeDsmlEvents(events, streamText.text)
+      return
+    } catch (error) {
+      if (signal.aborted) throw new APIUserAbortError()
+      lastError = error
+      if (error instanceof ProviderOutputError) throw error
+      if (!shouldRetryCcbOpenAIError(error)) throw error
+
+      const remainingBudgetMs = Math.max(0, deadlineMs - Date.now())
+      if (remainingBudgetMs <= 0) {
+        throw new RetryBudgetExhaustedError(lastError, retryBudgetMs, attempt)
+      }
+      if (attempt > maxRetries) throw error
+
+      const retryAfter = (error as APIError | undefined)?.headers?.get?.(
+        'retry-after',
+      )
+      const delayMs = getRetryDelay(
+        attempt,
+        retryAfter ?? null,
+        Math.min(getMaxRetryDelayMs(), remainingBudgetMs),
+        remainingBudgetMs,
+        getRetryBaseMs(),
+      )
+      logForDebugging(
+        `[OpenAI] CCB retry ${attempt}/${maxRetries} after ${delayMs}ms`,
+      )
+      await sleepForRetry(delayMs, signal)
+    }
+  }
+
+  throw lastError
+}
+
 function routeFailureScope(error: unknown): 'provider' | 'model' | 'account' {
   const { scope } = classifyError(error)
   return scope
@@ -572,6 +670,7 @@ export async function* retryDirectProviderStream(
         routeError(`${route.providerId}/${route.model} failed`, {
           status,
           elapsedMs: Date.now() - started,
+          errorMessage: (error as any)?.message,
           ...(route.accountId ? { account: route.accountId } : {}),
           errorType: error instanceof Error ? error.name : typeof error,
         })
@@ -991,6 +1090,23 @@ async function createRouteStream(
     }
     throw err
   }
+}
+
+function ccbRetryRouteStream(
+  createRoute: (
+    route: DirectRoute,
+  ) => Promise<AsyncIterable<ChatCompletionChunk>>,
+  route: DirectRoute,
+  signal: AbortSignal,
+): Promise<AsyncIterable<ChatCompletionChunk>> {
+  if (!isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) {
+    return createRoute(route)
+  }
+  return Promise.resolve({
+    async *[Symbol.asyncIterator](): AsyncGenerator<ChatCompletionChunk, void> {
+      yield* retryCcbOpenAIStream(() => createRoute(route), signal)
+    },
+  })
 }
 
 async function* allOfRaceStream(
@@ -1578,20 +1694,25 @@ export async function* queryModelOpenAI(
       retryDirectProviderStream(
         routes,
         route =>
-          createRouteStream(route, signal, {
-            messages: openaiMessages,
-            tools: openaiTools,
-            toolChoice: openaiToolChoice,
-            enableThinking,
-            maxTokens: Math.min(maxTokens, ADVISOR_AUTO_MAX_TOKENS),
-            reasoningEffort: isLocalCodexAdvisor
-              ? undefined
-              : reasoningEffortParam,
-            temperatureOverride: options.temperatureOverride,
-            fetchOverride: options.fetchOverride as unknown as typeof fetch,
-            source: options.querySource,
-            allowReasoningStrip: true,
-          }),
+          ccbRetryRouteStream(
+            c =>
+              createRouteStream(c, signal, {
+                messages: openaiMessages,
+                tools: openaiTools,
+                toolChoice: openaiToolChoice,
+                enableThinking,
+                maxTokens: Math.min(maxTokens, ADVISOR_AUTO_MAX_TOKENS),
+                reasoningEffort: isLocalCodexAdvisor
+                  ? undefined
+                  : reasoningEffortParam,
+                temperatureOverride: options.temperatureOverride,
+                fetchOverride: options.fetchOverride as unknown as typeof fetch,
+                source: options.querySource,
+                allowReasoningStrip: true,
+              }),
+            route,
+            signal,
+          ),
         signal,
       )
 
@@ -1677,45 +1798,54 @@ export async function* queryModelOpenAI(
             ? retryDirectProviderStream(
                 directRoutes,
                 route =>
-                  createRouteStream(route, signal, {
-                    messages: openaiMessages,
-                    tools: openaiTools,
-                    toolChoice: openaiToolChoice,
-                    enableThinking,
-                    maxTokens,
-                    reasoningEffort: reasoningEffortParam,
-                    temperatureOverride: options.temperatureOverride,
-                    fetchOverride:
-                      options.fetchOverride as unknown as typeof fetch,
-                    source: options.querySource,
-                    allowReasoningStrip: true,
-                  }),
+                  ccbRetryRouteStream(
+                    c =>
+                      createRouteStream(c, signal, {
+                        messages: openaiMessages,
+                        tools: openaiTools,
+                        toolChoice: openaiToolChoice,
+                        enableThinking,
+                        maxTokens,
+                        reasoningEffort: reasoningEffortParam,
+                        temperatureOverride: options.temperatureOverride,
+                        fetchOverride:
+                          options.fetchOverride as unknown as typeof fetch,
+                        source: options.querySource,
+                        allowReasoningStrip: true,
+                      }),
+                    route,
+                    signal,
+                  ),
                 signal,
               )
             : isOpencodeFree
               ? retryOpencodeFreeStream(() => createDirectRequest(), signal)
-              : getOpenAIClient({
-                  maxRetries: 0,
-                  fetchOverride:
-                    options.fetchOverride as unknown as typeof fetch,
-                  source: options.querySource,
-                }).chat.completions.create(
-                  buildOpenAIRequestBody({
-                    model: openaiModel,
-                    messages: openaiMessages,
-                    tools: openaiTools,
-                    toolChoice: openaiToolChoice,
-                    enableThinking,
-                    maxTokens,
-                    reasoningEffort: clampReasoningEffort(
-                      undefined,
-                      reasoningEffortParam,
-                    ),
-                    temperatureOverride: options.temperatureOverride,
-                    promptCacheKey,
-                  }),
-                  { signal },
-                ))
+              : (() => {
+                  const createStream = () =>
+                    getOpenAIClient({
+                      maxRetries: 0,
+                      fetchOverride:
+                        options.fetchOverride as unknown as typeof fetch,
+                      source: options.querySource,
+                    }).chat.completions.create(
+                      buildOpenAIRequestBody({
+                        model: openaiModel,
+                        messages: openaiMessages,
+                        tools: openaiTools,
+                        toolChoice: openaiToolChoice,
+                        enableThinking,
+                        maxTokens,
+                        reasoningEffort: clampReasoningEffort(
+                          undefined,
+                          reasoningEffortParam,
+                        ),
+                        temperatureOverride: options.temperatureOverride,
+                        promptCacheKey,
+                      }),
+                      { signal },
+                    )
+                  return retryCcbOpenAIStream(createStream, signal)
+                })())
 
     const adaptedStream = useChatGPTResponses
       ? adaptResponsesStreamToAnthropic(

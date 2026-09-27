@@ -53,6 +53,52 @@ const DEFAULT_MAX_RETRIES = 10
 const FLOOR_OUTPUT_TOKENS = 3000
 const MAX_529_RETRIES = 3
 export const BASE_DELAY_MS = 500
+// CCB-router override: 10s base, 5min cap. Only withRetry picks these up via
+// CCB_RETRY_BASE_MS / CCB_MAX_RETRY_DELAY_MS; other callers of getRetryDelay
+// (compact.ts, settingsSync, policyLimits, ...) keep the 500ms / 32s default
+// so their tight polling loops are unchanged.
+const DEFAULT_RETRY_BUDGET_MS = 24 * 60 * 60 * 1000
+// 10s start, exponential doubling, cap at 24min. First 7 attempts
+// (10+20+40+80+160+320+640=1270s≈21min) fill the ramp; the remaining ~59
+// attempts at 24min cap together cover the rest of the 24h budget. Matches
+// CCB_API_MAX_RETRIES=60 in the ccb wrapper.
+const CCB_DEFAULT_BASE_DELAY_MS = 10_000
+const CCB_DEFAULT_MAX_DELAY_MS = 24 * 60 * 1000
+
+export function parseEnvInt(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value) return fallback
+  const n = parseInt(value, 10)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+export function getRetryBudgetMs(): number {
+  const hoursEnv = process.env.CCB_RETRY_BUDGET_HOURS
+  if (hoursEnv) {
+    const h = parseFloat(hoursEnv)
+    if (Number.isFinite(h) && h > 0) return h * 60 * 60 * 1000
+  }
+  return parseEnvInt(process.env.CCB_RETRY_BUDGET_MS, DEFAULT_RETRY_BUDGET_MS)
+}
+
+export function getRetryBaseMs(): number {
+  if (isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) {
+    return parseEnvInt(process.env.CCB_RETRY_BASE_MS, CCB_DEFAULT_BASE_DELAY_MS)
+  }
+  return BASE_DELAY_MS
+}
+
+export function getMaxRetryDelayMs(): number {
+  if (isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) {
+    return parseEnvInt(
+      process.env.CCB_MAX_RETRY_DELAY_MS,
+      CCB_DEFAULT_MAX_DELAY_MS,
+    )
+  }
+  return 32000
+}
 
 // Foreground query sources where the user IS blocking on the result — these
 // retry on 529. Everything else (summaries, titles, suggestions, classifiers)
@@ -102,6 +148,10 @@ function isPersistentRetryEnabled(): boolean {
     ? isEnvTruthy(process.env.CLAUDE_CODE_UNATTENDED_RETRY)
     : false
 }
+
+// Statuses that signal a permanent client error — never retry even under
+// CCB_INTERNAL_ROUTER. Everything else (429, 408, 4xx-not-here, 5xx) is
+// treated as transient when a user-managed aggregator is in front of us.
 
 function isTransientCapacityError(error: unknown): boolean {
   return (
@@ -157,6 +207,34 @@ export class CannotRetryError extends Error {
   }
 }
 
+/**
+ * Raised when the agent-layer retry budget window expires. Carries the
+ * original provider error plus wall-clock budget and attempt count so the
+ * surfaced message reads as an operational failure (e.g.
+ * "retry budget exhausted (~24h, 60 attempts): openrouter upstream timeout")
+ * instead of a bare "连接错误" / "terminated" from the last flaky provider.
+ */
+export class RetryBudgetExhaustedError extends Error {
+  constructor(
+    public readonly originalError: unknown,
+    public readonly budgetMs: number,
+    public readonly attemptsMade: number,
+  ) {
+    const original =
+      originalError instanceof Error
+        ? originalError.message
+        : errorMessage(originalError)
+    const budgetMinutes = Math.round(budgetMs / 60000)
+    super(
+      `retry budget exhausted (~${budgetMinutes}m, ${attemptsMade} attempts): ${original}`,
+    )
+    this.name = 'RetryBudgetExhaustedError'
+    if (originalError instanceof Error && originalError.stack) {
+      this.stack = originalError.stack
+    }
+  }
+}
+
 export class FallbackTriggeredError extends Error {
   constructor(
     public readonly originalModel: string,
@@ -186,7 +264,20 @@ export async function* withRetry<T>(
   let consecutive529Errors = options.initialConsecutive529Errors ?? 0
   let lastError: unknown
   let persistentAttempt = 0
+  const retryBudgetMs = getRetryBudgetMs()
+  const retryBudgetDeadlineMs = Date.now() + retryBudgetMs
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    const remainingBudgetMs = Math.max(0, retryBudgetDeadlineMs - Date.now())
+    if (remainingBudgetMs <= 0 && attempt > 1) {
+      logForDebugging(
+        `Retry budget exhausted after ${attempt - 1} attempts (~${(retryBudgetMs / 1000).toFixed(0)}s) — surfacing structured error`,
+        { level: 'error' },
+      )
+      throw new RetryBudgetExhaustedError(lastError, retryBudgetMs, attempt - 1)
+    }
+    if (attempt > 1 && options.signal?.aborted) {
+      throw new APIUserAbortError()
+    }
     if (options.signal?.aborted) {
       throw new APIUserAbortError()
     }
@@ -531,17 +622,23 @@ export function getRetryDelay(
   attempt: number,
   retryAfterHeader?: string | null,
   maxDelayMs = 32000,
+  remainingBudgetMs?: number,
+  baseDelayMs = BASE_DELAY_MS,
 ): number {
   if (retryAfterHeader) {
     const seconds = parseInt(retryAfterHeader, 10)
     if (!isNaN(seconds)) {
-      return seconds * 1000
+      const fromHeader = seconds * 1000
+      if (remainingBudgetMs === undefined) return fromHeader
+      return Math.min(fromHeader, remainingBudgetMs)
     }
   }
 
-  const baseDelay = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), maxDelayMs)
+  const baseDelay = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs)
   const jitter = Math.random() * 0.25 * baseDelay
-  return baseDelay + jitter
+  const total = baseDelay + jitter
+  if (remainingBudgetMs === undefined) return total
+  return Math.min(total, remainingBudgetMs)
 }
 
 function parseMaxTokensContextOverflowError(error: APIError):

@@ -10,6 +10,7 @@ import { ProvidersFileSchema, type ProviderConfig } from './types.js'
 import { EMBEDDED_PROVIDERS } from './embeddedProviders.generated.js'
 import { CCB_ROUTING_PROVIDERS } from '../routing/registry.generated.js'
 import { readCodeBuddyCnPoolSync } from '../api/openai/codebuddyCnAuth.js'
+import { ProviderBackendRegistry } from './registry.js'
 
 /**
  * The four built-in OpenAI-compat providers.
@@ -355,12 +356,25 @@ export function _invalidateProviderCache(): void {
  * This function never throws — corrupt files produce a warning + fallback.
  */
 export function loadProviders(): ProviderConfig[] {
+  // Phase 3.3: delegate to registry when backend is initialized (bootstrapProviders called)
+  if (ProviderBackendRegistry.isInitialized()) {
+    return ProviderBackendRegistry.getBackend().loadProvidersSync()
+  }
   // J1: return cached result if available (prevents repeated disk reads on findProvider)
   if (_cachedProviders !== null) return _cachedProviders
 
   const result = _loadProvidersInternal()
   _cachedProviders = result.providers
   return result.providers
+}
+
+/**
+ * Raw legacy provider loader — reads providers.json + built-ins, NO registry delegation,
+ * NO J1 cache mutation. Used internally by LegacyBackend to avoid circular recursion.
+ * Exposed as a named export so backend.ts can import without triggering the registry path.
+ */
+export function loadProvidersLegacyRaw(): ProviderConfig[] {
+  return _loadProvidersInternal().providers
 }
 
 /**
@@ -549,6 +563,8 @@ export function saveProviders(providers: ProviderConfig[]): ProviderConfig[] {
 
   // J1: invalidate cache so next loadProviders() reads fresh data
   _invalidateProviderCache()
+  // Phase 3.3: also invalidate registry backend cache
+  ProviderBackendRegistry.invalidateCache()
 
   return Array.from(merged.values())
 }

@@ -21,7 +21,6 @@ import {
   EMBEDDED_ROUTING_PROVIDERS,
   loadCcbEmbedProviders,
   loadHermesProviders,
-  loadCodexOAuthProviders,
 } from '../src/services/providerRegistry/loader.js'
 
 async function getAllProviders(): Promise<Array<{ id: string; config: any; source: string }>> {
@@ -49,13 +48,7 @@ async function getAllProviders(): Promise<Array<{ id: string; config: any; sourc
     all.push({ id: p.id, config: p, source: 'HERMES_PROVIDERS' })
   }
 
-  // 5. CODEX_PROVIDERS
-  const codex = loadCodexOAuthProviders()
-  for (const p of codex) {
-    all.push({ id: p.id, config: p, source: 'CODEX_PROVIDERS' })
-  }
-
-  // 6. USER_PROVIDERS from providers.json (final merged result)
+  // 5. USER_PROVIDERS from providers.json (final merged result)
   const userProviders = loadProviders()
   for (const p of userProviders) {
     all.push({ id: p.id, config: p, source: 'USER_PROVIDERS' })

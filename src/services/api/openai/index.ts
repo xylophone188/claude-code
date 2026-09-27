@@ -1779,19 +1779,24 @@ export async function* queryModelOpenAI(
                   .filter(g => g.length > 0)
               })(),
               (route, raceSignal) =>
-                createRouteStream(route, raceSignal, {
-                  messages: openaiMessages,
-                  tools: openaiTools,
-                  toolChoice: openaiToolChoice,
-                  enableThinking,
-                  maxTokens,
-                  reasoningEffort: reasoningEffortParam,
-                  temperatureOverride: options.temperatureOverride,
-                  fetchOverride:
-                    options.fetchOverride as unknown as typeof fetch,
-                  source: options.querySource,
-                  allowReasoningStrip: true,
-                }),
+                ccbRetryRouteStream(
+                  c =>
+                    createRouteStream(c, raceSignal, {
+                      messages: openaiMessages,
+                      tools: openaiTools,
+                      toolChoice: openaiToolChoice,
+                      enableThinking,
+                      maxTokens,
+                      reasoningEffort: reasoningEffortParam,
+                      temperatureOverride: options.temperatureOverride,
+                      fetchOverride:
+                        options.fetchOverride as unknown as typeof fetch,
+                      source: options.querySource,
+                      allowReasoningStrip: true,
+                    }),
+                  route,
+                  raceSignal,
+                ),
               signal,
             )
           : directRoutes.length > 0

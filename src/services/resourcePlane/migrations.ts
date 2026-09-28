@@ -273,6 +273,30 @@ ALTER TABLE resource_plane.sync_nodes DROP COLUMN IF EXISTS region;
 ALTER TABLE resource_plane.sync_nodes DROP COLUMN IF EXISTS global_fencing_epoch;
 `
 
+const V5_UP = `
+-- Phase 5.0: Schema registry for credential structures
+CREATE TABLE IF NOT EXISTS resource_plane.credential_schemas (
+  schema_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider_id TEXT NOT NULL,
+  auth_type TEXT NOT NULL,
+  secret_type TEXT NOT NULL,
+  schema_json JSONB NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider_id, auth_type, secret_type, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_credential_schemas_provider ON resource_plane.credential_schemas (provider_id);
+CREATE INDEX IF NOT EXISTS idx_rp_credential_schemas_auth_secret ON resource_plane.credential_schemas (auth_type, secret_type);
+`
+
+const V5_DOWN = `
+DROP INDEX IF EXISTS resource_plane.idx_rp_credential_schemas_provider;
+DROP INDEX IF EXISTS resource_plane.idx_rp_credential_schemas_auth_secret;
+DROP TABLE IF EXISTS resource_plane.credential_schemas;
+`
+
 export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
   {
     version: 1,
@@ -296,6 +320,12 @@ export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
     name: 'phase4_0_multi_region',
     up: V4_UP,
     down: V4_DOWN,
+  },
+  {
+    version: 5,
+    name: 'phase5_0_schema_registry',
+    up: V5_UP,
+    down: V5_DOWN,
   },
 ]
 

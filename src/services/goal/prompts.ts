@@ -56,7 +56,14 @@ ${goal.objective}
 
 Continue working towards the goal. Do NOT narrow the scope of the goal — even if you cannot complete everything in one turn, maintain the full objective and make as much progress as possible.
 
-When you believe the goal is fully achieved, use the GoalTool to mark it complete. Before doing so, perform a strict Completion Audit:
+When you believe the goal is fully achieved, mark it complete:
+
+1. **If GoalTool is available** (shown in your tool list): use GoalTool with status "complete" and the Completion Audit evidence.
+
+2. **If GoalTool is NOT available**: In your FINAL response, include the exact line:
+   GOAL_COMPLETE: [brief reason + evidence summary]
+
+   This text marker will be detected by the system to auto-complete the goal.
 
 ### Completion Audit
 1. Derive concrete requirements from the objective and any referenced files.
@@ -71,7 +78,8 @@ If you encounter an obstacle you genuinely cannot overcome:
 - Do NOT mark blocked on the first encounter.
 - The same blocking condition must persist for at least 3 consecutive continuation turns before you may mark blocked.
 - "Difficult", "slow", or "partially incomplete" is NOT blocked.
-- If blocked, use the GoalTool with status "blocked" and a clear reason.
+- If blocked: if GoalTool available, use it with status "blocked"; otherwise include:
+   GOAL_BLOCKED: [clear reason]
 
 Resume working now.
 </goal-steering>`

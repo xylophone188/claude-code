@@ -5323,6 +5323,7 @@ export function REPL({
     hasActiveLocalJsxUI: isShowingLocalJSXCommand,
     isInPlanMode: toolPermissionContext.mode === 'plan',
     isQueryActiveNow: queryGuard.getSnapshot,
+    messages,
     onContinuationEnqueued: ({ turn, objective }) => {
       const visibleGoalTurnInput = `Goal auto-continue (${turn}/1): continue advancing "${objective}".`;
       setMessages(oldMessages => [

@@ -93,8 +93,8 @@ export function resolveDirectRoutes(
 }
 
 const INTERNAL_POOL_ORDER = {
-  'v8': ['sensenova', 'nvidia', 'opencode'],
-  'auto': ['sensenova', 'nvidia', 'opencode'],
+  v8: ['sensenova', 'nvidia', 'opencode'],
+  auto: ['sensenova', 'nvidia', 'opencode'],
   'worker-pool': ['sensenova', 'nvidia', 'opencode'],
   'chat-pool': ['sensenova', 'nvidia', 'groq', 'qwen'],
   'advisor-pool': ['nvidia', 'sensenova', 'deepseek', 'qwen'],
@@ -102,37 +102,62 @@ const INTERNAL_POOL_ORDER = {
 } as const
 
 function normalizeDirectBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/(?:chat\/completions|responses)\/?$/, '').replace(/\/+$/, '')
+  return baseUrl
+    .replace(/\/(?:chat\/completions|responses)\/?$/, '')
+    .replace(/\/+$/, '')
 }
 
-function providerKeys(provider: ProviderConfig): Array<{ id?: string; apiKey: string; model?: string }> {
+function providerKeys(
+  provider: ProviderConfig,
+): Array<{ id?: string; apiKey: string; model?: string }> {
   const accounts = (provider.accounts ?? [])
     .filter(account => account.enabled !== false)
     .flatMap(account => {
-      const apiKey = account.apiKey ?? (account.apiKeyEnv ? process.env[account.apiKeyEnv] : undefined)
+      const apiKey =
+        account.apiKey ??
+        (account.apiKeyEnv ? process.env[account.apiKeyEnv] : undefined)
       return apiKey ? [{ id: account.id, apiKey, model: account.model }] : []
     })
   if (accounts.length) return accounts
-  const apiKey = provider.apiKey ?? (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined)
+  const apiKey =
+    provider.apiKey ??
+    (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined)
   return apiKey ? [{ apiKey }] : provider.noAuth ? [{ apiKey: '' }] : []
 }
 
 function resolveViaInternalRouter(spec: string): DirectRoute[] {
   const trimmed = spec.replace(/^ccb\//i, '')
   const poolName = trimmed.toLowerCase() as keyof typeof INTERNAL_POOL_ORDER
-  const providers = loadProviders().filter(provider => provider.kind === 'openai-compat')
-  const requestedProvider = trimmed.includes('/') ? trimmed.slice(0, trimmed.indexOf('/')) : trimmed
-  const requestedModel = trimmed.includes('/') ? trimmed.slice(trimmed.indexOf('/') + 1) : undefined
+  const providers = loadProviders().filter(
+    provider => provider.kind === 'openai-compat',
+  )
+  const requestedProvider = trimmed.includes('/')
+    ? trimmed.slice(0, trimmed.indexOf('/'))
+    : trimmed
+  const requestedModel = trimmed.includes('/')
+    ? trimmed.slice(trimmed.indexOf('/') + 1)
+    : undefined
   const ordered = INTERNAL_POOL_ORDER[poolName]
   const selected = ordered
-    ? [...providers].sort((a, b) => (ordered.indexOf(a.id as never) + 1 || 99) - (ordered.indexOf(b.id as never) + 1 || 99))
+    ? [...providers].sort(
+        (a, b) =>
+          (ordered.indexOf(a.id as never) + 1 || 99) -
+          (ordered.indexOf(b.id as never) + 1 || 99),
+      )
     : providers.filter(provider => provider.id === requestedProvider)
   const routes: DirectRoute[] = []
   for (const provider of selected) {
     const keys = providerKeys(provider)
     const models = requestedModel
       ? [requestedModel]
-      : [...new Set((provider.accounts ?? []).map(account => account.model).filter(Boolean).concat(provider.models ?? [], provider.defaultModel))]
+      : [
+          ...new Set(
+            (provider.accounts ?? [])
+              .map(account => account.model)
+              .filter(Boolean)
+              .concat(provider.models ?? [], provider.defaultModel),
+          ),
+        ]
     for (const key of keys) {
       for (const model of models) {
         if (!model) continue
@@ -161,10 +186,6 @@ export function resetOmniRouteConfigForTests(): void {
   resetOmniRouteConfig()
 }
 
-function resetOmniRouteConfig(): void {
-  cachedConfig = undefined
-}
-
 export function resetDirectRouteStateForTests(): void {
   resetOmniRouteConfig()
 }
@@ -182,13 +203,36 @@ function resolveViaOmniRoute(
   const modelSpec = /^(?:auto|race)$/i.test(stripped) ? 'auto/smart' : stripped
   if (/^(?:auto|race)(?:\/|$)/i.test(modelSpec)) {
     if (config.serverSideRouting) {
-      return [{ providerId: 'omniroute', baseURL: config.baseUrl, model: modelSpec, apiKey: config.apiKey, kind: 'provider' }]
+      return [
+        {
+          providerId: 'omniroute',
+          baseURL: config.baseUrl,
+          model: modelSpec,
+          apiKey: config.apiKey,
+          kind: 'provider',
+        },
+      ]
     }
-    return [{ providerId: 'omniroute', baseURL: config.baseUrl, model: modelSpec, apiKey: config.apiKey, kind: 'provider' }]
+    return [
+      {
+        providerId: 'omniroute',
+        baseURL: config.baseUrl,
+        model: modelSpec,
+        apiKey: config.apiKey,
+        kind: 'provider',
+      },
+    ]
   }
-  return [{ providerId: 'omniroute', baseURL: config.baseUrl, model: modelSpec, apiKey: config.apiKey, kind: 'provider' }]
+  return [
+    {
+      providerId: 'omniroute',
+      baseURL: config.baseUrl,
+      model: modelSpec,
+      apiKey: config.apiKey,
+      kind: 'provider',
+    },
+  ]
 }
-
 
 // ── Provider Model Listing ─────────────────────────────────────────
 

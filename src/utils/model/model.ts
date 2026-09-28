@@ -21,6 +21,9 @@ import {
 } from '../context.js'
 import { isEnvTruthy } from '../envUtils.js'
 import { getModelStrings, resolveOverriddenModel } from './modelStrings.js'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { formatModelPricing, getOpus46CostTier } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
@@ -441,7 +444,12 @@ export function isOpus1mMergeEnabled(): boolean {
 }
 
 export function renderModelSetting(setting: ModelName | ModelAlias): string {
-  if (setting === 'worker-pool' || setting === 'auto' || setting === 'v8' || setting === 'chat-pool') {
+  if (
+    setting === 'worker-pool' ||
+    setting === 'auto' ||
+    setting === 'v8' ||
+    setting === 'chat-pool'
+  ) {
     return 'v8·自主选模'
   }
   if (setting === 'opusplan') {
@@ -512,6 +520,12 @@ export function renderModelName(model: ModelName): string {
   const publicName = getPublicModelDisplayName(model)
   if (publicName) {
     return publicName
+  }
+  // CCB auto-routing: show the actual resolved provider/model instead of the
+  // abstract auto/ variant. Read from the file ccb-router writes on each request.
+  const ccbResolved = getCcbResolvedModel()
+  if (ccbResolved && model.startsWith('auto/')) {
+    return ccbResolved
   }
   if (process.env.USER_TYPE === 'ant') {
     const resolved = parseUserSpecifiedModel(model)
@@ -670,6 +684,26 @@ export function isLegacyModelRemapEnabled(): boolean {
   return !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP)
 }
 
+function getCcbResolvedModel(): string | null {
+  // Read the last-resolved model written by ccb-router (CCB_SHOW_MODEL=1 feature).
+  if (!isEnvTruthy(process.env.CCB_SHOW_MODEL)) return null
+  const resolvedFile = join(homedir(), '.ccb-embed', 'last-resolved.json')
+  try {
+    const raw = readFileSync(resolvedFile, 'utf8')
+    const parsed = JSON.parse(raw) as {
+      provider?: string
+      model?: string
+      at?: number
+    }
+    if (!parsed.provider || !parsed.model) return null
+    // Reject stale entries (>30 min) to avoid showing an old model after a restart
+    if (parsed.at && Date.now() - parsed.at > 30 * 60 * 1000) return null
+    return `${parsed.provider}/${parsed.model}`
+  } catch {
+    return null
+  }
+}
+
 export function modelDisplayString(model: ModelSetting): string {
   if (model === null) {
     if (process.env.USER_TYPE === 'ant') {
@@ -680,7 +714,19 @@ export function modelDisplayString(model: ModelSetting): string {
     return `Default (${getDefaultMainLoopModel()})`
   }
   const resolvedModel = parseUserSpecifiedModel(model)
-  return model === resolvedModel ? resolvedModel : `${model} (${resolvedModel})`
+  const display =
+    model === resolvedModel ? resolvedModel : `${model} (${resolvedModel})`
+  // CCB auto-routing: when the configured model is an auto-variant, show the
+  // actual provider/model that the router last resolved. This makes the status
+  // line readable (e.g. "cohere/command-a-03-2025") instead of "auto/best-chat".
+  const ccbResolved = getCcbResolvedModel()
+  if (
+    ccbResolved &&
+    (model === 'auto/best-chat' || model.startsWith('auto/'))
+  ) {
+    return ccbResolved
+  }
+  return display
 }
 
 // @[MODEL LAUNCH]: Add a marketing name mapping for the new model below.

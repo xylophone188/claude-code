@@ -47,6 +47,36 @@ function hookLog(msg: string): void {
   logForDebugging(`[goal] hook: ${msg}`)
 }
 
+/** Detect self-reported completion markers in message text. */
+function extractGoalMarker(messages: unknown[]): 'complete' | 'blocked' | null {
+  if (!Array.isArray(messages)) return null
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as Record<string, unknown>
+    if (!m || m.role !== 'assistant') continue
+    const content = m.content
+    if (
+      typeof content === 'string' &&
+      /GOAL_(COMPLETE|BLOCKED):/.test(content)
+    ) {
+      return content.includes('GOAL_COMPLETE:') ? 'complete' : 'blocked'
+    }
+    if (Array.isArray(content)) {
+      for (const part of content) {
+        const text =
+          typeof part === 'string'
+            ? part
+            : (part as Record<string, unknown>)?.text
+              ? (part as Record<string, unknown>).text
+              : undefined
+        if (typeof text === 'string' && /GOAL_(COMPLETE|BLOCKED):/.test(text)) {
+          return text.includes('GOAL_COMPLETE:') ? 'complete' : 'blocked'
+        }
+      }
+    }
+  }
+  return null
+}
+
 export type UseGoalContinuationOpts = {
   isLoading: boolean
   wasAborted: boolean
@@ -59,6 +89,8 @@ export type UseGoalContinuationOpts = {
     turn: number
     objective: string
   }) => void
+  /** Optional message list for post-turn marker detection. */
+  messages?: unknown[]
 }
 
 export function useGoalContinuation(opts: UseGoalContinuationOpts): void {
@@ -119,6 +151,28 @@ export function useGoalContinuation(opts: UseGoalContinuationOpts): void {
     }
     if (goal.status === 'active') {
       budgetLimitFiredRef.current = false
+    }
+
+    // Check for self-reported completion/blocked markers from the model's
+    // final response. If found, transition goal status and stop continuation.
+    const marker = extractGoalMarker(opts.messages ?? [])
+    if (marker === 'complete') {
+      const completed = completeGoal()
+      if (completed) {
+        persistCurrentGoal()
+        // Drain any enqueued continuation prompts to prevent further turns.
+        // Note: drainGoalContinuationQueue is in the command module; we avoid
+        // importing it here to keep the hook pure. The queue will naturally
+        // stop since goal is no longer 'active'.
+      }
+      hookLog('goal completed via model marker, stopping continuation')
+      return
+    }
+    if (marker === 'blocked') {
+      // For blocked, we just log and don't continue.
+      // User must explicitly /goal resume or /goal continue.
+      hookLog('goal blocked via model marker, stopping continuation')
+      return
     }
 
     // Budget-limited: inject one final steering prompt so the model

@@ -96,7 +96,7 @@ describe('migration definitions', () => {
 
   test('parameterized writes: no SQL string interpolation in the runner body', () => {
     const source = v1Up()
-    expect(source).not.toContain('$1\'')
+    expect(source).not.toContain("$1'")
     expect(source).not.toContain(' + ')
   })
 })
@@ -107,7 +107,11 @@ function mockPool(appliedVersions: number[] = []) {
     async query(text: string, _params: unknown[] = []) {
       statements.push(text.trim())
       if (/order by version desc/i.test(text)) {
-        return { rows: appliedVersions.length ? [{ version: Math.max(...appliedVersions) }] : [] }
+        return {
+          rows: appliedVersions.length
+            ? [{ version: Math.max(...appliedVersions) }]
+            : [],
+        }
       }
       if (/select version from resource_plane\.migrations/i.test(text)) {
         return { rows: appliedVersions.map(version => ({ version })) }
@@ -133,7 +137,7 @@ describe('migration runner', () => {
   test('applies all migrations in one transaction when none are applied', async () => {
     const pool = mockPool()
     const result = await runResourcePlaneMigrations(pool)
-    expect(result.applied).toEqual([1, 2, 3])
+    expect(result.applied).toEqual([1, 2, 3, 4])
     expect(result.skipped).toEqual([])
     const ordered = pool.statements.join('\n').toLowerCase()
     const begin = ordered.indexOf('begin')
@@ -144,11 +148,13 @@ describe('migration runner', () => {
   })
 
   test('is idempotent: re-run skips already applied versions and stays a no-op', async () => {
-    const pool = mockPool([1, 2, 3])
+    const pool = mockPool([1, 2, 3, 4])
     const result = await runResourcePlaneMigrations(pool)
-    expect(result).toEqual({ applied: [], skipped: [1, 2, 3] })
+    expect(result).toEqual({ applied: [], skipped: [1, 2, 3, 4] })
     const joined = pool.statements.join('\n').toLowerCase().replace(/\s+/g, ' ')
-    expect(joined).not.toContain('create table resource_plane.provider_accounts')
+    expect(joined).not.toContain(
+      'create table resource_plane.provider_accounts',
+    )
     expect(joined).not.toContain('check (')
     expect(joined).not.toContain('add constraint')
   })
@@ -156,10 +162,12 @@ describe('migration runner', () => {
   test('applies only the missing migrations in the middle of the sequence', async () => {
     const pool = mockPool([1])
     const result = await runResourcePlaneMigrations(pool)
-    expect(result).toEqual({ applied: [2, 3], skipped: [1] })
+    expect(result).toEqual({ applied: [2, 3, 4], skipped: [1] })
     const joined = pool.statements.join('\n').toLowerCase()
     expect(joined).toContain('not valid')
-    expect(joined).not.toContain('create table resource_plane.provider_accounts')
+    expect(joined).not.toContain(
+      'create table resource_plane.provider_accounts',
+    )
   })
 
   test('rolls back on SQL failure and never records the failed migration', async () => {
@@ -167,7 +175,8 @@ describe('migration runner', () => {
       calls: [] as string[],
       async query(text: string) {
         this.calls.push(text.trim().toLowerCase())
-        if (/select version from resource_plane\.migrations/i.test(text)) return { rows: [] }
+        if (/select version from resource_plane\.migrations/i.test(text))
+          return { rows: [] }
         if (/begin/i.test(text)) return { rows: [] }
         throw new Error('boom')
       },
@@ -190,7 +199,9 @@ describe('rollback helper', () => {
     expect(result).toBe(2)
     const joined = pool.statements.join('\n').toLowerCase()
     expect(joined).toContain('drop constraint if exists')
-    expect(joined).toContain('delete from resource_plane.migrations where version = $1')
+    expect(joined).toContain(
+      'delete from resource_plane.migrations where version = $1',
+    )
     expect(joined).toContain('commit')
   })
 

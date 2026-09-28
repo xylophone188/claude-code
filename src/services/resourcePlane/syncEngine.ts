@@ -20,6 +20,8 @@ export interface SyncNodeInfo {
   lastSyncedAt: Date
   status: 'healthy' | 'degraded' | 'offline'
   fencingEpoch: number
+  region: string
+  globalFencingEpoch: number
 }
 
 export interface SyncDelta {
@@ -69,6 +71,8 @@ export interface FencingToken {
 export class SyncEngine {
   private readonly nodeId: string
   private readonly fencingEpoch: number
+  private readonly region: string
+  private readonly globalFencingEpoch: number
   private localRevision: number = 0
   private readonly heartbeatIntervalMs: number
   private readonly syncPollIntervalMs: number
@@ -76,14 +80,20 @@ export class SyncEngine {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private syncTimer: ReturnType<typeof setInterval> | null = null
 
-  constructor(options: {
-    nodeId?: string
-    fencingEpoch?: number
-    heartbeatIntervalMs?: number
-    syncPollIntervalMs?: number
-  } = {}) {
+  constructor(
+    options: {
+      nodeId?: string
+      fencingEpoch?: number
+      region?: string
+      globalFencingEpoch?: number
+      heartbeatIntervalMs?: number
+      syncPollIntervalMs?: number
+    } = {},
+  ) {
     this.nodeId = options.nodeId ?? process.env.HOSTNAME ?? 'node-unknown'
     this.fencingEpoch = options.fencingEpoch ?? Date.now()
+    this.region = options.region ?? process.env.CCB_REGION ?? 'default'
+    this.globalFencingEpoch = options.globalFencingEpoch ?? this.fencingEpoch
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 5_000
     this.syncPollIntervalMs = options.syncPollIntervalMs ?? 30_000
   }
@@ -93,8 +103,14 @@ export class SyncEngine {
   async start(): Promise<void> {
     if (this.heartbeatTimer) return
     console.log(`[SyncEngine] Starting sync engine for node=${this.nodeId}`)
-    this.heartbeatTimer = setInterval(() => this._heartbeat(), this.heartbeatIntervalMs)
-    this.syncTimer = setInterval(() => this._pollSync(), this.syncPollIntervalMs)
+    this.heartbeatTimer = setInterval(
+      () => this._heartbeat(),
+      this.heartbeatIntervalMs,
+    )
+    this.syncTimer = setInterval(
+      () => this._pollSync(),
+      this.syncPollIntervalMs,
+    )
     await this._heartbeat()
     await this._pollSync()
   }
@@ -115,13 +131,15 @@ export class SyncEngine {
     const client = await pool.connect()
     try {
       await client.query(
-        `INSERT INTO resource_plane.sync_nodes (node_id, last_revision, last_synced_at, fencing_epoch, status)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO resource_plane.sync_nodes (node_id, last_revision, last_synced_at, fencing_epoch, status, region, global_fencing_epoch)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (node_id) DO UPDATE SET
            last_revision = EXCLUDED.last_revision,
            last_synced_at = EXCLUDED.last_synced_at,
            fencing_epoch = EXCLUDED.fencing_epoch,
            status = EXCLUDED.status,
+           region = EXCLUDED.region,
+           global_fencing_epoch = EXCLUDED.global_fencing_epoch,
            updated_at = now()`,
         [
           nodeInfo.nodeId,
@@ -129,6 +147,8 @@ export class SyncEngine {
           nodeInfo.lastSyncedAt,
           nodeInfo.fencingEpoch,
           nodeInfo.status,
+          nodeInfo.region,
+          nodeInfo.globalFencingEpoch,
         ],
       )
     } finally {
@@ -141,7 +161,7 @@ export class SyncEngine {
     const client = await pool.connect()
     try {
       const res = await client.query(
-        `SELECT node_id, last_revision, last_synced_at, fencing_epoch, status, updated_at
+        `SELECT node_id, last_revision, last_synced_at, fencing_epoch, status, region, global_fencing_epoch, updated_at
          FROM resource_plane.sync_nodes WHERE node_id = $1`,
         [nodeId],
       )
@@ -153,6 +173,8 @@ export class SyncEngine {
         lastSyncedAt: new Date(row.last_synced_at),
         fencingEpoch: Number(row.fencing_epoch),
         status: row.status as SyncNodeInfo['status'],
+        region: row.region,
+        globalFencingEpoch: Number(row.global_fencing_epoch),
       }
     } finally {
       client.release()
@@ -164,7 +186,7 @@ export class SyncEngine {
     const client = await pool.connect()
     try {
       const res = await client.query(
-        `SELECT node_id, last_revision, last_synced_at, fencing_epoch, status, updated_at
+        `SELECT node_id, last_revision, last_synced_at, fencing_epoch, status, region, global_fencing_epoch, updated_at
          FROM resource_plane.sync_nodes ORDER BY last_synced_at DESC`,
       )
       return res.rows.map(row => ({
@@ -173,6 +195,8 @@ export class SyncEngine {
         lastSyncedAt: new Date(row.last_synced_at),
         fencingEpoch: Number(row.fencing_epoch),
         status: row.status as SyncNodeInfo['status'],
+        region: row.region,
+        globalFencingEpoch: Number(row.global_fencing_epoch),
       }))
     } finally {
       client.release()
@@ -189,9 +213,14 @@ export class SyncEngine {
         lastSyncedAt: new Date(),
         status: 'healthy',
         fencingEpoch: this.fencingEpoch,
+        region: this.region,
+        globalFencingEpoch: this.globalFencingEpoch,
       })
     } catch (err) {
-      console.error(`[SyncEngine] Heartbeat failed for node=${this.nodeId}:`, err)
+      console.error(
+        `[SyncEngine] Heartbeat failed for node=${this.nodeId}:`,
+        err,
+      )
     }
   }
 
@@ -231,12 +260,16 @@ export class SyncEngine {
     const startMs = Date.now()
     const fencingToken = this._generateFencingToken()
 
-    // Validate fencing to prevent split-brain
-    if (peer.fencingEpoch < this.fencingEpoch) {
+    // Validate fencing to prevent split-brain. Cross-region peers are ordered
+    // by global fencing epoch; intra-region by local epoch.
+    const peerEpoch = Math.max(peer.globalFencingEpoch, peer.fencingEpoch)
+    const myEpoch = Math.max(this.globalFencingEpoch, this.fencingEpoch)
+    if (peerEpoch > myEpoch) {
+      // Peer is ahead — treat as skipped; we do not backfill from a stale peer.
       return {
         success: true,
         appliedRevision: this.localRevision,
-        skippedRevisions: 0,
+        skippedRevisions: 1,
         conflictsResolved: 0,
         durationMs: Date.now() - startMs,
       }
@@ -278,7 +311,9 @@ export class SyncEngine {
     }
   }
 
-  private async _fetchRemoteState(nodeId: string): Promise<ProviderConfig[] | null> {
+  private async _fetchRemoteState(
+    nodeId: string,
+  ): Promise<ProviderConfig[] | null> {
     const pool = getPgPool()
     const client = await pool.connect()
     try {
@@ -345,11 +380,17 @@ export class SyncEngine {
         })),
       ),
       sourceRevision: this.localRevision,
-      targetRevision: remoteState.reduce((max, p) => Math.max(max, p.metadata?.revision as number ?? 0), 0),
+      targetRevision: remoteState.reduce(
+        (max, p) => Math.max(max, (p.metadata?.revision as number) ?? 0),
+        0,
+      ),
     }
   }
 
-  private async _applyDelta(delta: SyncDelta, fencingToken: FencingToken): Promise<void> {
+  private async _applyDelta(
+    delta: SyncDelta,
+    fencingToken: FencingToken,
+  ): Promise<void> {
     const pool = getPgPool()
     const client = await pool.connect()
     try {
@@ -385,6 +426,8 @@ export class SyncEngine {
   getMetrics() {
     return {
       nodeId: this.nodeId,
+      region: this.region,
+      globalFencingEpoch: this.globalFencingEpoch,
       localRevision: this.localRevision,
       fencingEpoch: this.fencingEpoch,
       heartbeatIntervalMs: this.heartbeatIntervalMs,

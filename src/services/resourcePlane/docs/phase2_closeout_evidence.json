@@ -1,0 +1,127 @@
+{
+  "phase": "Phase 2: providers.json -> PG Resource Plane Import",
+  "status": "CLOSED",
+  "verdict": "PASS",
+  "timestamp": "2026-09-28T00:00:00.000Z",
+  "commit": {
+    "sha": "be07336da837c24f4bd4878b3555b4ddaab55725",
+    "branch": "snapshot/dirty-tree-prefix-20260924"
+  },
+  "migration": {
+    "schema": "resource_plane",
+    "version": 1,
+    "name": "001_resource_plane_init",
+    "appliedCount": 1,
+    "skippedOnSecondRun": 1,
+    "idempotent": true
+  },
+  "databaseObjects": {
+    "schema": "resource_plane",
+    "tables": [
+      "resource_plane.migrations",
+      "resource_plane.provider_accounts",
+      "resource_plane.model_capabilities",
+      "resource_plane.provider_health",
+      "resource_plane.quota_state",
+      "resource_plane.routing_resources",
+      "resource_plane.device_resources",
+      "resource_plane.credential_secrets",
+      "resource_plane.outbox_events",
+      "resource_plane.inbox_events",
+      "resource_plane.lease_state"
+    ],
+    "primaryKeys": {
+      "provider_accounts": ["provider_id", "account_id"],
+      "credential_secrets": [
+        "provider_id",
+        "account_id",
+        "secret_type",
+        "secret_id"
+      ],
+      "model_capabilities": ["provider_id", "model_id"]
+    },
+    "indexes": [
+      "idx_rp_provider_accounts_auth",
+      "idx_rp_provider_accounts_revision",
+      "idx_rp_credential_secrets_refreshable",
+      "idx_rp_credential_secrets_owner",
+      "idx_rp_credential_secrets_expiry"
+    ]
+  },
+  "fixtureImportEvidence": {
+    "fixtureInput": {
+      "providers": ["gitee", "nvidia", "codex"],
+      "accounts": 4,
+      "credentials": 5,
+      "capabilities": 2
+    },
+    "rowCounts": {
+      "initial": {
+        "provider_accounts": 0,
+        "credential_secrets": 0,
+        "model_capabilities": 0
+      },
+      "afterFirstImport": {
+        "provider_accounts": 4,
+        "credential_secrets": 5,
+        "model_capabilities": 2
+      },
+      "afterSecondImport": {
+        "provider_accounts": 4,
+        "credential_secrets": 5,
+        "model_capabilities": 2
+      }
+    },
+    "idempotencyVerified": true,
+    "duplicateRowsCreated": 0,
+    "secretIdStability": "100% deterministic (RFC 4122 v5 without randomUUID)",
+    "oauthSecretTypePreserved": [
+      {
+        "providerId": "codex",
+        "secretType": "accessToken",
+        "authType": "oauth"
+      },
+      {
+        "providerId": "codex",
+        "secretType": "refreshToken",
+        "authType": "oauth"
+      }
+    ]
+  },
+  "encryptionBoundaryEvidence": {
+    "envelopePrefix": "rpenc:v1:1:aes-256-gcm:",
+    "algorithm": "aes-256-gcm",
+    "keyVersion": 1,
+    "rawPlaintextLeakDetected": false,
+    "decryptionRoundtripVerified": true
+  },
+  "testExecution": {
+    "testCommand": "cd /home/melody/cloud/source-code/github/ai/claude-code && bun test src/services/resourcePlane",
+    "totalTests": 55,
+    "passed": 55,
+    "failed": 0,
+    "files": [
+      "src/services/resourcePlane/__tests__/types.test.ts",
+      "src/services/resourcePlane/__tests__/credentials.test.ts",
+      "src/services/resourcePlane/__tests__/migrations.test.ts",
+      "src/services/resourcePlane/__tests__/importer.test.ts"
+    ]
+  },
+  "pgGateValidation": {
+    "testFile": "src/services/resourcePlane/__tests__/pgGate.test.ts",
+    "targetPostgres": "127.0.0.1:5432/omniroute",
+    "allPassed": true
+  },
+  "nextPhase": {
+    "phase": "Phase 3: CCB runtime -> PG Resource Plane",
+    "state": "READY (NOT STARTED)",
+    "preconditionsSatisfied": [
+      "Phase 2 closeout accepted",
+      "PG migration verified",
+      "Resource Plane repository connected and verified with real PG",
+      "CCB runtime reads strictly non-sensitive metadata",
+      "Credential decrypt boundary strictly at transport layer",
+      "Zero production credentials migrated prematurely"
+    ]
+  }
+}

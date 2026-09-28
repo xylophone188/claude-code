@@ -256,6 +256,23 @@ DROP TABLE IF EXISTS resource_plane.metrics;
 DROP TABLE IF EXISTS resource_plane.sync_nodes;
 `
 
+const V4_UP = `
+-- Phase 4.0: Multi-region replication
+-- Add region and global fencing epoch to sync_nodes for cross-region coordination.
+ALTER TABLE resource_plane.sync_nodes
+  ADD COLUMN IF NOT EXISTS region text NOT NULL DEFAULT 'default',
+  ADD COLUMN IF NOT EXISTS global_fencing_epoch bigint NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_rp_sync_nodes_region
+  ON resource_plane.sync_nodes (region, status);
+`
+
+const V4_DOWN = `
+DROP INDEX IF EXISTS resource_plane.idx_rp_sync_nodes_region;
+ALTER TABLE resource_plane.sync_nodes DROP COLUMN IF EXISTS region;
+ALTER TABLE resource_plane.sync_nodes DROP COLUMN IF EXISTS global_fencing_epoch;
+`
+
 export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
   {
     version: 1,
@@ -273,6 +290,12 @@ export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
     name: 'phase3_5_extensions',
     up: V3_UP,
     down: V3_DOWN,
+  },
+  {
+    version: 4,
+    name: 'phase4_0_multi_region',
+    up: V4_UP,
+    down: V4_DOWN,
   },
 ]
 
@@ -400,7 +423,10 @@ export async function rollbackLatestResourcePlaneMigration(
   })
 }
 
-async function rollbackVersion(client: PoolClient, version: number): Promise<void> {
+async function rollbackVersion(
+  client: PoolClient,
+  version: number,
+): Promise<void> {
   const migration = RESOURCE_PLANE_MIGRATIONS.find(m => m.version === version)
   if (!migration?.down) {
     throw new ResourcePlaneValidationError(
@@ -408,5 +434,8 @@ async function rollbackVersion(client: PoolClient, version: number): Promise<voi
     )
   }
   await client.query(migration.down)
-  await client.query('DELETE FROM resource_plane.migrations WHERE version = $1', [version])
+  await client.query(
+    'DELETE FROM resource_plane.migrations WHERE version = $1',
+    [version],
+  )
 }

@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { ResourcePlaneApi, resetResourcePlaneApiForTest } from '../api.js'
 import { SyncEngine, resetSyncEngineForTest } from '../syncEngine.js'
-import { CredentialRotation, CredentialExpirationManager, CredentialAudit, getLifecycleMetrics } from '../credentialLifecycle.js'
-import { MetricsCollector, HealthChecker, resetMonitoringForTest } from '../monitoring.js'
+import {
+  CredentialRotation,
+  CredentialExpirationManager,
+  CredentialAudit,
+  getLifecycleMetrics,
+} from '../credentialLifecycle.js'
+import {
+  MetricsCollector,
+  HealthChecker,
+  resetMonitoringForTest,
+} from '../monitoring.js'
 import { runResourcePlaneMigrations } from '../migrations.js'
 import { getPgPool } from '../../pg/pool.js'
 
@@ -33,7 +42,10 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
 
   describe('Cross-service sync', () => {
     test('SyncEngine registers nodes and tracks heartbeats', async () => {
-      const engine = new SyncEngine({ nodeId: 'test-node-1', fencingEpoch: 1000 })
+      const engine = new SyncEngine({
+        nodeId: 'test-node-1',
+        fencingEpoch: 1000,
+      })
       await engine.start()
 
       const status = await engine.getNodeStatus('test-node-1')
@@ -45,7 +57,11 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
     }, 10_000)
 
     test('SyncEngine lists multiple nodes', async () => {
-      const engine = new SyncEngine({ nodeId: 'test-node-2', fencingEpoch: 2000 })
+      const engine = new SyncEngine({
+        nodeId: 'test-node-2',
+        fencingEpoch: 2000,
+        region: 'test-region',
+      })
       await engine.start()
 
       // Register a second node
@@ -55,6 +71,8 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
         lastSyncedAt: new Date(),
         status: 'healthy',
         fencingEpoch: 3000,
+        region: 'test-region',
+        globalFencingEpoch: 3000,
       })
 
       const nodes = await engine.listNodes()
@@ -70,7 +88,8 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
       const pool = getPgPool()
       const client = await pool.connect()
       try {
-        const result = await CredentialExpirationManager.checkExpiringCredentials(24 * 365)
+        const result =
+          await CredentialExpirationManager.checkExpiringCredentials(24 * 365)
         expect(Array.isArray(result)).toBe(true)
       } finally {
         client.release()
@@ -103,7 +122,7 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
           authType: 'apiKey',
           secretType: 'apiKey',
           newSecret: { type: 'apiKey', apiKey: 'test-key' },
-        })
+        }),
       ).rejects.toThrow(/Credential not found/)
     })
   })
@@ -157,10 +176,10 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
 
     test('ResourcePlaneApi lifecycle methods work', async () => {
       const api = new ResourcePlaneApi({ autoStartSync: false })
-      
+
       // Initialize without starting sync
       await api.initialize()
-      
+
       // Get metrics
       const metrics = await api.getMetrics()
       expect(metrics).toBeDefined()
@@ -172,7 +191,10 @@ describe('Phase 3.5: ResourcePlane extensions', () => {
 
   describe('Integration: Full flow', () => {
     test('Sync engine + monitoring integration', async () => {
-      const engine = new SyncEngine({ nodeId: 'integration-node', fencingEpoch: 4000 })
+      const engine = new SyncEngine({
+        nodeId: 'integration-node',
+        fencingEpoch: 4000,
+      })
       await engine.start()
 
       // Give heartbeat time to register

@@ -290,11 +290,24 @@ CREATE TABLE IF NOT EXISTS resource_plane.credential_schemas (
 CREATE INDEX IF NOT EXISTS idx_rp_credential_schemas_provider ON resource_plane.credential_schemas (provider_id);
 CREATE INDEX IF NOT EXISTS idx_rp_credential_schemas_auth_secret ON resource_plane.credential_schemas (auth_type, secret_type);
 `
-
 const V5_DOWN = `
-DROP INDEX IF EXISTS resource_plane.idx_rp_credential_schemas_provider;
-DROP INDEX IF EXISTS resource_plane.idx_rp_credential_schemas_auth_secret;
-DROP TABLE IF EXISTS resource_plane.credential_schemas;
+  DROP INDEX IF EXISTS idx_rp_credential_schemas_provider;
+  DROP INDEX IF EXISTS idx_rp_credential_schemas_auth_secret;
+  DROP TABLE IF EXISTS resource_plane.credential_schemas;
+`
+
+const V6_UP = `
+-- Phase 6.0: Signed Audit Log columns
+ALTER TABLE resource_plane.audit_events
+  ADD COLUMN IF NOT EXISTS prev_hash text,
+  ADD COLUMN IF NOT EXISTS hash text,
+  ADD COLUMN IF NOT EXISTS signature text;
+`
+
+const V6_DOWN = `
+ALTER TABLE resource_plane.audit_events DROP COLUMN IF EXISTS prev_hash;
+ALTER TABLE resource_plane.audit_events DROP COLUMN IF EXISTS hash;
+ALTER TABLE resource_plane.audit_events DROP COLUMN IF EXISTS signature;
 `
 
 export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
@@ -326,6 +339,12 @@ export const RESOURCE_PLANE_MIGRATIONS: ResourcePlaneMigration[] = [
     name: 'phase5_0_schema_registry',
     up: V5_UP,
     down: V5_DOWN,
+  },
+  {
+    version: 6,
+    name: 'phase6_0_signed_audit',
+    up: V6_UP,
+    down: V6_DOWN,
   },
 ]
 

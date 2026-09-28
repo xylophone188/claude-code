@@ -518,7 +518,9 @@ function providerConfigEqual(a: ProviderConfig, b: ProviderConfig): boolean {
  *
  * Returns the final merged list that was written.
  */
-export async function saveProviders(providers: ProviderConfig[]): Promise<ProviderConfig[]> {
+export async function saveProviders(
+  providers: ProviderConfig[],
+): Promise<ProviderConfig[]> {
   const filePath = getProvidersFilePath()
 
   // Build merged list (providers override defaults by id)
@@ -565,10 +567,17 @@ export async function saveProviders(providers: ProviderConfig[]): Promise<Provid
   // Phase 3.4: sync to resourcePlane if feature flag enabled
   if (process.env.CCB_RESOURCE_PLANE === '1') {
     try {
-      await syncToResourcePlane(Array.from(merged.values()), { ownerNodeId: 'cli-save', revision: Date.now() })
+      await syncToResourcePlane(Array.from(merged.values()), {
+        ownerNodeId: 'cli-save',
+        revision: Date.now(),
+      })
     } catch (err) {
       // Log and re-throw - PG sync failure must not be silent
-      logError('[saveProviders] ResourcePlane sync failed:', err)
+      logError(
+        new Error(
+          `[saveProviders] ResourcePlane sync failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      )
       throw err
     }
   }

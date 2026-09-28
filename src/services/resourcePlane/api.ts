@@ -11,7 +11,11 @@
 import type { ProviderConfig } from '../providerRegistry/types.js'
 import { syncToResourcePlane } from './writeAdapter.js'
 import { loadProvidersFromResourcePlane } from './readAdapter.js'
-import { SyncEngine, getSyncEngine, resetSyncEngineForTest as resetSyncEngine } from './syncEngine.js'
+import {
+  SyncEngine,
+  getSyncEngine,
+  resetSyncEngineForTest as resetSyncEngine,
+} from './syncEngine.js'
 import {
   CredentialRotation,
   CredentialExpirationManager,
@@ -21,7 +25,11 @@ import {
   type CredentialExpirationCheck,
   type CredentialAuditEntry,
 } from './credentialLifecycle.js'
-import { getMetricsCollector, getHealthChecker, resetMonitoringForTest } from './monitoring.js'
+import {
+  getMetricsCollector,
+  getHealthChecker,
+  resetMonitoringForTest,
+} from './monitoring.js'
 import type {
   ResourceAuthType,
   ResourceSecretType,
@@ -57,7 +65,9 @@ export class ResourcePlaneApi {
   /**
    * Load providers from ResourcePlane (metadata-only, credentials encrypted).
    */
-  async loadProviders(options?: { decryptCredentials?: boolean }): Promise<ProviderConfig[]> {
+  async loadProviders(options?: {
+    decryptCredentials?: boolean
+  }): Promise<ProviderConfig[]> {
     return loadProvidersFromResourcePlane({
       decryptCredentials: options?.decryptCredentials ?? false,
     })
@@ -100,7 +110,9 @@ export class ResourcePlaneApi {
   /**
    * Check for expiring credentials.
    */
-  async checkExpiringCredentials(hoursThreshold?: number): Promise<CredentialExpirationCheck[]> {
+  async checkExpiringCredentials(
+    hoursThreshold?: number,
+  ): Promise<CredentialExpirationCheck[]> {
     return CredentialExpirationManager.checkExpiringCredentials(hoursThreshold)
   }
 
@@ -131,14 +143,19 @@ export class ResourcePlaneApi {
   /**
    * Get credential audit log.
    */
-  async getAuditLog(providerId?: string, limit?: number): Promise<CredentialAuditEntry[]> {
+  async getAuditLog(
+    providerId?: string,
+    limit?: number,
+  ): Promise<CredentialAuditEntry[]> {
     return CredentialAudit.getAuditLog(providerId, limit)
   }
 
   /**
    * Log a credential audit entry.
    */
-  async logAudit(entry: Omit<CredentialAuditEntry, 'performedAt'>): Promise<void> {
+  async logAudit(
+    entry: Omit<CredentialAuditEntry, 'performedAt'>,
+  ): Promise<void> {
     await CredentialAudit.log(entry)
   }
 
@@ -161,20 +178,28 @@ export class ResourcePlaneApi {
   /**
    * Register a node.
    */
-  async registerNode(nodeId: string, lastRevision: number): Promise<void> {
+  async registerNode(
+    nodeId: string,
+    lastRevision: number,
+    region = 'default',
+  ): Promise<void> {
     await this.syncEngine.registerNode({
       nodeId,
       lastRevision,
       lastSyncedAt: new Date(),
       status: 'healthy',
       fencingEpoch: this.options.fencingEpoch ?? 0,
+      region,
+      globalFencingEpoch: this.options.fencingEpoch ?? 0,
     })
   }
 
   /**
    * List all registered nodes.
    */
-  async listNodes(): Promise<Array<{ nodeId: string; status: string; lastRevision: number }>> {
+  async listNodes(): Promise<
+    Array<{ nodeId: string; status: string; lastRevision: number }>
+  > {
     const nodes = await this.syncEngine.listNodes()
     return nodes.map(n => ({
       nodeId: n.nodeId,
@@ -247,7 +272,9 @@ export class ResourcePlaneApi {
 
 let _api: ResourcePlaneApi | null = null
 
-export function getResourcePlaneApi(options?: ResourcePlaneApiOptions): ResourcePlaneApi {
+export function getResourcePlaneApi(
+  options?: ResourcePlaneApiOptions,
+): ResourcePlaneApi {
   if (!_api) {
     _api = new ResourcePlaneApi(options)
   }

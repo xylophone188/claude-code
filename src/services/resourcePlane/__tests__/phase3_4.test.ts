@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { ProviderBackendRegistry } from '../../providerRegistry/registry.js'
-import { LegacyBackend, ResourcePlaneBackend } from '../../providerRegistry/backend.js'
+import {
+  LegacyBackend,
+  ResourcePlaneBackend,
+} from '../../providerRegistry/backend.js'
 import { loadProviders } from '../../providerRegistry/loader.js'
 import { syncToResourcePlane } from '../writeAdapter.js'
 import { getPgPool } from '../../pg/pool.js'
@@ -61,7 +64,7 @@ describe('Phase 3.4: ResourcePlane write path', () => {
         const before = await client.query(
           'SELECT count(*) FROM resource_plane.provider_accounts',
         )
-        const initial = parseInt(before.rows[0].count)
+        const initial = parseInt(before.rows[0].count, 10)
 
         const providers = loadProviders()
         const result = await syncToResourcePlane(providers, {
@@ -77,7 +80,7 @@ describe('Phase 3.4: ResourcePlane write path', () => {
         const after = await client.query(
           'SELECT count(*) FROM resource_plane.provider_accounts',
         )
-        const final = parseInt(after.rows[0].count)
+        const final = parseInt(after.rows[0].count, 10)
         // After full reconciliation, PG should match the bundle
         expect(final).toBeGreaterThanOrEqual(0)
       } finally {
@@ -89,7 +92,9 @@ describe('Phase 3.4: ResourcePlane write path', () => {
       process.env[ENV_KEY] = '1'
       const providers = loadProviders()
       // With valid key, should not throw ResourceSecretKeyError
-      await expect(syncToResourcePlane(providers, { revision: 1 })).resolves.toBeDefined()
+      await expect(
+        syncToResourcePlane(providers, { revision: 1 }),
+      ).resolves.toBeDefined()
     })
   })
 

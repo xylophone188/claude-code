@@ -84,7 +84,12 @@ export class CredentialRotation {
       await client.query('BEGIN')
 
       // Fetch existing credential
-      const secretId = deterministicSecretId('resource_plane:secret', input.providerId, input.accountId, input.secretType)
+      const secretId = deterministicSecretId(
+        'resource_plane:secret',
+        input.providerId,
+        input.accountId,
+        input.secretType,
+      )
       const existing = await getTypedCredentialSecret(
         client,
         input.providerId,
@@ -103,17 +108,18 @@ export class CredentialRotation {
       const newKeyVersion = oldKeyVersion + 1
 
       // Encrypt new secret with new key version
-      const { encryptedSecret: newEncryptedSecret } = await encryptTypedCredential({
-        providerId: input.providerId,
-        accountId: input.accountId,
-        authType: input.authType,
-        secretType: input.secretType,
-        secretId: existing.secretId,
-        value: input.newSecret,
-        keyVersion: newKeyVersion,
-        revision: existing.revision + 1,
-        ownerNodeId: existing.ownerNodeId,
-      })
+      const { encryptedSecret: newEncryptedSecret } =
+        await encryptTypedCredential({
+          providerId: input.providerId,
+          accountId: input.accountId,
+          authType: input.authType,
+          secretType: input.secretType,
+          secretId: existing.secretId,
+          value: input.newSecret,
+          keyVersion: newKeyVersion,
+          revision: existing.revision + 1,
+          ownerNodeId: existing.ownerNodeId,
+        })
 
       // Insert new version
       await createTypedCredentialSecret(client, {
@@ -149,7 +155,6 @@ export class CredentialRotation {
         action: 'rotate',
         keyVersion: newKeyVersion,
         performedBy: 'credential-rotation',
-        performedAt: new Date(),
         reason: `Rotated from keyVersion ${oldKeyVersion} to ${newKeyVersion}`,
       })
 
@@ -178,12 +183,18 @@ export class CredentialRotation {
       value: CredentialSecretValue
     }>,
     options?: { performedBy?: string },
-  ): Promise<{ rotated: number; failed: Array<{ accountId: string; error: string }> }> {
-    const results = { rotated: 0, failed: [] as { accountId: string; error: string }[] }
+  ): Promise<{
+    rotated: number
+    failed: Array<{ accountId: string; error: string }>
+  }> {
+    const results = {
+      rotated: 0,
+      failed: [] as { accountId: string; error: string }[],
+    }
 
     for (const cred of newSecrets) {
       try {
-        await this.rotate({
+        await CredentialRotation.rotate({
           providerId,
           accountId: cred.accountId,
           authType: cred.authType,
@@ -272,11 +283,10 @@ export class CredentialExpirationManager {
         action: 'rotate',
         keyVersion: 0,
         performedBy: 'expiration-renewal',
-        performedAt: new Date(),
         reason: `Renewed for ${additionalDays} days`,
       })
 
-      return res.rowCount > 0
+      return (res.rowCount ?? 0) > 0
     } finally {
       client.release()
     }
@@ -303,7 +313,6 @@ export class CredentialExpirationManager {
           action: 'expire',
           keyVersion: 0,
           performedBy: 'credential-expiry-cleanup',
-          performedAt: new Date(),
           reason: `Auto-expired ${count} credentials`,
         })
       }
@@ -405,10 +414,10 @@ export async function getLifecycleMetrics(): Promise<CredentialLifecycleMetrics>
     ])
 
     return {
-      totalCredentials: parseInt(countRes.rows[0].count),
-      expiringSoonCount: parseInt(expiringRes.rows[0].count),
-      expiredCount: parseInt(expiredRes.rows[0].count),
-      rotationCount: parseInt(rotationRes.rows[0].count ?? '0'),
+      totalCredentials: parseInt(countRes.rows[0].count, 10),
+      expiringSoonCount: parseInt(expiringRes.rows[0].count, 10),
+      expiredCount: parseInt(expiredRes.rows[0].count, 10),
+      rotationCount: parseInt(rotationRes.rows[0].count ?? '0', 10),
       lastRotationAt: rotationRes.rows[0].last_rotation
         ? new Date(rotationRes.rows[0].last_rotation)
         : null,

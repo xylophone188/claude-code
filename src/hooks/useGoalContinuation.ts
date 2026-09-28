@@ -32,6 +32,7 @@ import {
   getGoal,
   incrementGoalTurns,
   MAX_GOAL_TURNS,
+  completeGoal,
 } from 'src/services/goal/goalState.js'
 import { persistCurrentGoal } from 'src/services/goal/goalStorage.js'
 import {

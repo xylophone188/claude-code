@@ -117,7 +117,7 @@ export class ActiveActiveReplication {
   }
 
   private async _replicateToRegion(leader: SyncNodeInfo): Promise<void> {
-    const result = await this.syncEngine._syncWithPeer(leader)
+    const result = await this.syncEngine.syncWithPeer(leader)
 
     if (!result.success) {
       console.warn(

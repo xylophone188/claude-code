@@ -15,7 +15,11 @@ import type { Pool, PoolClient } from 'pg'
 import { getPgPool } from '../pg/pool.js'
 import { decryptTypedCredential } from './credentials.js'
 import type { ProviderConfig } from '../providerRegistry/types.js'
-import type { ResourceAuthType, ResourceProviderAccountMetadata, ResourceSecretType } from './types.js'
+import type {
+  ResourceAuthType,
+  ResourceProviderAccountMetadata,
+  ResourceSecretType,
+} from './types.js'
 
 export interface ResourcePlaneReadOptions {
   pool?: Pool | PoolClient
@@ -40,7 +44,12 @@ export async function loadProvidersFromResourcePlane(
   options: ResourcePlaneReadOptions = {},
 ): Promise<ProviderConfig[]> {
   const now = Date.now()
-  if (!options.pool && !options.decryptCredentials && _cachedProviders && now - _cacheLoadedAt < CACHE_TTL_MS) {
+  if (
+    !options.pool &&
+    !options.decryptCredentials &&
+    _cachedProviders &&
+    now - _cacheLoadedAt < CACHE_TTL_MS
+  ) {
     return _cachedProviders
   }
 
@@ -54,7 +63,14 @@ export async function loadProvidersFromResourcePlane(
       WHERE enabled = true
       ORDER BY provider_id, account_id
     `
-    const accountRes = await client.query<ResourceProviderAccountMetadata & { provider_id: string; account_id: string; auth_type: string; base_url: string | null }>(accountQuery)
+    const accountRes = await client.query<
+      ResourceProviderAccountMetadata & {
+        provider_id: string
+        account_id: string
+        auth_type: string
+        base_url: string | null
+      }
+    >(accountQuery)
     if (!accountRes.rows.length) {
       return []
     }
@@ -109,10 +125,8 @@ export async function loadProvidersFromResourcePlane(
             accountId: row.account_id,
             authType: row.auth_type,
             secretType: row.secret_type,
-            secretId: row.secret_id,
             keyVersion: row.key_version,
             encryptedSecret: row.encrypted_secret,
-            revision: row.revision,
           })
           const plain =
             decrypted.type === 'apiKey'
@@ -123,7 +137,11 @@ export async function loadProvidersFromResourcePlane(
           if (plain) {
             const key = `${row.provider_id}:${row.account_id}`
             // Prioritize primary secret
-            if (!secretsByProviderAccount.has(key) || row.secret_type === 'apiKey' || row.secret_type === 'accessToken') {
+            if (
+              !secretsByProviderAccount.has(key) ||
+              row.secret_type === 'apiKey' ||
+              row.secret_type === 'accessToken'
+            ) {
               secretsByProviderAccount.set(key, plain)
             }
           }
@@ -152,27 +170,42 @@ export async function loadProvidersFromResourcePlane(
           ? meta.defaultModel
           : models[0] || `${providerId}/default`
 
-      const accountsConfig: NonNullable<ProviderConfig['accounts']> = accList.map(a => {
-        const accMeta = (a.metadata ?? {}) as Record<string, unknown>
-        const key = `${a.provider_id}:${a.account_id}`
-        const decryptedKey = secretsByProviderAccount.get(key)
-        const envKey = typeof accMeta.apiKeyEnv === 'string' ? accMeta.apiKeyEnv : undefined
-        const fixedModel = typeof accMeta.model === 'string' ? accMeta.model : undefined
+      const accountsConfig: NonNullable<ProviderConfig['accounts']> =
+        accList.map(a => {
+          const accMeta = (a.metadata ?? {}) as Record<string, unknown>
+          const key = `${a.provider_id}:${a.account_id}`
+          const decryptedKey = secretsByProviderAccount.get(key)
+          const envKey =
+            typeof accMeta.apiKeyEnv === 'string'
+              ? accMeta.apiKeyEnv
+              : undefined
+          const fixedModel =
+            typeof accMeta.model === 'string' ? accMeta.model : undefined
 
-        return {
-          id: a.account_id,
-          enabled: a.enabled,
-          ...(decryptedKey ? { apiKey: decryptedKey } : {}),
-          ...(envKey ? { apiKeyEnv: envKey } : {}),
-          ...(fixedModel ? { model: fixedModel } : {}),
-        }
-      })
+          return {
+            id: a.account_id,
+            enabled: a.enabled,
+            ...(decryptedKey ? { apiKey: decryptedKey } : {}),
+            ...(envKey ? { apiKeyEnv: envKey } : {}),
+            ...(fixedModel ? { model: fixedModel } : {}),
+          }
+        })
 
-      const baseUrl = primaryAcc.base_url || `https://api.${providerId}.example.invalid/v1`
-      const compatRule = (typeof meta.compatRule === 'string' ? meta.compatRule : 'permissive') as ProviderConfig['compatRule']
-      const headers = meta.headers && typeof meta.headers === 'object' ? (meta.headers as Record<string, string>) : undefined
-      const timeoutMs = typeof meta.timeoutMs === 'number' ? meta.timeoutMs : undefined
-      const reasoningEffortMax = typeof meta.reasoningEffortMax === 'string' ? (meta.reasoningEffortMax as ProviderConfig['reasoningEffortMax']) : undefined
+      const baseUrl =
+        primaryAcc.base_url || `https://api.${providerId}.example.invalid/v1`
+      const compatRule = (
+        typeof meta.compatRule === 'string' ? meta.compatRule : 'permissive'
+      ) as ProviderConfig['compatRule']
+      const headers =
+        meta.headers && typeof meta.headers === 'object'
+          ? (meta.headers as Record<string, string>)
+          : undefined
+      const timeoutMs =
+        typeof meta.timeoutMs === 'number' ? meta.timeoutMs : undefined
+      const reasoningEffortMax =
+        typeof meta.reasoningEffortMax === 'string'
+          ? (meta.reasoningEffortMax as ProviderConfig['reasoningEffortMax'])
+          : undefined
 
       providers.push({
         id: providerId,
@@ -224,7 +257,9 @@ export async function resolveTransportCredential(
          WHERE provider_id = $1 AND account_id = $2
          ORDER BY CASE secret_type WHEN 'apiKey' THEN 1 WHEN 'accessToken' THEN 2 ELSE 3 END
          LIMIT 1`
-    const params = secretType ? [providerId, accountId, secretType] : [providerId, accountId]
+    const params = secretType
+      ? [providerId, accountId, secretType]
+      : [providerId, accountId]
     const res = await client.query<{
       provider_id: string
       account_id: string
@@ -246,10 +281,8 @@ export async function resolveTransportCredential(
       accountId: row.account_id,
       authType: row.auth_type,
       secretType: row.secret_type,
-      secretId: row.secret_id,
       keyVersion: row.key_version,
       encryptedSecret: row.encrypted_secret,
-      revision: row.revision,
     })
 
     if (decrypted.type === 'apiKey') {

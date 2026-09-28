@@ -1048,6 +1048,7 @@ if (markerIdx !== -1) {
     }
     if (fnEnd !== -1) {
       let fn = s.substring(fnStart, fnEnd + 1)
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: These are literal strings for string replacement, not template literals
       const pairs = [
         ['}d ${z}h ${Y}m ${$}s', '}天${z}时${Y}分${$}秒'],
         ['}d ${z}h ${Y}m', '}天${z}时${Y}分'],

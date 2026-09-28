@@ -45,6 +45,8 @@ export interface SyncDelta {
   }>
   sourceRevision: number
   targetRevision: number
+  skippedRevisions: number
+  conflictsResolved: number
 }
 
 export interface SyncResult {
@@ -238,7 +240,7 @@ export class SyncEngine {
 
       for (const peer of otherPeers) {
         try {
-          const result = await this._syncWithPeer(peer)
+          const result = await this.syncWithPeer(peer)
           if (!result.success && result.errors) {
             errors.push(...result.errors)
           }
@@ -256,7 +258,7 @@ export class SyncEngine {
     }
   }
 
-  private async _syncWithPeer(peer: SyncNodeInfo): Promise<SyncResult> {
+  async syncWithPeer(peer: SyncNodeInfo): Promise<SyncResult> {
     const startMs = Date.now()
     const fencingToken = this._generateFencingToken()
 
@@ -340,7 +342,12 @@ export class SyncEngine {
             kind: 'openai-compat' as const,
             baseUrl: (row.base_url as string) || '',
             defaultModel: (meta.defaultModel as string) || '',
-            compatRule: (meta.compatRule as string) || 'permissive',
+            compatRule: ((meta.compatRule as string) || 'permissive') as
+              | 'cerebras'
+              | 'groq'
+              | 'deepseek'
+              | 'strict-openai'
+              | 'permissive',
             accounts: [],
           }
           providerMap.set(providerId, provider)
@@ -381,9 +388,11 @@ export class SyncEngine {
       ),
       sourceRevision: this.localRevision,
       targetRevision: remoteState.reduce(
-        (max, p) => Math.max(max, (p.metadata?.revision as number) ?? 0),
+        (max, p) => Math.max(max, (p as any).revision ?? 0),
         0,
       ),
+      skippedRevisions: 0,
+      conflictsResolved: 0,
     }
   }
 

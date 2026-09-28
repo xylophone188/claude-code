@@ -48,7 +48,13 @@ export interface ModelCapabilityWrite {
 
 export type CredentialSecretValue =
   | { type: 'apiKey'; apiKey: string }
-  | { type: 'oauth'; accessToken: string; refreshToken?: string; idToken?: string; clientSecret?: string }
+  | {
+      type: 'oauth'
+      accessToken: string
+      refreshToken?: string
+      idToken?: string
+      clientSecret?: string
+    }
   | { type: 'custom'; secrets: Record<string, string> }
 
 export interface ResourcePlaneImportBundle {
@@ -76,7 +82,7 @@ export interface RawAccount {
  */
 export function transformProviders(
   providers: ProviderConfig[],
-  options?: { ownerNodeId?: string },
+  options?: { ownerNodeId?: string; revision?: number },
 ): ResourcePlaneImportBundle {
   const accounts: ResourceProviderAccountMetadata[] = []
   const credentials: CredentialSecretWrite[] = []
@@ -99,9 +105,10 @@ export function transformProviders(
     }
 
     // Normalize accounts to raw format with full flexibility
-    const rawAccounts: RawAccount[] = Array.isArray(entry.accounts) && entry.accounts.length > 0
-      ? entry.accounts.map(acc => ({ ...acc }))
-      : [{ id: 'default', apiKey: entry.apiKey }]
+    const rawAccounts: RawAccount[] =
+      Array.isArray(entry.accounts) && entry.accounts.length > 0
+        ? entry.accounts.map(acc => ({ ...acc }))
+        : [{ id: 'default', apiKey: entry.apiKey }]
 
     for (const acc of rawAccounts) {
       const accountId = String(acc.id || 'default').trim()
@@ -120,7 +127,9 @@ export function transformProviders(
       if (!seenAccountKeys.has(accountKey)) {
         seenAccountKeys.add(accountKey)
         const metadata: Record<string, unknown> = {
-          ...(entry.reasoningEffortMax !== undefined ? { reasoningEffortMax: entry.reasoningEffortMax } : {}),
+          ...(entry.reasoningEffortMax !== undefined
+            ? { reasoningEffortMax: entry.reasoningEffortMax }
+            : {}),
           ...(entry.compatRule ? { compatRule: entry.compatRule } : {}),
           ...(entry.headers ? { headers: entry.headers } : {}),
           ...(entry.apiKeyEnv ? { apiKeyEnv: entry.apiKeyEnv } : {}),
@@ -131,7 +140,11 @@ export function transformProviders(
         accounts.push({
           providerId,
           accountId,
-          name: acc.name || (accountId === 'default' ? providerId : `${providerId}-${accountId}`),
+          name:
+            acc.name ||
+            (accountId === 'default'
+              ? providerId
+              : `${providerId}-${accountId}`),
           authType,
           transport,
           baseUrl,
@@ -143,10 +156,19 @@ export function transformProviders(
         })
       }
 
-      if (authType === 'apiKey' && acc.apiKey && typeof acc.apiKey === 'string') {
+      if (
+        authType === 'apiKey' &&
+        acc.apiKey &&
+        typeof acc.apiKey === 'string'
+      ) {
         const secretType: ResourceSecretType = 'apiKey'
         validateResourceAuthSecretPair(authType, secretType)
-        const secretId = deterministicSecretId('resource_plane:secret', providerId, accountId, secretType)
+        const secretId = deterministicSecretId(
+          'resource_plane:secret',
+          providerId,
+          accountId,
+          secretType,
+        )
         const secretKey = `${providerId}:${accountId}:${secretType}:${secretId}`
         if (!seenSecretKeys.has(secretKey)) {
           seenSecretKeys.add(secretKey)
@@ -165,12 +187,25 @@ export function transformProviders(
       }
 
       if (authType === 'oauth' && tokens) {
-        const secretTypes: ResourceSecretType[] = ['accessToken', 'refreshToken', 'idToken', 'clientSecret']
+        const secretTypes: ResourceSecretType[] = [
+          'accessToken',
+          'refreshToken',
+          'idToken',
+          'clientSecret',
+        ]
         for (const secretType of secretTypes) {
-          const value = tokens[`${secretType.replace(/Token$/, '_token')}` as keyof typeof tokens]
+          const value =
+            tokens[
+              `${secretType.replace(/Token$/, '_token')}` as keyof typeof tokens
+            ]
           if (value && typeof value === 'string') {
             validateResourceAuthSecretPair(authType, secretType)
-            const secretId = deterministicSecretId('resource_plane:secret', providerId, accountId, secretType)
+            const secretId = deterministicSecretId(
+              'resource_plane:secret',
+              providerId,
+              accountId,
+              secretType,
+            )
             const secretKey = `${providerId}:${accountId}:${secretType}:${secretId}`
             if (!seenSecretKeys.has(secretKey)) {
               seenSecretKeys.add(secretKey)
@@ -228,8 +263,11 @@ export async function syncToResourcePlane(
   const ownerNodeId = options.ownerNodeId ?? 'unknown'
   const revision = options.revision ?? 1
 
-  const { accounts: newAccounts, credentials: newCredentials, capabilities: newCapabilities } =
-    transformProviders(providers, { ownerNodeId, revision })
+  const {
+    accounts: newAccounts,
+    credentials: newCredentials,
+    capabilities: newCapabilities,
+  } = transformProviders(providers, { ownerNodeId, revision })
 
   const client = await pool.connect()
   try {
@@ -242,46 +280,72 @@ export async function syncToResourcePlane(
     let capabilityDeletions = 0
     if (bundleProviderIds.size > 0) {
       const res = await client.query(
-        `DELETE FROM resource_plane.model_capabilities WHERE provider_id NOT IN (${Array.from(bundleProviderIds).map((_, i) => `$${i + 1}`).join(',')})`,
+        `DELETE FROM resource_plane.model_capabilities WHERE provider_id NOT IN (${Array.from(
+          bundleProviderIds,
+        )
+          .map((_, i) => `$${i + 1}`)
+          .join(',')})`,
         Array.from(bundleProviderIds),
       )
       capabilityDeletions = res.rowCount ?? 0
     } else {
-      const res = await client.query(`DELETE FROM resource_plane.model_capabilities`)
+      const res = await client.query(
+        `DELETE FROM resource_plane.model_capabilities`,
+      )
       capabilityDeletions = res.rowCount ?? 0
     }
 
     let credentialDeletions = 0
     if (bundleProviderIds.size > 0) {
       const res = await client.query(
-        `DELETE FROM resource_plane.credential_secrets WHERE provider_id NOT IN (${Array.from(bundleProviderIds).map((_, i) => `$${i + 1}`).join(',')})`,
+        `DELETE FROM resource_plane.credential_secrets WHERE provider_id NOT IN (${Array.from(
+          bundleProviderIds,
+        )
+          .map((_, i) => `$${i + 1}`)
+          .join(',')})`,
         Array.from(bundleProviderIds),
       )
       credentialDeletions = res.rowCount ?? 0
     } else {
-      const res = await client.query(`DELETE FROM resource_plane.credential_secrets`)
+      const res = await client.query(
+        `DELETE FROM resource_plane.credential_secrets`,
+      )
       credentialDeletions = res.rowCount ?? 0
     }
 
     let accountDeletions = 0
     if (bundleProviderIds.size > 0) {
       const res = await client.query(
-        `DELETE FROM resource_plane.provider_accounts WHERE provider_id NOT IN (${Array.from(bundleProviderIds).map((_, i) => `$${i + 1}`).join(',')})`,
+        `DELETE FROM resource_plane.provider_accounts WHERE provider_id NOT IN (${Array.from(
+          bundleProviderIds,
+        )
+          .map((_, i) => `$${i + 1}`)
+          .join(',')})`,
         Array.from(bundleProviderIds),
       )
       accountDeletions = res.rowCount ?? 0
     } else {
-      const res = await client.query(`DELETE FROM resource_plane.provider_accounts`)
+      const res = await client.query(
+        `DELETE FROM resource_plane.provider_accounts`,
+      )
       accountDeletions = res.rowCount ?? 0
     }
 
     // 2. Upsert all bundle data
     for (const acc of newAccounts) {
-      await createProviderAccountMetadata(client, { ...acc, ownerNodeId, revision })
+      await createProviderAccountMetadata(client, {
+        ...acc,
+        ownerNodeId,
+        revision,
+      })
     }
 
     for (const cred of newCredentials) {
-      await createTypedCredentialSecret(client, { ...cred, ownerNodeId, revision })
+      await createTypedCredentialSecret(client, {
+        ...cred,
+        ownerNodeId,
+        revision,
+      })
     }
 
     for (const cap of newCapabilities) {
@@ -296,11 +360,23 @@ export async function syncToResourcePlane(
         [providerId],
       )
       const newAccountSet = new Set<string>()
-      newAccounts.filter(a => a.providerId === providerId).forEach((acc) => newAccountSet.add(`${acc.providerId}:${acc.accountId}`))
-      for (const row of existingAccounts.rows as Array<{ provider_id: string; account_id: string }>) {
+      newAccounts
+        .filter(a => a.providerId === providerId)
+        .forEach(acc => newAccountSet.add(`${acc.providerId}:${acc.accountId}`))
+      for (const row of existingAccounts.rows as Array<{
+        provider_id: string
+        account_id: string
+      }>) {
         const key = `${row.provider_id}:${row.account_id}`
         if (!newAccountSet.has(key)) {
-          if (await deleteProviderAccountMetadata(client, row.provider_id, row.account_id)) accountDeletions++
+          if (
+            await deleteProviderAccountMetadata(
+              client,
+              row.provider_id,
+              row.account_id,
+            )
+          )
+            accountDeletions++
         }
       }
     }
@@ -312,15 +388,31 @@ export async function syncToResourcePlane(
         [providerId],
       )
       const newCredentialSet = new Set<string>()
-      newCredentials.filter(c => c.providerId === providerId).forEach((cred) =>
-        newCredentialSet.add(`${cred.providerId}:${cred.accountId}:${cred.secretType}:${cred.secretId}`),
-      )
+      newCredentials
+        .filter(c => c.providerId === providerId)
+        .forEach(cred =>
+          newCredentialSet.add(
+            `${cred.providerId}:${cred.accountId}:${cred.secretType}:${cred.secretId}`,
+          ),
+        )
       for (const row of existingCredentials.rows as Array<{
-        provider_id: string; account_id: string; secret_type: ResourceSecretType; secret_id: string
+        provider_id: string
+        account_id: string
+        secret_type: ResourceSecretType
+        secret_id: string
       }>) {
         const key = `${row.provider_id}:${row.account_id}:${row.secret_type}:${row.secret_id}`
         if (!newCredentialSet.has(key)) {
-          if (await deleteTypedCredentialSecret(client, row.provider_id, row.account_id, row.secret_type, row.secret_id)) credentialDeletions++
+          if (
+            await deleteTypedCredentialSecret(
+              client,
+              row.provider_id,
+              row.account_id,
+              row.secret_type,
+              row.secret_id,
+            )
+          )
+            credentialDeletions++
         }
       }
     }
@@ -332,13 +424,21 @@ export async function syncToResourcePlane(
         [providerId],
       )
       const newCapabilitySet = new Set<string>()
-      newCapabilities.filter(c => c.providerId === providerId).forEach((cap) =>
-        newCapabilitySet.add(`${cap.providerId}:${cap.modelId}`),
-      )
-      for (const row of existingCapabilities.rows as Array<{ provider_id: string; model_id: string }>) {
+      newCapabilities
+        .filter(c => c.providerId === providerId)
+        .forEach(cap =>
+          newCapabilitySet.add(`${cap.providerId}:${cap.modelId}`),
+        )
+      for (const row of existingCapabilities.rows as Array<{
+        provider_id: string
+        model_id: string
+      }>) {
         const key = `${row.provider_id}:${row.model_id}`
         if (!newCapabilitySet.has(key)) {
-          if (await deleteModelCapability(client, row.provider_id, row.model_id)) capabilityDeletions++
+          if (
+            await deleteModelCapability(client, row.provider_id, row.model_id)
+          )
+            capabilityDeletions++
         }
       }
     }

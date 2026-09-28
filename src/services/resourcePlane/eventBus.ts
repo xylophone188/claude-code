@@ -18,7 +18,7 @@ export interface OutboxEvent {
   aggregateType: string
   aggregateId: string
   eventType: string
-  payload: Record<string, unknown>
+  payload: unknown
   revision: number
   sourceNodeId: string
   createdAt: Date
@@ -53,7 +53,10 @@ export interface EventBusOptions {
 export class OutboxProducer {
   static async append(
     client: PoolClient,
-    event: Omit<OutboxEvent, 'eventId' | 'createdAt' | 'deliveredAt' | 'deliveryAttempts' | 'lastError'>,
+    event: Omit<
+      OutboxEvent,
+      'eventId' | 'createdAt' | 'deliveredAt' | 'deliveryAttempts' | 'lastError'
+    >,
   ): Promise<string> {
     const eventId = crypto.randomUUID()
     const now = new Date()
@@ -79,11 +82,20 @@ export class OutboxProducer {
 
   static async appendBatch(
     client: PoolClient,
-    events: Array<Omit<OutboxEvent, 'eventId' | 'createdAt' | 'deliveredAt' | 'deliveryAttempts' | 'lastError'>>,
+    events: Array<
+      Omit<
+        OutboxEvent,
+        | 'eventId'
+        | 'createdAt'
+        | 'deliveredAt'
+        | 'deliveryAttempts'
+        | 'lastError'
+      >
+    >,
   ): Promise<string[]> {
     const ids: string[] = []
     for (const event of events) {
-      ids.push(await this.append(client, event))
+      ids.push(await OutboxProducer.append(client, event))
     }
     return ids
   }
@@ -108,7 +120,9 @@ export class OutboxConsumer {
     this.maxRetryDelayMs = options.maxRetryDelayMs ?? 60_000
   }
 
-  async start(publisher: (event: OutboxEvent) => Promise<boolean>): Promise<void> {
+  async start(
+    publisher: (event: OutboxEvent) => Promise<boolean>,
+  ): Promise<void> {
     if (this.timer) return
     console.log('[OutboxConsumer] Starting outbox publisher')
     this.stopped = false
@@ -123,14 +137,28 @@ export class OutboxConsumer {
     console.log('[OutboxConsumer] Stopped outbox publisher')
   }
 
-  private async _poll(publisher: (event: OutboxEvent) => Promise<boolean>): Promise<void> {
+  private async _poll(
+    publisher: (event: OutboxEvent) => Promise<boolean>,
+  ): Promise<void> {
     if (this.stopped) return
 
     const pool = getPgPool()
     const client = await pool.connect()
     try {
       // Get undelivered events ordered by creation time
-      const res = await client.query<OutboxEvent>(
+      const res = await client.query<{
+        event_id: string
+        aggregate_type: string
+        aggregate_id: string
+        event_type: string
+        payload: unknown
+        revision: number
+        source_node_id: string
+        created_at: Date
+        delivered_at: Date | null
+        delivery_attempts: number
+        last_error: string | null
+      }>(
         `SELECT event_id, aggregate_type, aggregate_id, event_type, payload, revision,
                 source_node_id, created_at, delivered_at, delivery_attempts, last_error
          FROM resource_plane.outbox_events
@@ -145,16 +173,33 @@ export class OutboxConsumer {
 
       console.log(`[OutboxConsumer] Publishing ${res.rows.length} events`)
 
-      for (const event of res.rows) {
+      for (const row of res.rows) {
+        const event: OutboxEvent = {
+          eventId: row.event_id,
+          aggregateType: row.aggregate_type,
+          aggregateId: row.aggregate_id,
+          eventType: row.event_type,
+          payload: row.payload,
+          revision: row.revision,
+          sourceNodeId: row.source_node_id,
+          createdAt: row.created_at,
+          deliveredAt: row.delivered_at,
+          deliveryAttempts: row.delivery_attempts,
+          lastError: row.last_error,
+        }
         try {
           const success = await publisher(event)
           if (success) {
-            await this._markDelivered(client, event.event_id)
+            await this._markDelivered(client, event.eventId)
           } else {
-            await this._incrementRetry(client, event.event_id, 'Publisher returned false')
+            await this._incrementRetry(
+              client,
+              event.eventId,
+              'Publisher returned false',
+            )
           }
         } catch (err) {
-          await this._incrementRetry(client, event.event_id, String(err))
+          await this._incrementRetry(client, event.eventId, String(err))
         }
       }
     } catch (err) {
@@ -164,7 +209,10 @@ export class OutboxConsumer {
     }
   }
 
-  private async _markDelivered(client: PoolClient, eventId: string): Promise<void> {
+  private async _markDelivered(
+    client: PoolClient,
+    eventId: string,
+  ): Promise<void> {
     await client.query(
       `UPDATE resource_plane.outbox_events
        SET delivered_at = now(), delivery_attempts = delivery_attempts + 1
@@ -173,7 +221,11 @@ export class OutboxConsumer {
     )
   }
 
-  private async _incrementRetry(client: PoolClient, eventId: string, error: string): Promise<void> {
+  private async _incrementRetry(
+    client: PoolClient,
+    eventId: string,
+    error: string,
+  ): Promise<void> {
     await client.query(
       `UPDATE resource_plane.outbox_events
        SET delivery_attempts = delivery_attempts + 1, last_error = $2
@@ -216,7 +268,9 @@ export class InboxConsumer {
     console.log('[InboxConsumer] Stopped inbox processor')
   }
 
-  async receive(event: Omit<InboxEvent, 'eventId' | 'receivedAt' | 'appliedAt' | 'applyError'>): Promise<void> {
+  async receive(
+    event: Omit<InboxEvent, 'receivedAt' | 'appliedAt' | 'applyError'>,
+  ): Promise<void> {
     const pool = getPgPool()
     const client = await pool.connect()
     try {
@@ -243,7 +297,15 @@ export class InboxConsumer {
     const pool = getPgPool()
     const client = await pool.connect()
     try {
-      const res = await client.query<InboxEvent>(
+      const res = await client.query<{
+        event_id: string
+        source_node_id: string
+        event_type: string
+        payload: unknown
+        received_at: Date
+        applied_at: Date | null
+        apply_error: string | null
+      }>(
         `SELECT event_id, source_node_id, event_type, payload, received_at, applied_at, apply_error
          FROM resource_plane.inbox_events
          WHERE applied_at IS NULL
@@ -254,7 +316,16 @@ export class InboxConsumer {
 
       if (res.rows.length === 0) return
 
-      for (const event of res.rows) {
+      for (const row of res.rows) {
+        const event: InboxEvent = {
+          eventId: row.event_id,
+          sourceNodeId: row.source_node_id,
+          eventType: row.event_type,
+          payload: row.payload as Record<string, unknown>,
+          receivedAt: row.received_at,
+          appliedAt: row.applied_at,
+          applyError: row.apply_error,
+        }
         await this._processEvent(client, event)
       }
     } catch (err) {
@@ -264,22 +335,32 @@ export class InboxConsumer {
     }
   }
 
-  private async _processEvent(client: PoolClient, event: InboxEvent): Promise<void> {
-    const handler = this.handlers.get(event.event_type)
+  private async _processEvent(
+    client: PoolClient,
+    event: InboxEvent,
+  ): Promise<void> {
+    const handler = this.handlers.get(event.eventType)
     if (!handler) {
-      await this._markFailed(client, event.event_id, `No handler for event type: ${event.event_type}`)
+      await this._markFailed(
+        client,
+        event.eventId,
+        `No handler for event type: ${event.eventType}`,
+      )
       return
     }
 
     try {
       await handler(event)
-      await this._markApplied(client, event.event_id)
+      await this._markApplied(client, event.eventId)
     } catch (err) {
-      await this._markFailed(client, event.event_id, String(err))
+      await this._markFailed(client, event.eventId, String(err))
     }
   }
 
-  private async _markApplied(client: PoolClient, eventId: string): Promise<void> {
+  private async _markApplied(
+    client: PoolClient,
+    eventId: string,
+  ): Promise<void> {
     await client.query(
       `UPDATE resource_plane.inbox_events
        SET applied_at = now()
@@ -288,7 +369,11 @@ export class InboxConsumer {
     )
   }
 
-  private async _markFailed(client: PoolClient, eventId: string, error: string): Promise<void> {
+  private async _markFailed(
+    client: PoolClient,
+    eventId: string,
+    error: string,
+  ): Promise<void> {
     await client.query(
       `UPDATE resource_plane.inbox_events
        SET apply_error = $2
@@ -312,7 +397,8 @@ export const RESOURCE_PLANE_EVENT_TYPES = {
   SYNC_COMPLETED: 'sync.completed',
 } as const
 
-export type ResourcePlaneEventType = (typeof RESOURCE_PLANE_EVENT_TYPES)[keyof typeof RESOURCE_PLANE_EVENT_TYPES]
+export type ResourcePlaneEventType =
+  (typeof RESOURCE_PLANE_EVENT_TYPES)[keyof typeof RESOURCE_PLANE_EVENT_TYPES]
 
 // ── Helper: Emit domain events ────────────────────────────────────────────────
 

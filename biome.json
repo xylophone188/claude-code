@@ -36,7 +36,8 @@
         "noArrayIndexKey": "off",
         "noConsole": "off",
         "noConfusingLabels": "off",
-        "useIterableCallbackReturn": "off"
+        "useIterableCallbackReturn": "off",
+        "noTemplateCurlyInString": "off"
       },
       "style": {
         "useConst": "off",

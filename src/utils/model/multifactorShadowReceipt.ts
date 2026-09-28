@@ -100,16 +100,22 @@ function shapeOf(value: unknown): FactorShape | undefined {
     return value ? { kind: 'string', length: value.length } : undefined
   }
   if (typeof value === 'boolean') return { kind: 'boolean' }
-  if (typeof value === 'number' && Number.isFinite(value)) return { kind: 'number' }
+  if (typeof value === 'number' && Number.isFinite(value))
+    return { kind: 'number' }
   return undefined
 }
 
 /** 真实可观测配置快照：只记形状/长度，密钥与 URL 内容不进 receipt。 */
-function factorSnapshot(env: NodeJS.ProcessEnv): MultifactorShadowReceipt['factors'] {
+function factorSnapshot(
+  env: NodeJS.ProcessEnv,
+): MultifactorShadowReceipt['factors'] {
   const candidates: Array<[string, unknown]> = [
     ['model', env.CLAUDE_CODE_MODEL],
     ['baseUrl', env.CLAUDE_CODE_BASE_URL ?? env.ANTHROPIC_BASE_URL],
-    ['apiKey', env.CLAUDE_CODE_API_KEY ?? env.ANTHROPIC_API_KEY ?? env.OPENAI_API_KEY],
+    [
+      'apiKey',
+      env.CLAUDE_CODE_API_KEY ?? env.ANTHROPIC_API_KEY ?? env.OPENAI_API_KEY,
+    ],
     ['modelMaxTokens', env.CLAUDE_CODE_MODEL_MAX_TOKENS],
     ['openaiModel', env.OPENAI_MODEL],
     ['openaiBaseUrl', env.OPENAI_BASE_URL],
@@ -131,7 +137,10 @@ function factorSnapshot(env: NodeJS.ProcessEnv): MultifactorShadowReceipt['facto
 const LEGACY_ALIASES = new Set(['opus', 'sonnet', 'haiku', 'auto', 'default'])
 
 function isLegacyAlias(model: string): boolean {
-  return LEGACY_ALIASES.has(model) || /(?:opus|sonnet|haiku|auto|default)\[1m\]/.test(model)
+  return (
+    LEGACY_ALIASES.has(model) ||
+    /(?:opus|sonnet|haiku|auto|default)\[1m\]/.test(model)
+  )
 }
 
 /**
@@ -183,8 +192,12 @@ export function buildMultifactorShadowReceipt(opts: {
     },
     bypassSignals: {
       envModelOverride: Boolean(env.CLAUDE_CODE_MODEL),
-      envBaseUrlOverride: Boolean(env.CLAUDE_CODE_BASE_URL || env.ANTHROPIC_BASE_URL),
-      envApiKeyOverride: Boolean(env.CLAUDE_CODE_API_KEY || env.ANTHROPIC_API_KEY),
+      envBaseUrlOverride: Boolean(
+        env.CLAUDE_CODE_BASE_URL || env.ANTHROPIC_BASE_URL,
+      ),
+      envApiKeyOverride: Boolean(
+        env.CLAUDE_CODE_API_KEY || env.ANTHROPIC_API_KEY,
+      ),
       envModelMaxTokensOverride: Boolean(env.CLAUDE_CODE_MODEL_MAX_TOKENS),
       directUrlOverride: Boolean(opts.directUrl),
       legacyOnlyPath,
@@ -204,16 +217,19 @@ export function buildMultifactorShadowReceipt(opts: {
   return deepFreeze(receipt)
 }
 
-function deepFreeze<T extends object>(value: T): T {
+function deepFreeze<T extends Record<string, unknown>>(value: T): T {
   for (const key of Object.keys(value)) {
     const child = value[key]
-    if (child && typeof child === 'object') deepFreeze(child as object)
+    if (child && typeof child === 'object')
+      deepFreeze(child as Record<string, unknown>)
   }
   return Object.freeze(value)
 }
 
 /** transport tag 的唯一解析入口；绝不在此之外按 pool 私选模型。 */
-export function resolveTransportTag(provider: ReturnType<typeof getAPIProvider>): TransportTag {
+export function resolveTransportTag(
+  provider: ReturnType<typeof getAPIProvider>,
+): TransportTag {
   if (provider === 'firstParty') return 'direct'
   if (provider === 'openai' || provider === 'opencode-free') return 'direct'
   return 'legacy'

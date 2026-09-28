@@ -9,7 +9,6 @@
  */
 
 import { getPgPool } from '../pg/pool.js'
-import type { PoolClient } from 'pg'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,56 +62,61 @@ export class MetricsCollector {
   }
 
   async collectMetrics(): Promise<ResourcePlaneMetrics> {
-    const startMs = Date.now()
     const pool = getPgPool()
-    const client = await pool.connect()
-    try {
-      const [
-        providersRes,
-        accountsRes,
-        credentialsRes,
-        capabilitiesRes,
-        syncNodesRes,
-        expiringRes,
-        expiredRes,
-        lastRevisionRes,
-      ] = await Promise.all([
-        client.query(`SELECT count(DISTINCT provider_id) as cnt FROM resource_plane.provider_accounts`),
-        client.query(`SELECT count(*) as cnt FROM resource_plane.provider_accounts`),
-        client.query(`SELECT count(*) as cnt FROM resource_plane.credential_secrets`),
-        client.query(`SELECT count(*) as cnt FROM resource_plane.model_capabilities`),
-        client.query(`SELECT count(*) as cnt FROM resource_plane.sync_nodes`),
-        client.query(
-          `SELECT count(*) as cnt FROM resource_plane.credential_secrets
-           WHERE expires_at IS NOT NULL AND (expires_at - now()) < ('7 days'::interval)`,
-        ),
-        client.query(
-          `SELECT count(*) as cnt FROM resource_plane.credential_secrets
-           WHERE expires_at IS NOT NULL AND expires_at <= now()`,
-        ),
-        client.query(
-          `SELECT MAX(revision) as max_revision FROM resource_plane.provider_accounts`,
-        ),
-      ])
+    const [
+      providersRes,
+      accountsRes,
+      credentialsRes,
+      capabilitiesRes,
+      syncNodesRes,
+      expiringRes,
+      expiredRes,
+      lastRevisionRes,
+    ] = await Promise.all([
+      pool.query(
+        `SELECT count(DISTINCT provider_id) as cnt FROM resource_plane.provider_accounts`,
+      ),
+      pool.query(
+        `SELECT count(*) as cnt FROM resource_plane.provider_accounts`,
+      ),
+      pool.query(
+        `SELECT count(*) as cnt FROM resource_plane.credential_secrets`,
+      ),
+      pool.query(
+        `SELECT count(*) as cnt FROM resource_plane.model_capabilities`,
+      ),
+      pool.query(`SELECT count(*) as cnt FROM resource_plane.sync_nodes`),
+      pool.query(
+        `SELECT count(*) as cnt FROM resource_plane.credential_secrets
+         WHERE expires_at IS NOT NULL AND (expires_at - now()) < ('7 days'::interval)`,
+      ),
+      pool.query(
+        `SELECT count(*) as cnt FROM resource_plane.credential_secrets
+         WHERE expires_at IS NOT NULL AND expires_at <= now()`,
+      ),
+      pool.query(
+        `SELECT MAX(revision) as max_revision FROM resource_plane.provider_accounts`,
+      ),
+    ])
 
-      const syncLatency = this._calculateAvgSyncLatency()
-      const failureRate = this._calculateFailureRate()
+    const syncLatency = this._calculateAvgSyncLatency()
+    const failureRate = this._calculateFailureRate()
 
-      return {
-        timestamp: new Date(),
-        totalProviders: parseInt(providersRes.rows[0].cnt),
-        totalAccounts: parseInt(accountsRes.rows[0].cnt),
-        totalCredentials: parseInt(credentialsRes.rows[0].cnt),
-        totalCapabilities: parseInt(capabilitiesRes.rows[0].cnt),
-        syncLatencyMs: syncLatency,
-        lastSyncRevision: parseInt(lastRevisionRes.rows[0].max_revision ?? '0'),
-        credentialExpiringSoon: parseInt(expiringRes.rows[0].cnt),
-        credentialExpired: parseInt(expiredRes.rows[0].cnt),
-        nodeCount: parseInt(syncNodesRes.rows[0].cnt),
-        syncErrors: this._failureCount,
-      }
-    } finally {
-      client.release()
+    return {
+      timestamp: new Date(),
+      totalProviders: parseInt(providersRes.rows[0].cnt, 10),
+      totalAccounts: parseInt(accountsRes.rows[0].cnt, 10),
+      totalCredentials: parseInt(credentialsRes.rows[0].cnt, 10),
+      totalCapabilities: parseInt(capabilitiesRes.rows[0].cnt, 10),
+      syncLatencyMs: syncLatency,
+      lastSyncRevision: parseInt(
+        lastRevisionRes.rows[0].max_revision ?? '0',
+        10,
+      ),
+      credentialExpiringSoon: parseInt(expiringRes.rows[0].cnt, 10),
+      credentialExpired: parseInt(expiredRes.rows[0].cnt, 10),
+      nodeCount: parseInt(syncNodesRes.rows[0].cnt, 10),
+      syncErrors: this._failureCount,
     }
   }
 
@@ -147,7 +151,9 @@ export class MetricsCollector {
   shouldAlert(): string[] {
     const alerts: string[] = []
 
-    if (this._calculateAvgSyncLatency() > this.thresholds.syncLatencyThresholdMs) {
+    if (
+      this._calculateAvgSyncLatency() > this.thresholds.syncLatencyThresholdMs
+    ) {
       alerts.push(
         `Sync latency ${this._calculateAvgSyncLatency()}ms exceeds threshold ${this.thresholds.syncLatencyThresholdMs}ms`,
       )
@@ -166,7 +172,9 @@ export class MetricsCollector {
 // ── Health Checker ────────────────────────────────────────────────────────────
 
 export class HealthChecker {
-  constructor(private readonly thresholds: AlertThreshold = DEFAULT_THRESHOLDS) {}
+  constructor(
+    private readonly thresholds: AlertThreshold = DEFAULT_THRESHOLDS,
+  ) {}
 
   async checkAll(): Promise<Map<string, HealthCheckResult>> {
     const results = new Map<string, HealthCheckResult>()
@@ -222,7 +230,9 @@ export class HealthChecker {
       return {
         component: 'encryption',
         status: hasKey ? 'healthy' : 'unhealthy',
-        details: hasKey ? 'Encryption key available' : 'No encryption key found',
+        details: hasKey
+          ? 'Encryption key available'
+          : 'No encryption key found',
       }
     } catch (err) {
       return {
@@ -240,7 +250,7 @@ export class HealthChecker {
       const res = await client.query(
         `SELECT count(*) as cnt FROM resource_plane.sync_nodes`,
       )
-      const nodeCount = parseInt(res.rows[0].cnt)
+      const nodeCount = parseInt(res.rows[0].cnt, 10)
       return {
         component: 'sync',
         status: nodeCount > 0 ? 'healthy' : 'degraded',
@@ -259,12 +269,13 @@ export class HealthChecker {
         `SELECT count(*) as cnt FROM resource_plane.credential_secrets
          WHERE expires_at IS NOT NULL AND (expires_at - now()) < ('7 days'::interval)`,
       )
-      const expiringSoon = parseInt(res.rows[0].cnt)
+      const expiringSoon = parseInt(res.rows[0].cnt, 10)
       return {
         component: 'expiration',
-        status: expiringSoon <= this.thresholds.credentialExpiringSoonThreshold
-          ? 'healthy'
-          : 'degraded',
+        status:
+          expiringSoon <= this.thresholds.credentialExpiringSoonThreshold
+            ? 'healthy'
+            : 'degraded',
         details: `${expiringSoon} credentials expiring within 7 days`,
       }
     } finally {
@@ -272,7 +283,9 @@ export class HealthChecker {
     }
   }
 
-  getOverallStatus(results: Map<string, HealthCheckResult>): 'healthy' | 'degraded' | 'unhealthy' {
+  getOverallStatus(
+    results: Map<string, HealthCheckResult>,
+  ): 'healthy' | 'degraded' | 'unhealthy' {
     const statuses = [...results.values()]
     if (statuses.some(r => r.status === 'unhealthy')) return 'unhealthy'
     if (statuses.some(r => r.status === 'degraded')) return 'degraded'

@@ -26,7 +26,6 @@ const COMMAND_SUBSTITUTION_PATTERNS = [
     message: 'Zsh equals expansion (=cmd)',
   },
   { pattern: /\$\(/, message: '$() command substitution' },
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: describing shell syntax, not a template literal
   { pattern: /\$\{/, message: '${} parameter substitution' },
   { pattern: /\$\[/, message: '$[] legacy arithmetic expansion' },
   { pattern: /~\[/, message: 'Zsh-style parameter expansion' },

@@ -64,6 +64,20 @@ export async function hasResourceSecretKeyAsync(): Promise<boolean> {
   return Boolean(await readKeyMaterial())
 }
 
+/**
+ * Return the derived AES-GCM key as a hex string, for callers that need the
+ * same key material for HMAC signing (signed audit chain). Derives from the
+ * same source as encryption so signatures and ciphertext share one key source.
+ */
+export async function getResourceSecretKeyAsync(): Promise<string> {
+  const key = await deriveKey()
+  try {
+    return key.toString('hex')
+  } finally {
+    key.fill(0)
+  }
+}
+
 async function deriveKey(): Promise<Buffer> {
   const material = await readKeyMaterial()
   if (!material) {

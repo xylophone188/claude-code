@@ -20,11 +20,9 @@ export function MessageTimestamp({ message, isTranscriptMode }: Props): React.Re
     return null;
   }
 
-  const formattedTimestamp = new Date(message.timestamp as string | number | Date).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const d = new Date(message.timestamp as string | number | Date);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formattedTimestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
   return (
     <Box minWidth={stringWidth(formattedTimestamp)}>

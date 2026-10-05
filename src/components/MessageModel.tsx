@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text, stringWidth } from '@anthropic/ink';
 import type { NormalizedMessage } from '../types/message.js';
+import { renderModelName } from '../utils/model/model.js';
 
 type Props = {
   message: NormalizedMessage;
@@ -20,11 +21,12 @@ export function MessageModel({ message, isTranscriptMode }: Props): React.ReactN
     return null;
   }
 
-  const model = message.message!.model as string;
+  const rawModel = message.message!.model as string;
+  const displayModel = renderModelName(rawModel);
 
   return (
-    <Box minWidth={stringWidth(model) + 8}>
-      <Text dimColor>{model}</Text>
+    <Box minWidth={stringWidth(displayModel) + 8}>
+      <Text dimColor>{displayModel}</Text>
     </Box>
   );
 }

@@ -791,6 +791,11 @@ async function* queryLoop(
       exceeds200kTokens:
         permissionMode === 'plan' &&
         doesMostRecentAssistantMessageExceed200k(messagesForQuery),
+      turnCount,
+      agentId: toolUseContext.agentId,
+      querySource,
+      isReviewOrVerification:
+        querySource === 'review' || querySource === 'verification',
     })
 
     queryCheckpoint('query_setup_end')

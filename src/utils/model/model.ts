@@ -250,27 +250,94 @@ export function getDefaultHaikuModel(): ModelName {
  * @param params Subset of the runtime context to determine the model to use.
  * @returns The model to use
  */
+export const ABSTRACT_POOLS = new Set([
+  'auto',
+  'v8',
+  'chat-pool',
+  'worker-pool',
+  'advisor-pool',
+  'review-pool',
+  'ccb-main',
+  'default',
+])
+
+export function isAbstractPool(model: string | null | undefined): boolean {
+  if (!model) return true
+  const lower = model.toLowerCase().trim()
+  return (
+    ABSTRACT_POOLS.has(lower) ||
+    lower.endsWith('-pool') ||
+    lower === 'v8' ||
+    lower === 'auto'
+  )
+}
+
 export function getRuntimeMainLoopModel(params: {
   permissionMode: PermissionMode
   mainLoopModel: string
   exceeds200kTokens?: boolean
+  turnCount?: number
+  agentId?: string
+  querySource?: string
+  isReviewOrVerification?: boolean
 }): ModelName {
-  const { permissionMode, mainLoopModel, exceeds200kTokens = false } = params
+  const {
+    permissionMode,
+    mainLoopModel,
+    exceeds200kTokens = false,
+    turnCount,
+    agentId,
+    querySource,
+    isReviewOrVerification = false,
+  } = params
 
-  // opusplan uses Opus in plan mode without [1m] suffix.
-  if (
-    getUserSpecifiedModelSetting() === 'opusplan' &&
-    permissionMode === 'plan' &&
-    !exceeds200kTokens
-  ) {
-    return getDefaultOpusModel()
-  }
+  // 1. Plan / Code-Review / Verification -> Advisor / Approval Mode
+  const isAdvisorMode =
+    permissionMode === 'plan' ||
+    isReviewOrVerification ||
+    querySource === 'review' ||
+    querySource === 'verification' ||
+    mainLoopModel === 'advisor-pool' ||
+    mainLoopModel === 'review-pool' ||
+    mainLoopModel === 'advisor'
 
-  // sonnetplan by default
-  if (getUserSpecifiedModelSetting() === 'haiku' && permissionMode === 'plan') {
+  if (isAdvisorMode) {
+    if (getUserSpecifiedModelSetting() === 'opusplan' && !exceeds200kTokens) {
+      return getDefaultOpusModel()
+    }
+    if (!isFirstPartyAnthropicBaseUrl()) {
+      return 'advisor-pool'
+    }
     return getDefaultSonnetModel()
   }
 
+  // 2. Agent-to-Agent (A2A) Mode
+  const isA2A =
+    Boolean(agentId) ||
+    querySource === 'agent' ||
+    querySource === 'a2a' ||
+    process.env.CCB_A2A === '1' ||
+    process.env.CCB_WORKER_IDENTITY === '1' ||
+    process.env.CCB_REMOTE_MODE === '1'
+
+  if (isA2A) {
+    if (isAbstractPool(mainLoopModel)) {
+      return 'worker-pool'
+    }
+    return mainLoopModel
+  }
+
+  // 3. Interactive User Request (Human user chat)
+  if (isAbstractPool(mainLoopModel)) {
+    // First turn of user interaction: use chat-pool for high comprehension & instruction following
+    if (!turnCount || turnCount <= 1) {
+      return 'chat-pool'
+    }
+    // Subsequent turns (turn 2+): transition to worker-pool for execution & high cost-performance
+    return 'worker-pool'
+  }
+
+  // 4. Default: User specified a concrete model setting
   return mainLoopModel
 }
 

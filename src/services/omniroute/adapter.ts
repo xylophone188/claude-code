@@ -85,7 +85,7 @@ export function resolveDirectRoutes(
   // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
   // routes only; otherwise it would silently bypass OAuth Responses routing.
   const isGatewayRoute =
-    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$))/i.test(raw) ||
+    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|.*-pool$)/i.test(raw) ||
     (raw.includes('/') &&
       !/^(?:advisor|lite|full|ultra|review|smart|opus)$/i.test(raw))
   if (!isGatewayRoute) return []
@@ -95,10 +95,10 @@ export function resolveDirectRoutes(
 const INTERNAL_POOL_ORDER = {
   v8: ['sensenova', 'nvidia', 'opencode'],
   auto: ['sensenova', 'nvidia', 'opencode'],
-  'worker-pool': ['sensenova', 'nvidia', 'opencode'],
-  'chat-pool': ['sensenova', 'nvidia', 'groq', 'qwen'],
-  'advisor-pool': ['nvidia', 'sensenova', 'deepseek', 'qwen'],
-  'review-pool': ['nvidia', 'sensenova', 'deepseek', 'qwen'],
+  'worker-pool': ['nvidia', 'opencode', 'sensenova'],
+  'chat-pool': ['sensenova', 'qwen', 'glm', 'nvidia'],
+  'advisor-pool': ['sensenova', 'deepseek', 'nvidia', 'codex'],
+  'review-pool': ['sensenova', 'deepseek', 'nvidia', 'codex'],
 } as const
 
 function normalizeDirectBaseUrl(baseUrl: string): string {
@@ -161,10 +161,14 @@ function resolveViaInternalRouter(spec: string): DirectRoute[] {
     for (const key of keys) {
       for (const model of models) {
         if (!model) continue
+        const effectiveModel =
+          provider.id === 'nvidia' && !model.includes('/')
+            ? 'nvidia/' + model
+            : model
         routes.push({
           providerId: provider.id,
           baseURL: normalizeDirectBaseUrl(provider.baseUrl),
-          model,
+          model: effectiveModel,
           apiKey: key.apiKey,
           headers: provider.headers,
           timeoutMs: provider.timeoutMs,

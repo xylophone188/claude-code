@@ -1,8 +1,17 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { mkdir, readFile, rm, writeFile } from 'fs/promises'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs'
+import { mkdir, readFile, rename, rm, unlink, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { z } from 'zod/v4'
-import { getSessionCreatedTeams } from '../../bootstrap/state.js'
+import { getSessionCreatedTeams, getSessionId } from '../../bootstrap/state.js'
+import { formatAgentId } from '../agentId.js'
+import { getCwd } from '../cwd.js'
 import { logForDebugging } from '../debug.js'
 import { getTeamsDir } from '../envUtils.js'
 import { errorMessage, getErrnoCode } from '../errors.js'
@@ -93,6 +102,81 @@ export type Input = z.infer<ReturnType<typeof inputSchema>>
 // Export SpawnTeamOutput as Output for backward compatibility
 export type Output = SpawnTeamOutput
 
+export const TeamFileSchema = lazySchema(() =>
+  z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    createdAt: z.number(),
+    leadAgentId: z.string(),
+    leadSessionId: z.string().optional(),
+    hiddenPaneIds: z.array(z.string()).optional(),
+    teamAllowedPaths: z
+      .array(
+        z.object({
+          path: z.string(),
+          toolName: z.string(),
+          addedBy: z.string(),
+          addedAt: z.number(),
+        }),
+      )
+      .optional(),
+    members: z.array(
+      z.object({
+        agentId: z.string(),
+        name: z.string(),
+        agentType: z.string().optional(),
+        model: z.string().optional(),
+        prompt: z.string().optional(),
+        color: z.string().optional(),
+        planModeRequired: z.boolean().optional(),
+        joinedAt: z.number(),
+        tmuxPaneId: z.string(),
+        cwd: z.string(),
+        worktreePath: z.string().optional(),
+        sessionId: z.string().optional(),
+        subscriptions: z.array(z.string()),
+        backendType: z.enum(['tmux', 'in-process', 'iterm2']).optional(),
+        isActive: z.boolean().optional(),
+        mode: z
+          .enum(['default', 'plan', 'acceptEdits', 'dontAsk', 'auto'])
+          .optional(),
+      }),
+    ),
+  }),
+)
+
+export function isValidTeamFile(value: unknown): value is TeamFile {
+  return TeamFileSchema().safeParse(value).success
+}
+
+export function createDefaultTeamFile(
+  teamName = 'default',
+  cwd = getCwd(),
+): TeamFile {
+  const sanitizedTeamName = sanitizeName(teamName) || 'default'
+  const leadAgentId = formatAgentId(TEAM_LEAD_NAME, sanitizedTeamName)
+  const now = Date.now()
+
+  return {
+    name: sanitizedTeamName,
+    description: 'Default team',
+    createdAt: now,
+    leadAgentId,
+    leadSessionId: getSessionId(),
+    members: [
+      {
+        agentId: leadAgentId,
+        name: TEAM_LEAD_NAME,
+        agentType: TEAM_LEAD_NAME,
+        joinedAt: now,
+        tmuxPaneId: '',
+        cwd,
+        subscriptions: [],
+      },
+    ],
+  }
+}
+
 /**
  * Sanitizes a name for use in tmux window names, worktree paths, and file paths.
  * Replaces all non-alphanumeric characters with hyphens and lowercases.
@@ -131,7 +215,14 @@ export function getTeamFilePath(teamName: string): string {
 export function readTeamFile(teamName: string): TeamFile | null {
   try {
     const content = readFileSync(getTeamFilePath(teamName), 'utf-8')
-    return jsonParse(content) as TeamFile
+    const parsed = jsonParse(content)
+    if (!isValidTeamFile(parsed)) {
+      logForDebugging(
+        `[TeammateTool] Team file for ${teamName} has invalid schema`,
+      )
+      return null
+    }
+    return parsed
   } catch (e) {
     if (getErrnoCode(e) === 'ENOENT') return null
     logForDebugging(
@@ -149,7 +240,14 @@ export async function readTeamFileAsync(
 ): Promise<TeamFile | null> {
   try {
     const content = await readFile(getTeamFilePath(teamName), 'utf-8')
-    return jsonParse(content) as TeamFile
+    const parsed = jsonParse(content)
+    if (!isValidTeamFile(parsed)) {
+      logForDebugging(
+        `[TeammateTool] Team file for ${teamName} has invalid schema`,
+      )
+      return null
+    }
+    return parsed
   } catch (e) {
     if (getErrnoCode(e) === 'ENOENT') return null
     logForDebugging(
@@ -160,17 +258,31 @@ export async function readTeamFileAsync(
 }
 
 /**
- * Writes a team file (sync — for sync contexts)
+ * Writes a team file atomically (sync — for sync contexts)
  */
 // sync IO: called from sync context
 function writeTeamFile(teamName: string, teamFile: TeamFile): void {
   const teamDir = getTeamDir(teamName)
   mkdirSync(teamDir, { recursive: true })
-  writeFileSync(getTeamFilePath(teamName), jsonStringify(teamFile, null, 2))
+  const targetPath = getTeamFilePath(teamName)
+  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
+  try {
+    writeFileSync(tempPath, jsonStringify(teamFile, null, 2), { mode: 0o600 })
+    renameSync(tempPath, targetPath)
+  } catch (error) {
+    try {
+      if (existsSync(tempPath)) {
+        unlinkSync(tempPath)
+      }
+    } catch {
+      // Best-effort cleanup
+    }
+    throw error
+  }
 }
 
 /**
- * Writes a team file (async — for tool handlers)
+ * Writes a team file atomically (async — for tool handlers)
  */
 export async function writeTeamFileAsync(
   teamName: string,
@@ -178,7 +290,58 @@ export async function writeTeamFileAsync(
 ): Promise<void> {
   const teamDir = getTeamDir(teamName)
   await mkdir(teamDir, { recursive: true })
-  await writeFile(getTeamFilePath(teamName), jsonStringify(teamFile, null, 2))
+  const targetPath = getTeamFilePath(teamName)
+  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
+  try {
+    await writeFile(tempPath, jsonStringify(teamFile, null, 2), { mode: 0o600 })
+    await rename(tempPath, targetPath)
+  } catch (error) {
+    try {
+      await unlink(tempPath)
+    } catch {
+      // Best-effort cleanup
+    }
+    throw error
+  }
+}
+
+/**
+ * Atomically ensures a valid default team exists when absent or corrupt.
+ * Never overwrites a valid existing team.
+ */
+export async function ensureDefaultTeamFileAsync(
+  teamName = 'default',
+  cwd = getCwd(),
+): Promise<TeamFile> {
+  const sanitizedTeamName = sanitizeName(teamName) || 'default'
+  const existing = await readTeamFileAsync(sanitizedTeamName)
+  if (existing) {
+    return existing
+  }
+
+  const defaultTeamFile = createDefaultTeamFile(sanitizedTeamName, cwd)
+  await writeTeamFileAsync(sanitizedTeamName, defaultTeamFile)
+  return defaultTeamFile
+}
+
+/**
+ * Sync variant: ensures a valid default team exists when absent or corrupt.
+ * Never overwrites a valid existing team.
+ */
+// sync IO: called from sync context
+export function ensureDefaultTeamFile(
+  teamName = 'default',
+  cwd = getCwd(),
+): TeamFile {
+  const sanitizedTeamName = sanitizeName(teamName) || 'default'
+  const existing = readTeamFile(sanitizedTeamName)
+  if (existing) {
+    return existing
+  }
+
+  const defaultTeamFile = createDefaultTeamFile(sanitizedTeamName, cwd)
+  writeTeamFile(sanitizedTeamName, defaultTeamFile)
+  return defaultTeamFile
 }
 
 /**

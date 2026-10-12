@@ -7,9 +7,43 @@ import { registerBundledSkill } from '../bundledSkills.js'
  * Generate JSON Schema from the settings Zod schema.
  * This keeps the skill prompt in sync with the actual types.
  */
+function removeUndefinedBranches(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(removeUndefinedBranches)
+  }
+  if (!schema || typeof schema !== 'object') {
+    return schema
+  }
+
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === '~standard') {
+      continue
+    }
+    if (key === 'anyOf' && Array.isArray(value)) {
+      const representableBranches = value.filter(
+        branch =>
+          branch !== null &&
+          typeof branch === 'object' &&
+          Object.keys(branch).length > 0,
+      )
+      if (representableBranches.length === 1) {
+        return removeUndefinedBranches(representableBranches[0])
+      }
+      sanitized[key] = representableBranches.map(removeUndefinedBranches)
+      continue
+    }
+    sanitized[key] = removeUndefinedBranches(value)
+  }
+  return sanitized
+}
+
 function generateSettingsSchema(): string {
-  const jsonSchema = toJSONSchema(SettingsSchema(), { io: 'input' })
-  return jsonStringify(jsonSchema, null, 2)
+  const jsonSchema = toJSONSchema(SettingsSchema(), {
+    io: 'input',
+    unrepresentable: 'any',
+  })
+  return jsonStringify(removeUndefinedBranches(jsonSchema), null, 2)
 }
 
 const SETTINGS_EXAMPLES_DOCS = `## Settings File Locations

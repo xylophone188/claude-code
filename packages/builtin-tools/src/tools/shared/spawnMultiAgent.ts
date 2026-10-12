@@ -23,6 +23,7 @@ import {
 } from 'src/utils/swarm/constants.js'
 import { It2SetupPrompt } from 'src/utils/swarm/It2SetupPrompt.js'
 import {
+  ensureDefaultTeamFileAsync,
   getTeamFilePath,
   readTeamFileAsync,
   sanitizeAgentName,
@@ -183,7 +184,13 @@ async function resolveSpawn(
     )
   }
 
-  const teamFile = await readTeamFileAsync(teamName)
+  let teamFile = await readTeamFileAsync(teamName)
+  if (!teamFile && teamName === 'default') {
+    teamFile = await ensureDefaultTeamFileAsync(
+      'default',
+      input.cwd || getCwd(),
+    )
+  }
   if (!teamFile) {
     throw new Error(
       `Team "${teamName}" does not exist. Call TeamCreate first to create the team before spawning teammates.`,

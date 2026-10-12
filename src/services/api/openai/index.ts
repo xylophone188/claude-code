@@ -660,6 +660,10 @@ function shouldRetryCcbOpenAIError(error: unknown): boolean {
   if (error instanceof StreamAttemptTimeoutError) return true
   if (error instanceof APIConnectionError) return true
   if (error instanceof APIError) return isTransientCcbStatus(error.status)
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  if (message.includes('terminated') || message.includes('econnreset') || message.includes('socket hang up')) {
+    return true
+  }
   return false
 }
 
@@ -701,8 +705,12 @@ export async function* retryCcbOpenAIStream(
     } catch (error) {
       if (signal.aborted) throw new APIUserAbortError()
       lastError = error
-      if (error instanceof ProviderOutputError) throw error
-      if (!shouldRetryCcbOpenAIError(error)) throw error
+      // When output validation fails on a transient stream, retry within budget
+      // rather than aborting the entire turn immediately.
+      const isOutputValidationFailure = error instanceof ProviderOutputError
+      if (!isOutputValidationFailure && !shouldRetryCcbOpenAIError(error)) {
+        throw error
+      }
 
       const remainingBudgetMs = Math.max(0, deadlineMs - Date.now())
       if (remainingBudgetMs <= 0) {

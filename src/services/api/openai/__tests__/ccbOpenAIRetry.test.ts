@@ -7,7 +7,7 @@ mock.module('src/services/providerRegistry/loader.ts', () => ({
   loadProviders: () => [],
 }))
 
-const { retryCcbOpenAIStream } = await import('../index.js')
+const { retryCcbOpenAIStream, StreamAttemptTimeoutError } = await import('../index.js')
 const { RetryBudgetExhaustedError } = await import('../../withRetry.js')
 
 function streamOf(
@@ -136,5 +136,72 @@ describe('retryCcbOpenAIStream', () => {
     ).rejects.toBeInstanceOf(RetryBudgetExhaustedError)
 
     expect(attempts).toBe(1)
+  })
+
+  test('retries StreamAttemptTimeoutError', async () => {
+    let attempts = 0
+    const events = await Array.fromAsync(
+      retryCcbOpenAIStream(
+        async () => {
+          attempts++
+          if (attempts === 1)
+            throw new StreamAttemptTimeoutError('first')
+          return streamOf(textChunk('ok after timeout'), finishChunk)
+        },
+        new AbortController().signal,
+        2,
+        1000,
+        () => Promise.resolve(),
+      ),
+    )
+
+    expect(attempts).toBe(2)
+    expect(events).toHaveLength(2)
+  })
+
+  test('retries transient invalid provider text output within budget', async () => {
+    let attempts = 0
+    // Simulating invalid text then valid response
+    const invalidTextChunk = textChunk('\x00\x01\x02\x03\x04\x05')
+    const events = await Array.fromAsync(
+      retryCcbOpenAIStream(
+        async () => {
+          attempts++
+          if (attempts === 1) {
+            return streamOf(invalidTextChunk, finishChunk)
+          }
+          return streamOf(textChunk('valid recovery output'), finishChunk)
+        },
+        new AbortController().signal,
+        2,
+        1000,
+        () => Promise.resolve(),
+      ),
+    )
+
+    expect(attempts).toBe(2)
+    expect(events).toHaveLength(2)
+  })
+
+  test('retries transient terminated / stream cutoff errors within budget', async () => {
+    let attempts = 0
+    const events = await Array.fromAsync(
+      retryCcbOpenAIStream(
+        async () => {
+          attempts++
+          if (attempts === 1) {
+            throw new Error('terminated')
+          }
+          return streamOf(textChunk('recovered after terminated'), finishChunk)
+        },
+        new AbortController().signal,
+        2,
+        1000,
+        () => Promise.resolve(),
+      ),
+    )
+
+    expect(attempts).toBe(2)
+    expect(events).toHaveLength(2)
   })
 })

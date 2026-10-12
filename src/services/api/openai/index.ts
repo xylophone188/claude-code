@@ -63,10 +63,12 @@ import {
   classifyErrorStatus,
   recordRaceMetric,
   setActiveCcbRoute,
+  getActiveCcbRoute,
 } from '../../omniroute/adapter.js'
 import { classifyError } from '../../omniroute/adapter.js'
 import { fuseAnswers, type PanelAnswer } from '../../routing/fusion.js'
 import {
+  currentFreeOpenCodeModels,
   invalidateOpenCodeModelsCache,
   refreshAutoHealth,
 } from '../../routing/autoScoring.js'
@@ -168,6 +170,186 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw new APIUserAbortError()
 }
 
+const STREAM_FIRST_MEANINGFUL_TIMEOUT_MS = parseEnvInt(
+  process.env.CCB_STREAM_FIRST_MEANINGFUL_TIMEOUT_MS,
+  180_000,
+)
+const STREAM_INACTIVITY_TIMEOUT_MS = parseEnvInt(
+  process.env.CCB_STREAM_INACTIVITY_TIMEOUT_MS,
+  180_000,
+)
+const STREAM_ATTEMPT_TIMEOUT_MS = parseEnvInt(
+  process.env.CCB_STREAM_ATTEMPT_TIMEOUT_MS,
+  600_000,
+)
+
+export class StreamAttemptTimeoutError extends Error {
+  constructor(
+    public readonly phase: 'create' | 'first' | 'inactivity' | 'total',
+  ) {
+    super(`upstream stream ${phase} timeout`)
+    this.name = 'StreamAttemptTimeoutError'
+  }
+}
+
+/** Synchronous close: an aborting/throwing iterator must never block a fallback. */
+function closeStreamIterator(
+  iterator: AsyncIterator<unknown> | undefined,
+): void {
+  if (iterator?.return) {
+    try {
+      void Promise.resolve(iterator.return()).catch(() => undefined)
+    } catch {}
+  }
+}
+
+type DeadlinePhase = 'first' | 'inactivity' | 'total'
+
+type DeadlineOutcome<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: 'aborted' | 'timeout'; phase: DeadlinePhase }
+
+/**
+ * Race a promise against a hard deadline. The inner work may ignore the
+ * AbortSignal entirely; when the deadline fires we still return so the caller
+ * can switch to the next candidate instead of parking on a stalled upstream.
+ * Every timer / listener is cleared on any outcome.
+ */
+function withDeadline<T>(
+  work: () => Promise<T>,
+  options: {
+    timeoutMs: number
+    parentSignal: AbortSignal
+    attemptSignal: AbortController
+    timedOutPhase: DeadlinePhase
+  },
+): Promise<DeadlineOutcome<T>> {
+  throwIfAborted(options.parentSignal)
+  if (options.timeoutMs <= 0) {
+    options.attemptSignal.abort()
+    return Promise.resolve({
+      ok: false,
+      reason: 'timeout',
+      phase: options.timedOutPhase,
+    })
+  }
+  return new Promise<DeadlineOutcome<T>>((resolve, reject) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let onParentAbort: (() => void) | undefined
+    const finish = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (onParentAbort)
+        options.parentSignal.removeEventListener('abort', onParentAbort)
+      fn()
+    }
+    onParentAbort = () =>
+      finish(() => {
+        options.attemptSignal.abort()
+        resolve({ ok: false, reason: 'aborted', phase: options.timedOutPhase })
+      })
+    options.parentSignal.addEventListener('abort', onParentAbort, {
+      once: true,
+    })
+    if (options.parentSignal.aborted) {
+      onParentAbort()
+      return
+    }
+    timer = setTimeout(
+      () =>
+        finish(() => {
+          options.attemptSignal.abort()
+          resolve({
+            ok: false,
+            reason: 'timeout',
+            phase: options.timedOutPhase,
+          })
+        }),
+      options.timeoutMs,
+    )
+    Promise.resolve()
+      .then(work)
+      .then(
+        value => finish(() => resolve({ ok: true, value })),
+        error => finish(() => reject(error)),
+      )
+  })
+}
+
+async function nextStreamChunkWithDeadline<T>(
+  iterator: AsyncIterator<T>,
+  controller: AbortController,
+  parentSignal: AbortSignal,
+  startedAt: number,
+  meaningful: boolean,
+): Promise<IteratorResult<T>> {
+  throwIfAborted(parentSignal)
+  const remainingTotal = STREAM_ATTEMPT_TIMEOUT_MS - (Date.now() - startedAt)
+  const inactivity = meaningful
+    ? STREAM_INACTIVITY_TIMEOUT_MS
+    : STREAM_FIRST_MEANINGFUL_TIMEOUT_MS - (Date.now() - startedAt)
+  // `startedAt` is per-attempt, so this absolute budget includes the create()
+  // wait time. Non-meaningful chunks (role / heartbeat / usage only) never
+  // reset it.
+  const timeoutMs = Math.min(inactivity, remainingTotal)
+  const timedOutPhase: DeadlinePhase =
+    remainingTotal <= inactivity ? 'total' : meaningful ? 'inactivity' : 'first'
+  const outcome = await withDeadline<IteratorResult<T>>(() => iterator.next(), {
+    timeoutMs,
+    parentSignal,
+    attemptSignal: controller,
+    timedOutPhase,
+  })
+  if (!outcome.ok) {
+    if (outcome.reason === 'aborted') throw new APIUserAbortError()
+    throw new StreamAttemptTimeoutError(timedOutPhase)
+  }
+  return outcome.value
+}
+
+async function createStreamWithDeadline<T extends AsyncIterable<unknown>>(
+  createStream: () => Promise<T>,
+  controller: AbortController,
+  parentSignal: AbortSignal,
+  startedAt: number,
+): Promise<T> {
+  throwIfAborted(parentSignal)
+  const elapsed = Date.now() - startedAt
+  const remainingTotal = STREAM_ATTEMPT_TIMEOUT_MS - elapsed
+  const remainingFirst = STREAM_FIRST_MEANINGFUL_TIMEOUT_MS - elapsed
+  const phase = remainingTotal <= remainingFirst ? 'total' : 'first'
+  let abandoned = false
+  let created: T | undefined
+  try {
+    const outcome = await withDeadline<T>(
+      async () => {
+        const stream = await createStream()
+        created = stream
+        if (abandoned) closeStreamIterator(stream[Symbol.asyncIterator]())
+        return stream
+      },
+      {
+        timeoutMs: Math.min(remainingFirst, remainingTotal),
+        parentSignal,
+        attemptSignal: controller,
+        timedOutPhase: phase,
+      },
+    )
+    if (!outcome.ok) {
+      abandoned = true
+      if (created) closeStreamIterator(created[Symbol.asyncIterator]())
+      if (outcome.reason === 'aborted') throw new APIUserAbortError()
+      throw new StreamAttemptTimeoutError(phase)
+    }
+    return outcome.value
+  } catch (error) {
+    abandoned = true
+    throw error
+  }
+}
+
 function waitForRaceDelay(delayMs: number, signal: AbortSignal): Promise<void> {
   if (!delayMs) return Promise.resolve()
   return new Promise((resolve, reject) => {
@@ -184,6 +366,7 @@ function waitForRaceDelay(delayMs: number, signal: AbortSignal): Promise<void> {
     }
     if (signal.aborted) abort()
     else signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) abort()
   })
 }
 
@@ -246,9 +429,21 @@ function prependDeferredToolListIfNeeded(
 
 const OPENCODE_FREE_BASE_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
-const OPENCODE_FREE_MODEL = 'deepseek-v4-flash-free'
 const OPENCODE_FREE_RETRIES = 11 // 1 initial + 10 immediate retries
+
+/** Resolve the model for the default opencode-free provider: honor an explicit
+ *  `opencode/<model>` request, else the env override, else the first validated
+ *  free model in the live cache. Never falls back to a hardcoded model id, so
+ *  a retired id can only ever be used if the operator explicitly asks for it. */
+function currentOpenCodeModelName(requested: string): string {
+  if (isOpencodeModel(requested)) return getOpencodeModelName(requested)
+  if (process.env.OPENCODE_FREE_MODEL) return process.env.OPENCODE_FREE_MODEL
+  return currentFreeOpenCodeModels()[0] ?? ''
+}
 const DIRECT_ROUTE_RETRIES = 11 // 1 initial + 10 retries for transient upstream failures
+function getDirectRouteRetries(): number {
+  return parseEnvInt(process.env.CCB_DIRECT_ROUTE_RETRIES, 3)
+}
 const ADVISOR_AUTO_MAX_TOKENS = 8_192
 const AUTO_TIER_TTFS_TIMEOUT_MS = [
   4_000, 8_000, 12_000, 16_000, 20_000, 24_000,
@@ -462,6 +657,7 @@ function isTransientCcbStatus(status: number): boolean {
 
 function shouldRetryCcbOpenAIError(error: unknown): boolean {
   if (!isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) return false
+  if (error instanceof StreamAttemptTimeoutError) return true
   if (error instanceof APIConnectionError) return true
   if (error instanceof APIError) return isTransientCcbStatus(error.status)
   return false
@@ -543,6 +739,7 @@ export async function* retryDirectProviderStream(
   routes: DirectRoute[],
   createStream: (
     route: DirectRoute,
+    signal: AbortSignal,
   ) => Promise<AsyncIterable<ChatCompletionChunk>>,
   signal: AbortSignal,
   onFirstMeaningful?: () => void,
@@ -570,33 +767,90 @@ export async function* retryDirectProviderStream(
       route.providerId === 'opencode-dedicated' &&
       !reserveDedicatedExitSlot()
     ) {
-      skippedProviders.add(route.providerId)
       continue
     }
     throwIfAborted(signal)
     await waitForProviderRequestSlot(route.providerId, route.accountId)
     throwIfAborted(signal)
     const started = Date.now()
-    routeLog('request', 'direct request', {
-      provider: route.providerId,
-      model: route.model,
-      ...(route.accountId ? { account: route.accountId } : {}),
-    })
-    const attempts = route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : 1
+    const isAbstractPool =
+      route.model.endsWith('-pool') || route.model.includes('pool')
+    if (!isAbstractPool) {
+      routeLog('request', 'direct request', {
+        provider: route.providerId,
+        model: route.model,
+        ...(route.accountId ? { account: route.accountId } : {}),
+      })
+    }
+    const attempts =
+      route.kind === 'opencode' ? DIRECT_ROUTE_RETRIES : getDirectRouteRetries()
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
+        const started = Date.now()
         const events: ChatCompletionChunk[] = []
         let meaningful = false
         const streamText = { text: '' }
-        for await (const event of await createStream(route)) {
-          events.push(event)
-          const eventMeaningful = isMeaningfulOpenAIEvent(event)
-          if (!meaningful && eventMeaningful) {
-            meaningful = true
-            setActiveCcbRoute(route.providerId, route.model)
-            onFirstMeaningful?.()
+        const attemptController = new AbortController()
+        const abortAttempt = () => attemptController.abort()
+        signal.addEventListener('abort', abortAttempt, { once: true })
+        if (signal.aborted) abortAttempt()
+        let iterator: AsyncIterator<ChatCompletionChunk> | undefined
+        let actualModel: string | undefined
+        try {
+          const stream = await createStreamWithDeadline(
+            () => createStream(route, attemptController.signal),
+            attemptController,
+            signal,
+            started,
+          )
+          iterator = stream[Symbol.asyncIterator]()
+          for (;;) {
+            const next = await nextStreamChunkWithDeadline(
+              iterator,
+              attemptController,
+              signal,
+              started,
+              meaningful,
+            )
+            if (next.done) break
+            const event = next.value
+            events.push(event)
+            const eventMeaningful = isMeaningfulOpenAIEvent(event)
+            if (typeof event.model === 'string' && event.model) {
+              actualModel = event.model;
+              let provider = route.providerId;
+              if (actualModel.includes("/")) {
+                provider = actualModel.split("/")[0];
+              } else if (actualModel.startsWith("sensenova")) {
+                provider = "sensenova";
+              } else if (actualModel.startsWith("deepseek")) {
+                provider = "deepseek";
+              } else if (actualModel.startsWith("glm")) {
+                provider = "glm-cn";
+              } else if (actualModel.startsWith("gpt-")) {
+                provider = "codex";
+              } else if (actualModel.startsWith("claude") || actualModel.startsWith("gemini")) {
+                provider = "agy";
+              } else if (actualModel.startsWith("qwen")) {
+                provider = "qwen";
+              } else if (actualModel.startsWith("nvidia")) {
+                provider = "nvidia";
+              }
+              setActiveCcbRoute(provider, actualModel);
+            }
+            if (!meaningful && eventMeaningful) {
+              meaningful = true
+              if (!actualModel) {
+                setActiveCcbRoute(route.providerId, route.model)
+              }
+              onFirstMeaningful?.()
+            }
+            throwIfUpstreamBlocked(event, streamText)
           }
-          throwIfUpstreamBlocked(event, streamText)
+        } finally {
+          signal.removeEventListener('abort', abortAttempt)
+          attemptController.abort()
+          closeStreamIterator(iterator)
         }
         if (!meaningful)
           throw new ProviderOutputError(
@@ -610,16 +864,70 @@ export async function* retryDirectProviderStream(
         if (route.accountId)
           clearAccountFailure(route.providerId, route.accountId)
         clearModelFailure(route.providerId, route.model)
+        const effectiveModel = actualModel || route.model
+        let effectiveProvider = route.providerId
+        if (effectiveModel.includes('/')) {
+          effectiveProvider = effectiveModel.split('/')[0]
+        } else if (effectiveModel.startsWith('sensenova')) {
+          effectiveProvider = 'sensenova'
+        } else if (effectiveModel.startsWith('deepseek')) {
+          effectiveProvider = 'deepseek'
+        } else if (effectiveModel.startsWith('glm')) {
+          effectiveProvider = 'glm-cn'
+        } else if (effectiveModel.startsWith('gpt-')) {
+          effectiveProvider = 'codex'
+        } else if (
+          effectiveModel.startsWith('claude') ||
+          effectiveModel.startsWith('gemini')
+        ) {
+          effectiveProvider = 'agy'
+        } else if (effectiveModel.startsWith('qwen')) {
+          effectiveProvider = 'qwen'
+        }
         routeLog('request', 'direct response complete', {
-          provider: route.providerId,
-          model: route.model,
+          provider: effectiveProvider,
+          model: effectiveModel,
           elapsedMs: Date.now() - started,
           ...(route.accountId ? { account: route.accountId } : {}),
         })
+        setActiveCcbRoute(effectiveProvider, effectiveModel)
         yield* normalizeDsmlEvents(events, streamText.text)
         return
       } catch (error) {
         if (signal.aborted) throw new APIUserAbortError()
+        // A hard deadline fired. The failed partial was fully buffered and is
+        // dropped here: moving to the next candidate must never replay text or
+        // tool chunks that were already accumulated on this attempt.
+        if (error instanceof StreamAttemptTimeoutError) {
+          routeLog(
+            'deadline',
+            `${route.providerId}/${route.model} hard deadline`,
+            {
+              phase: error.phase,
+              attempt,
+              maxAttempts: attempts,
+              elapsedMs: Date.now() - started,
+            },
+          )
+          if (attempt < attempts) {
+            routeLog(
+              'retry',
+              `${route.providerId}/${route.model} stream timeout retry`,
+              {
+                attempt,
+                maxAttempts: attempts,
+                phase: error.phase,
+              },
+            )
+            await sleep(Math.min(1000, 100 * attempt), signal, {
+              abortError: () => new APIUserAbortError(),
+            })
+            continue
+          }
+          skippedModels.add(modelKey)
+          lastError = error
+          break
+        }
         const status = (error as { status?: number } | undefined)?.status
         if (route.kind === 'opencode' && status === 404) {
           invalidateOpenCodeModelsCache()
@@ -665,6 +973,26 @@ export async function* retryDirectProviderStream(
             )
             continue
           }
+        }
+        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
+          routeLog('retry', 'empty stream retry', {
+            attempt,
+            maxAttempts: attempts,
+          })
+          await sleep(Math.min(1000, 100 * attempt), signal, {
+            abortError: () => new APIUserAbortError(),
+          })
+          continue
+        }
+        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
+          routeLog('retry', route.providerId + '/' + route.model + ' empty stream retry', {
+            attempt,
+            maxAttempts: attempts,
+          })
+          await sleep(Math.min(1000, 100 * attempt), signal, {
+            abortError: () => new APIUserAbortError(),
+          })
+          continue
         }
         const scope = routeFailureScope(error)
         routeError(`${route.providerId}/${route.model} failed`, {
@@ -723,11 +1051,12 @@ export async function* retryTierDirectProviderStream(
     const attemptController = new AbortController()
     const abortAttempt = () => attemptController.abort()
     signal.addEventListener('abort', abortAttempt, { once: true })
+    if (signal.aborted) abortAttempt()
     const timeout = setTimeout(abortAttempt, timeoutMs)
     try {
       yield* retryDirectProviderStream(
         [route],
-        current => createStream(current, attemptController.signal),
+        (current, innerSignal) => createStream(current, innerSignal),
         attemptController.signal,
         () => clearTimeout(timeout),
       )
@@ -758,6 +1087,7 @@ export async function* raceDirectProviderStream(
     iterator: AsyncIterator<ChatCompletionChunk>
     events: ChatCompletionChunk[]
     elapsedMs: number
+    startedAt: number
     text: string
     toolCalls: number
   }
@@ -769,19 +1099,44 @@ export async function* raceDirectProviderStream(
   )
   const abort = () => controllers.forEach(controller => controller.abort())
   signal.addEventListener('abort', abort, { once: true })
+  if (signal.aborted) abort()
   const attempts = routes.map(async (route): Promise<Contender> => {
-    const started = Date.now()
-    const requestSignal = controllers.get(route)!.signal
+    const wallStart = Date.now()
+    const iteratorController = controllers.get(route)!
+    const requestSignal = iteratorController.signal
+    // The race delay is not part of the attempt budget: a delayed contender
+    // still gets a full first/total window once it actually opens a request.
+    // The absolute first-meaningful budget is anchored just after the delay,
+    // so create() wait time is included but the delay is not.
+    const delayController = new AbortController()
+    const abortDelay = () => delayController.abort()
+    signal.addEventListener('abort', abortDelay, { once: true })
+    if (signal.aborted) abortDelay()
+    let attemptStarted = wallStart
+    let retained = false
+    let iterator: AsyncIterator<ChatCompletionChunk> | undefined
     try {
-      await waitForRaceDelay(route.raceDelayMs ?? 0, requestSignal)
-      const stream = await createStream(route, requestSignal)
-      const iterator = stream[Symbol.asyncIterator]()
+      await waitForRaceDelay(route.raceDelayMs ?? 0, delayController.signal)
+      attemptStarted = Date.now()
+      const stream = await createStreamWithDeadline(
+        () => createStream(route, requestSignal),
+        iteratorController,
+        requestSignal,
+        attemptStarted,
+      )
+      iterator = stream[Symbol.asyncIterator]()
       const events: ChatCompletionChunk[] = []
       const streamText = { text: '' }
       let toolCalls = 0
       let dsml = false
       for (;;) {
-        const next = await iterator.next()
+        const next = await nextStreamChunkWithDeadline(
+          iterator,
+          iteratorController,
+          requestSignal,
+          attemptStarted,
+          Boolean(events.some(isMeaningfulOpenAIEvent)),
+        )
         if (next.done) {
           throw new ProviderOutputError(
             `${route.model} returned an empty stream`,
@@ -796,13 +1151,15 @@ export async function* raceDirectProviderStream(
           (dsml && isDsmlComplete(streamText.text)) ||
           (!dsml && isMeaningfulOpenAIEvent(event))
         ) {
+          retained = true
           return {
             route,
             iterator,
+            startedAt: attemptStarted,
             events: dsml
               ? normalizeDsmlEvents(events, streamText.text)
               : events,
-            elapsedMs: Date.now() - started,
+            elapsedMs: Date.now() - attemptStarted,
             text: streamText.text,
             toolCalls,
           }
@@ -821,11 +1178,18 @@ export async function* raceDirectProviderStream(
         model: route.model,
         account: route.accountId ?? 'default',
         outcome: requestSignal.aborted ? 'cancelled' : 'failed',
-        elapsedMs: Date.now() - started,
+        elapsedMs: Date.now() - attemptStarted,
         ...(status === undefined ? {} : { status }),
         errorCategory: classifyErrorStatus(status, requestSignal.aborted),
       })
       throw error
+    } finally {
+      signal.removeEventListener('abort', abortDelay)
+      delayController.abort()
+      if (!retained) {
+        iteratorController.abort()
+        closeStreamIterator(iterator)
+      }
     }
   })
   try {
@@ -909,10 +1273,34 @@ export async function* raceDirectProviderStream(
         contenders: routes.length,
       },
     )
+    let winnerYielded = winner.events.length > 0
     yield* winner.events
     for (;;) {
-      const next = await winner.iterator.next()
+      // Keep the absolute attempt budget anchored before stream creation.
+      const next = await nextStreamChunkWithDeadline(
+        winner.iterator,
+        controllers.get(winner.route)!,
+        signal,
+        winner.startedAt,
+        true,
+      ).catch(error => {
+        if (error instanceof StreamAttemptTimeoutError && !winnerYielded) {
+          // Nothing reached downstream yet, so handing the race to the next
+          // fallback tier is safe: there is nothing to silently replay. Once
+          // output is flowing the caller gets a finite failure instead of
+          // parking forever on a stalled winner.
+          routeError(
+            `race winner ${winner.route.model} stalled before downstream output; switching tier`,
+            { phase: error.phase },
+          )
+          throw new ProviderOutputError(
+            'race winner stalled before first output',
+          )
+        }
+        throw error
+      })
       if (next.done) break
+      winnerYielded = true
       winner.text += eventText(next.value)
       winner.toolCalls += eventToolCalls(next.value)
       winner.events.push(next.value)
@@ -935,6 +1323,7 @@ export async function* raceDirectProviderStream(
   } finally {
     signal.removeEventListener('abort', abort)
     abort()
+    closeStreamIterator(selected?.iterator)
     void Promise.allSettled(attempts).then(results => {
       for (const result of results) {
         if (result.status !== 'fulfilled') continue
@@ -1129,30 +1518,33 @@ async function* allOfRaceStream(
   )
   const abort = () => controllers.forEach(c => c.abort())
   signal.addEventListener('abort', abort, { once: true })
+  if (signal.aborted) abort()
   type Completed = {
     route: DirectRoute
+    events: ChatCompletionChunk[]
     fullText: string
     toolCalls: number
   }
   const attempts = routes.map(async (route): Promise<Completed> => {
     const requestSignal = controllers.get(route)!.signal
-    const stream = await createStream(route, requestSignal)
-    const iterator = stream[Symbol.asyncIterator]()
+    const events: ChatCompletionChunk[] = []
     let fullText = ''
     let toolCalls = 0
-    for (;;) {
-      const next = await iterator.next()
-      if (next.done) break
-      fullText += eventText(next.value)
-      toolCalls += eventToolCalls(next.value)
-      if (signal.aborted) {
-        throw new APIUserAbortError()
-      }
+    for await (const event of retryDirectProviderStream(
+      [route],
+      createStream,
+      requestSignal,
+    )) {
+      throwIfAborted(requestSignal)
+      events.push(event)
+      fullText += eventText(event)
+      toolCalls += eventToolCalls(event)
     }
-    return { route, fullText, toolCalls }
+    return { route, events, fullText, toolCalls }
   })
   try {
     const results = await Promise.allSettled(attempts)
+    throwIfAborted(signal)
     const completed = results
       .filter(
         (r): r is PromiseFulfilledResult<Completed> => r.status === 'fulfilled',
@@ -1163,8 +1555,7 @@ async function* allOfRaceStream(
       )
     if (completed.length < 2) {
       if (completed.length === 1) {
-        const stream = await createStream(completed[0].route, signal)
-        yield* stream
+        yield* completed[0].events
         return
       }
       throw new ProviderOutputError('allOf: no quorum completed')
@@ -1219,6 +1610,8 @@ async function* raceThenFallbackStream(
   const l1Controller = new AbortController()
   const abortL1 = () => l1Controller.abort()
   signal.addEventListener('abort', abortL1, { once: true })
+  if (signal.aborted) abortL1()
+  let hasYielded = false
   let l1TimedOut = false
   const timeout = setTimeout(() => {
     l1TimedOut = true
@@ -1231,21 +1624,21 @@ async function* raceThenFallbackStream(
     route => !route.race && route.kind !== 'race',
   )
   try {
-    if (raceRoutes.length)
-      yield* allOfRaceStream(
-        raceRoutes,
-        createStream,
-        l1Controller.signal,
-        () => clearTimeout(timeout),
-      )
-    else if (downgradeRoutes.length)
-      yield* retryDirectProviderStream(
-        downgradeRoutes,
-        route => createStream(route, l1Controller.signal),
-        l1Controller.signal,
-      )
+    const l1Stream = raceRoutes.length
+      ? allOfRaceStream(raceRoutes, createStream, l1Controller.signal, () =>
+          clearTimeout(timeout),
+        )
+      : retryDirectProviderStream(
+          downgradeRoutes,
+          createStream,
+          l1Controller.signal,
+        )
+    for await (const chunk of l1Stream) {
+      hasYielded = true
+      yield chunk
+    }
   } catch (error) {
-    if (signal.aborted) throw error
+    if (signal.aborted || hasYielded) throw error
     if (l1TimedOut)
       routeError('auto L1 race budget exhausted; entering fallback tiers', {
         l1: (l1Group ?? []).length,
@@ -1256,7 +1649,7 @@ async function* raceThenFallbackStream(
       try {
         yield* retryDirectProviderStream(
           downgradeRoutes,
-          route => createStream(route, l1Controller.signal),
+          (route, attemptSignal) => createStream(route, attemptSignal),
           l1Controller.signal,
         )
         return
@@ -1281,7 +1674,7 @@ async function* raceThenFallbackStream(
       try {
         yield* retryDirectProviderStream(
           group,
-          route => createStream(route, signal),
+          (route, attemptSignal) => createStream(route, attemptSignal),
           signal,
         )
         return
@@ -1424,7 +1817,7 @@ export async function* queryModelOpenAI(
                 providerId: 'opencode',
                 baseURL: OPENCODE_FREE_BASE_URL,
                 model:
-                  process.env.OPENCODE_FREE_MODEL ??
+                  currentOpenCodeModelName(options.model) ||
                   getOpencodeModelName(options.model),
                 apiKey: 'public',
                 headers: {
@@ -1693,10 +2086,10 @@ export async function* queryModelOpenAI(
     ): AsyncIterable<ChatCompletionChunk> =>
       retryDirectProviderStream(
         routes,
-        route =>
+        (route, attemptSignal) =>
           ccbRetryRouteStream(
             c =>
-              createRouteStream(c, signal, {
+              createRouteStream(c, attemptSignal, {
                 messages: openaiMessages,
                 tools: openaiTools,
                 toolChoice: openaiToolChoice,
@@ -1711,7 +2104,7 @@ export async function* queryModelOpenAI(
                 allowReasoningStrip: true,
               }),
             route,
-            signal,
+            attemptSignal,
           ),
         signal,
       )
@@ -1802,10 +2195,10 @@ export async function* queryModelOpenAI(
           : directRoutes.length > 0
             ? retryDirectProviderStream(
                 directRoutes,
-                route =>
+                (route, attemptSignal) =>
                   ccbRetryRouteStream(
                     c =>
-                      createRouteStream(c, signal, {
+                      createRouteStream(c, attemptSignal, {
                         messages: openaiMessages,
                         tools: openaiTools,
                         toolChoice: openaiToolChoice,
@@ -1819,7 +2212,7 @@ export async function* queryModelOpenAI(
                         allowReasoningStrip: true,
                       }),
                     route,
-                    signal,
+                    attemptSignal,
                   ),
                 signal,
               )
@@ -1954,6 +2347,12 @@ export async function* queryModelOpenAI(
           // Anthropic SDK path. Real usage (input + output tokens) is available
           // here and injected so tokenCountWithEstimation() can read it.
           if (partialMessage) {
+            const activeRoute = getActiveCcbRoute();
+            if (activeRoute?.model) {
+              partialMessage.model = activeRoute.model.includes("/")
+                ? activeRoute.model
+                : (activeRoute.provider ? (activeRoute.provider + "/" + activeRoute.model) : activeRoute.model);
+            }
             for (const output of assembleFinalAssistantOutputs({
               partialMessage,
               contentBlocks,

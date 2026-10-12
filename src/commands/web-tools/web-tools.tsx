@@ -9,8 +9,8 @@ import type { LocalJSXCommandCall, LocalJSXCommandContext } from '../../types/co
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SearchAdapterKey = 'tavily' | 'api' | 'bing' | 'brave' | 'exa';
-type FetchAdapterKey = 'tavily' | 'http';
+type SearchAdapterKey = 'tavily' | 'api' | 'bing' | 'brave' | 'exa' | 'omniroute';
+type FetchAdapterKey = 'tavily' | 'http' | 'omniroute';
 
 interface AdapterMeta {
   key: SearchAdapterKey | FetchAdapterKey;
@@ -20,13 +20,15 @@ interface AdapterMeta {
 }
 
 type SettingsJson = Record<string, unknown> & {
-  webSearchAdapter?: 'api' | 'bing' | 'brave' | 'exa' | 'tavily';
-  webFetchAdapter?: 'tavily' | 'http';
+  webSearchAdapter?: 'api' | 'bing' | 'brave' | 'exa' | 'tavily' | 'omniroute';
+  webFetchAdapter?: 'tavily' | 'http' | 'omniroute';
   tavilyEndpointUrl?: string;
   braveApiKey?: string;
   webFetchHttpTimeoutMs?: number;
   exaApiKey?: string;
   exaEndpointUrl?: string;
+  omniRouteWebToolsBaseUrl?: string;
+  omniRouteWebToolsApiKey?: string;
 };
 
 type ViewState = { kind: 'main' } | { kind: 'config'; adapter: AdapterMeta };
@@ -39,11 +41,13 @@ const SEARCH_ADAPTERS: AdapterMeta[] = [
   { key: 'bing', label: 'Bing', description: 'Scrape Bing HTML results', hasConfig: false },
   { key: 'brave', label: 'Brave', description: 'Brave Search API (needs API key)', hasConfig: true },
   { key: 'exa', label: 'Exa', description: 'Exa AI search (MCP endpoint)', hasConfig: true },
+  { key: 'omniroute', label: 'OmniRoute', description: 'OmniRoute /v1/search gateway', hasConfig: true },
 ];
 
 const FETCH_ADAPTERS: AdapterMeta[] = [
   { key: 'tavily', label: 'Tavily Extract', description: 'Use Tavily /extract (default)', hasConfig: true },
   { key: 'http', label: 'HTTP Direct', description: 'Fetch URL directly via HTTP', hasConfig: true },
+  { key: 'omniroute', label: 'OmniRoute', description: 'OmniRoute /v1/web/fetch gateway', hasConfig: true },
 ];
 
 // ── Config field definitions ───────────────────────────────────────────────
@@ -204,6 +208,24 @@ function getConfigFields(adapter: AdapterMeta): ConfigField[] {
         setValue: (s, v) => ({ ...s, webFetchHttpTimeoutMs: v ? Number(v) || undefined : undefined }),
       });
       break;
+    case 'omniroute':
+      fields.push({
+        key: 'omniRouteWebToolsBaseUrl',
+        label: 'Base URL',
+        placeholder: 'http://100.121.247.3:8888',
+        maskInput: false,
+        getValue: s => s.omniRouteWebToolsBaseUrl ?? 'http://100.121.247.3:8888',
+        setValue: (s, v) => ({ ...s, omniRouteWebToolsBaseUrl: v || undefined }),
+      });
+      fields.push({
+        key: 'omniRouteWebToolsApiKey',
+        label: 'API Key',
+        placeholder: 'omni-...',
+        maskInput: true,
+        getValue: s => s.omniRouteWebToolsApiKey ?? '',
+        setValue: (s, v) => ({ ...s, omniRouteWebToolsApiKey: v || undefined }),
+      });
+      break;
     default:
       break;
   }
@@ -330,7 +352,7 @@ function ConfigFieldsEditor({
       const currentVal = f.getValue(settings);
       updated = f.setValue(updated, currentVal);
     }
-    updateSettingsForSource('userSettings', updated as Record<string, unknown> & SettingsJson);
+    updateSettingsForSource('userSettings', updated as any);
     onSave(`Configuration saved for ${adapter.label}.`);
   }, [fields, settings, adapter.label, onSave]);
 
@@ -490,7 +512,7 @@ function WebToolsPanel({
     (key: string) => {
       const t = currentTab;
       const field = t === 'search' ? 'webSearchAdapter' : ('webFetchAdapter' as keyof SettingsJson);
-      updateSettingsForSource('userSettings', { [field]: key } as SettingsJson);
+      updateSettingsForSource('userSettings', { [field]: key } as any);
       const adapters = t === 'search' ? SEARCH_ADAPTERS : FETCH_ADAPTERS;
       const label = adapters.find(a => a.key === key)?.label ?? key;
       onClose(`${t === 'search' ? 'Web search' : 'Web fetch'} backend set to ${label}.`);
@@ -520,7 +542,7 @@ function WebToolsPanel({
       const tab =
         view.kind === 'config' ? (SEARCH_ADAPTERS.some(a => a.key === adapter.key) ? 'search' : 'fetch') : currentTab;
       const field = tab === 'search' ? ('webSearchAdapter' as const) : ('webFetchAdapter' as const);
-      updateSettingsForSource('userSettings', { [field]: adapter.key } as SettingsJson);
+      updateSettingsForSource('userSettings', { [field]: adapter.key } as any);
       onClose(msg);
     },
     [onClose, view, currentTab],

@@ -17,6 +17,7 @@ import {
 import {
   applyPromptToMarkdown,
   type FetchedContent,
+  fetchContentWithOmniRoute,
   fetchContentWithTavily,
   getURLMarkdownContent,
   isPreapprovedUrl,
@@ -216,6 +217,45 @@ ${DESCRIPTION}`
     // Select backend: settings.webFetchAdapter → default 'tavily'
     const settings = getSettings_DEPRECATED()
     const backend = settings.webFetchAdapter ?? 'tavily'
+
+    // OmniRoute path: server fetches URL and applies prompt server-side.
+    if ((backend as string) === 'omniroute') {
+      const response = await fetchContentWithOmniRoute(url, abortController)
+
+      const {
+        content,
+        bytes,
+        code,
+        codeText,
+        contentType,
+        persistedPath,
+        persistedSize,
+      } = response
+
+      let result = content
+      if (prompt && prompt.trim()) {
+        result = await applyPromptToMarkdown(
+          prompt,
+          content,
+          abortController.signal,
+          isNonInteractiveSession,
+          isPreapprovedUrl(url),
+        )
+      }
+      if (persistedPath) {
+        result += `\n\n[Binary content (${contentType}, ${formatFileSize(persistedSize ?? bytes)}) also saved to ${persistedPath}]`
+      }
+
+      const output: Output = {
+        bytes,
+        code,
+        codeText,
+        result,
+        durationMs: Date.now() - start,
+        url,
+      }
+      return { data: output }
+    }
 
     // Tavily path: /extract returns Markdown directly — skip turndown + queryHaiku
     if (backend === 'tavily') {

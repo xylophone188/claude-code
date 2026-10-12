@@ -268,6 +268,7 @@ function renderHTML(): string {
     }
     .step-node.active { color: #fff; background: var(--step-active); font-weight: 600; }
     .step-node.done { color: #2ecc8a; background: rgba(46, 204, 138, 0.1); border: 1px solid rgba(46, 204, 138, 0.3); }
+    .step-node.blocked { color: #ff6b6b; background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.4); font-weight: 600; }
     .step-arrow { color: var(--muted); font-size: 9px; }
 
     .copy-btn {
@@ -368,6 +369,10 @@ function renderHTML(): string {
             <span>💻 前端预处理</span>
             <span>⚡ CCB 工具引擎</span>
             <span>🌐 AgentBox (18800) 网关</span>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--accent); margin-left: 6px;">
+              <input type="checkbox" id="edictModeToggle" checked />
+              📜 Edict 三省六部流水线
+            </label>
           </div>
           <button class="send-btn" id="sendBtn" onclick="handleSend()">奉旨执行 ↑</button>
         </div>
@@ -405,15 +410,20 @@ function renderHTML(): string {
 
     function renderStepper(state) {
       if (!state) return '';
+      if (state === 'Blocked') {
+        return '<div class="edict-stepper"><span class="step-node blocked">🚫 阻断中断 (Blocked)</span></div>';
+      }
       const stages = [
         { key: 'Taizi', name: '🤴 太子' },
         { key: 'Chengxiang', name: '🏛️ 丞相' },
         { key: 'Zhongshu', name: '📋 中书' },
         { key: 'Menxia', name: '🔍 门下' },
+        { key: 'Zhenguo', name: '🛡️ 镇国' },
         { key: 'Assigned', name: '⚙️ 尚书' },
         { key: 'Doing', name: '⚔️ 六部' },
+        { key: 'Review', name: '🧪 自查' },
         { key: 'FinalReview', name: '⚖️ 御史台' },
-        { key: 'Done', name: '✅ 准奏归档' },
+        { key: 'Done', name: '✅ 准奏' },
       ];
       const stateIdx = stages.findIndex(s => s.key === state);
       const nodes = stages.map((s, idx) => {
@@ -572,10 +582,12 @@ function renderHTML(): string {
       });
       renderMessages();
 
+      const useEdict = document.getElementById('edictModeToggle')?.checked ?? true;
+
       await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: currentSessionId, content: text, asstMsgId })
+        body: JSON.stringify({ sessionId: currentSessionId, content: text, asstMsgId, useEdict })
       });
     }
 
@@ -681,6 +693,42 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 专用 Edict 三省六部确定性执行 API
+  if (req.method === 'POST' && p === '/api/edict') {
+    let body = ''
+    req.on('data', chunk => (body += chunk))
+    req.on('end', async () => {
+      try {
+        const parsed = JSON.parse(body)
+        const text = (parsed.content || parsed.input || '').trim()
+        if (!text) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, error: 'Missing content/input parameter' }))
+          return
+        }
+
+        const sessionId = parsed.sessionId || DEFAULT_SESSION_ID
+        const pipeline = new EdictPipeline({
+          onStateChange: (state, ctx) => {
+            broadcastSSE(sessionId, 'stage_change', {
+              messageId: parsed.messageId ?? `edict-${Date.now()}`,
+              state,
+              context: ctx,
+            })
+          },
+        })
+
+        const result = await pipeline.execute(text)
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true, result }))
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: err.message }))
+      }
+    })
+    return
+  }
+
   // 消息接收与三层分工派发
   if (req.method === 'POST' && p === '/api/messages') {
     let body = ''
@@ -704,7 +752,8 @@ const server = http.createServer((req, res) => {
         }
 
         const isCodingOrToolTask = /(写代码|修改|运行|bash|git|文件|修复|编译|重构|部署|测试|执行)/i.test(text)
-        const handlerLevel = isCodingOrToolTask ? 'ccb' : 'gateway'
+        const useEdict = parsed.useEdict ?? true
+        const handlerLevel = useEdict ? 'ccb' : (isCodingOrToolTask ? 'ccb' : 'gateway')
 
         const assistantMsg: Message = {
           id: asstMsgId,
@@ -717,65 +766,117 @@ const server = http.createServer((req, res) => {
         }
         session.messages.push(assistantMsg)
 
-        // 异步分流执行
+        // 异步分流执行：真实驱动 EdictPipeline 流水线
         ;(async () => {
-          broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Chengxiang' })
-          await new Promise(r => setTimeout(r, 150))
-          broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Zhongshu' })
-          await new Promise(r => setTimeout(r, 150))
-          broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Menxia' })
-          await new Promise(r => setTimeout(r, 150))
-          broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Assigned' })
-          await new Promise(r => setTimeout(r, 150))
-          broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Doing' })
+          if (useEdict) {
+            try {
+              const pipeline = new EdictPipeline({
+                onStateChange: (state, ctx) => {
+                  assistantMsg.edictState = state
+                  broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state })
+                },
+                executor: async (subtaskId, dept, task) => {
+                  const startChunk = `⚡ [${dept}] 正在调度履职: ${task?.title ?? subtaskId}\n`
+                  assistantMsg.content += startChunk
+                  broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: startChunk })
 
-          // ══ 2. CCB 负责工程代码、工具调用与复杂系统任务 ══
-          if (isCodingOrToolTask) {
-            const ccb = spawn('/home/melody/.local/bin/ccb', ['-p', text], {
-              stdio: ['ignore', 'pipe', 'pipe'],
-              env: {
-                ...process.env,
-                HOME: '/home/melody',
-                PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                TERM: 'dumb',
-              },
-            })
+                  // 若属于工部/刑部且为工程代码任务，联动 CCB 引擎执行具体指令
+                  if (isCodingOrToolTask && (dept === '工部' || dept === '刑部')) {
+                    await new Promise<void>((resolve) => {
+                      let resolved = false
+                      const safeResolve = () => {
+                        if (!resolved) {
+                          resolved = true
+                          resolve()
+                        }
+                      }
 
-            let fullOutput = ''
-            ccb.stdout.on('data', (d: any) => {
-              const chunk = d.toString()
-              fullOutput += chunk
-              assistantMsg.content = fullOutput
-              broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk })
-            })
+                      const timer = setTimeout(() => {
+                        try { ccb.kill('SIGTERM') } catch {}
+                        safeResolve()
+                      }, 25000)
 
-            ccb.stderr.on('data', (d: any) => {
-              const errChunk = d.toString()
-              if (!fullOutput) {
-                broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: errChunk })
+                      const ccb = spawn('/home/melody/.local/bin/ccb', [
+                        '-p',
+                        '--dangerously-skip-permissions',
+                        `${dept}任务: ${task?.description ?? text}`,
+                      ], {
+                        stdio: ['ignore', 'pipe', 'pipe'],
+                        env: {
+                          ...process.env,
+                          HOME: '/home/melody',
+                          PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                          TERM: 'dumb',
+                        },
+                      })
+
+                      ccb.stdout.on('data', (d: any) => {
+                        const chunk = d.toString()
+                        assistantMsg.content += chunk
+                        broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk })
+                      })
+
+                      ccb.stderr.on('data', (d: any) => {
+                        const errChunk = d.toString()
+                        assistantMsg.content += errChunk
+                        broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: errChunk })
+                      })
+
+                      ccb.on('close', () => {
+                        clearTimeout(timer)
+                        safeResolve()
+                      })
+                      ccb.on('error', () => {
+                        clearTimeout(timer)
+                        safeResolve()
+                      })
+                    })
+                  } else {
+                    await new Promise(r => setTimeout(r, 60))
+                  }
+
+                  const finishChunk = `✅ [${dept}] 履职成功: ${task?.title ?? subtaskId}\n`
+                  assistantMsg.content += finishChunk
+                  broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: finishChunk })
+                  return { success: true, output: `[${dept}] 履职完毕` }
+                },
+              })
+
+              const result = await pipeline.execute(text)
+              if ('directResponse' in result) {
+                assistantMsg.content = result.directResponse
+                assistantMsg.edictState = 'Done'
+                assistantMsg.status = 'done'
+              } else {
+                const report = '\n' + EdictPipeline.formatReport(result)
+                assistantMsg.content += report
+                assistantMsg.edictState = result.state
+                assistantMsg.status = result.state === 'Done' ? 'done' : 'error'
               }
-            })
 
-            ccb.on('close', async (code) => {
-              broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
-              await new Promise(r => setTimeout(r, 200))
-              assistantMsg.edictState = 'Done'
-              assistantMsg.status = code === 0 ? 'done' : 'error'
-              if (!assistantMsg.content) assistantMsg.content = `(执行结束，代码: ${code})`
               broadcastSSE(session.id, 'message_done', {
                 messageId: asstMsgId,
                 content: assistantMsg.content,
-                edictState: 'Done',
+                edictState: assistantMsg.edictState,
               })
-            })
-          } 
-          // ══ 3. 纯文本生成与问答分流给 agentbox-gateway (18800) ══
+            } catch (err: any) {
+              assistantMsg.content = `[Edict 流水线异常]: ${err.message}`
+              assistantMsg.status = 'error'
+              assistantMsg.edictState = 'Blocked'
+              broadcastSSE(session.id, 'message_done', {
+                messageId: asstMsgId,
+                content: assistantMsg.content,
+                edictState: 'Blocked',
+              })
+            }
+          }
+          // ══ 纯文本生成且关闭流水线时分流给 agentbox-gateway (18800) ══
           else {
             try {
               const reply = await callGateway(text)
               assistantMsg.content = reply
               broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
-              await new Promise(r => setTimeout(r, 200))
+              await new Promise(r => setTimeout(r, 100))
               assistantMsg.edictState = 'Done'
               assistantMsg.status = 'done'
               broadcastSSE(session.id, 'message_done', {

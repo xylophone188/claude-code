@@ -3,7 +3,10 @@ import fs from 'fs'
 import path from 'path'
 import { spawn } from 'child_process'
 import { EdictPipeline } from '../services/edict/pipeline.js'
-import type { PipelineContext, EdictTaskState } from '../services/edict/types.js'
+import type {
+  PipelineContext,
+  EdictTaskState,
+} from '../services/edict/types.js'
 
 const PORT = 38080
 const HOST = '127.0.0.1'
@@ -38,7 +41,8 @@ sessions.set(DEFAULT_SESSION_ID, {
     {
       id: 'init-1',
       role: 'system',
-      content: '⚡ 三层协作流水线已激活：\n1. [前端层]：0-Token 意图拦截、清屏、简单问答、划词防刷\n2. [CCB 核心层]：代码构建、系统命令执行、复杂多工具规划\n3. [AgentBox 网关层]：多模型池集群故障转移、大语言模型直推',
+      content:
+        '⚡ 三层协作流水线已激活：\n1. [前端层]：0-Token 意图拦截、清屏、简单问答、划词防刷\n2. [CCB 核心层]：代码构建、系统命令执行、复杂多工具规划\n3. [AgentBox 网关层]：多模型池集群故障转移、大语言模型直推',
       timestamp: Date.now(),
     },
   ],
@@ -61,7 +65,7 @@ async function callGateway(prompt: string): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer sk-bridge-local-18800',
+      Authorization: 'Bearer sk-bridge-local-18800',
     },
     body: JSON.stringify({
       model: 'auto',
@@ -622,7 +626,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
     })
 
@@ -703,7 +707,12 @@ const server = http.createServer((req, res) => {
         const text = (parsed.content || parsed.input || '').trim()
         if (!text) {
           res.writeHead(400, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ ok: false, error: 'Missing content/input parameter' }))
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: 'Missing content/input parameter',
+            }),
+          )
           return
         }
 
@@ -736,7 +745,8 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       try {
         const parsed = JSON.parse(body)
-        const session = sessions.get(parsed.sessionId) || sessions.get(DEFAULT_SESSION_ID)!
+        const session =
+          sessions.get(parsed.sessionId) || sessions.get(DEFAULT_SESSION_ID)!
         const asstMsgId = parsed.asstMsgId || `asst-${Date.now()}`
         const text = (parsed.content || '').trim()
 
@@ -751,9 +761,16 @@ const server = http.createServer((req, res) => {
           session.title = text.slice(0, 16)
         }
 
-        const isCodingOrToolTask = /(写代码|修改|运行|bash|git|文件|修复|编译|重构|部署|测试|执行)/i.test(text)
+        const isCodingOrToolTask =
+          /(写代码|修改|运行|bash|git|文件|修复|编译|重构|部署|测试|执行)/i.test(
+            text,
+          )
         const useEdict = parsed.useEdict ?? true
-        const handlerLevel = useEdict ? 'ccb' : (isCodingOrToolTask ? 'ccb' : 'gateway')
+        const handlerLevel = useEdict
+          ? 'ccb'
+          : isCodingOrToolTask
+            ? 'ccb'
+            : 'gateway'
 
         const assistantMsg: Message = {
           id: asstMsgId,
@@ -773,16 +790,25 @@ const server = http.createServer((req, res) => {
               const pipeline = new EdictPipeline({
                 onStateChange: (state, ctx) => {
                   assistantMsg.edictState = state
-                  broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state })
+                  broadcastSSE(session.id, 'stage_change', {
+                    messageId: asstMsgId,
+                    state,
+                  })
                 },
                 executor: async (subtaskId, dept, task) => {
                   const startChunk = `⚡ [${dept}] 正在调度履职: ${task?.title ?? subtaskId}\n`
                   assistantMsg.content += startChunk
-                  broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: startChunk })
+                  broadcastSSE(session.id, 'message_chunk', {
+                    messageId: asstMsgId,
+                    chunk: startChunk,
+                  })
 
                   // 若属于工部/刑部且为工程代码任务，联动 CCB 引擎执行具体指令
-                  if (isCodingOrToolTask && (dept === '工部' || dept === '刑部')) {
-                    await new Promise<void>((resolve) => {
+                  if (
+                    isCodingOrToolTask &&
+                    (dept === '工部' || dept === '刑部')
+                  ) {
+                    await new Promise<void>(resolve => {
                       let resolved = false
                       const safeResolve = () => {
                         if (!resolved) {
@@ -792,34 +818,46 @@ const server = http.createServer((req, res) => {
                       }
 
                       const timer = setTimeout(() => {
-                        try { ccb.kill('SIGTERM') } catch {}
+                        try {
+                          ccb.kill('SIGTERM')
+                        } catch {}
                         safeResolve()
                       }, 25000)
 
-                      const ccb = spawn('/home/melody/.local/bin/ccb', [
-                        '-p',
-                        '--dangerously-skip-permissions',
-                        `${dept}任务: ${task?.description ?? text}`,
-                      ], {
-                        stdio: ['ignore', 'pipe', 'pipe'],
-                        env: {
-                          ...process.env,
-                          HOME: '/home/melody',
-                          PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                          TERM: 'dumb',
+                      const ccb = spawn(
+                        '/home/melody/.local/bin/ccb',
+                        [
+                          '-p',
+                          '--dangerously-skip-permissions',
+                          `${dept}任务: ${task?.description ?? text}`,
+                        ],
+                        {
+                          stdio: ['ignore', 'pipe', 'pipe'],
+                          env: {
+                            ...process.env,
+                            HOME: '/home/melody',
+                            PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                            TERM: 'dumb',
+                          },
                         },
-                      })
+                      )
 
                       ccb.stdout.on('data', (d: any) => {
                         const chunk = d.toString()
                         assistantMsg.content += chunk
-                        broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk })
+                        broadcastSSE(session.id, 'message_chunk', {
+                          messageId: asstMsgId,
+                          chunk,
+                        })
                       })
 
                       ccb.stderr.on('data', (d: any) => {
                         const errChunk = d.toString()
                         assistantMsg.content += errChunk
-                        broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: errChunk })
+                        broadcastSSE(session.id, 'message_chunk', {
+                          messageId: asstMsgId,
+                          chunk: errChunk,
+                        })
                       })
 
                       ccb.on('close', () => {
@@ -837,7 +875,10 @@ const server = http.createServer((req, res) => {
 
                   const finishChunk = `✅ [${dept}] 履职成功: ${task?.title ?? subtaskId}\n`
                   assistantMsg.content += finishChunk
-                  broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: finishChunk })
+                  broadcastSSE(session.id, 'message_chunk', {
+                    messageId: asstMsgId,
+                    chunk: finishChunk,
+                  })
                   return { success: true, output: `[${dept}] 履职完毕` }
                 },
               })
@@ -875,7 +916,10 @@ const server = http.createServer((req, res) => {
             try {
               const reply = await callGateway(text)
               assistantMsg.content = reply
-              broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
+              broadcastSSE(session.id, 'stage_change', {
+                messageId: asstMsgId,
+                state: 'FinalReview',
+              })
               await new Promise(r => setTimeout(r, 100))
               assistantMsg.edictState = 'Done'
               assistantMsg.status = 'done'

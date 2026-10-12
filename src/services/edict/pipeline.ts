@@ -17,6 +17,8 @@ export class EdictPipeline {
     this.options = options
   }
 
+  private stageStartTimestamps: Map<string, number> = new Map()
+
   /**
    * 记录状态流转并向外部监听者分发回调
    */
@@ -24,14 +26,16 @@ export class EdictPipeline {
     state: EdictTaskState,
     context: PipelineContext,
   ): Promise<void> {
-    const prevTimestamp = context.completedAt ?? context.startedAt
     const now = Date.now()
     if (!context.stageDurations) {
       context.stageDurations = {}
     }
     if (context.state) {
-      context.stageDurations[context.state] = now - prevTimestamp
+      const stageStart =
+        this.stageStartTimestamps.get(context.state) ?? context.startedAt
+      context.stageDurations[context.state] = now - stageStart
     }
+    this.stageStartTimestamps.set(state, now)
 
     context.state = state
     if (!context.stateHistory.includes(state)) {
@@ -51,7 +55,9 @@ export class EdictPipeline {
   /**
    * 运行端到端确定性三省六部流水线
    */
-  async execute(input: string): Promise<PipelineContext | { directResponse: string }> {
+  async execute(
+    input: string,
+  ): Promise<PipelineContext | { directResponse: string }> {
     // 1. 太子分流：0-Token 拦截与任务 Spec 建立
     const taiziRes = await taiziStage(input, {
       defaultPriority: this.options?.defaultPriority,
@@ -103,7 +109,10 @@ export class EdictPipeline {
       context.reviewHistory.push(verdict)
 
       // 镇国公裁决：若存在系统高危破坏性风险，或显式启用镇国公阶段
-      if (context.draftPlan.hasSystemRisk && this.options?.enableZhenguo !== false) {
+      if (
+        context.draftPlan.hasSystemRisk &&
+        this.options?.enableZhenguo !== false
+      ) {
         await this.transitionTo('Zhenguo', context)
         const zhenguoRes = await zhenguoStage(context.spec, context.draftPlan)
         context.zhenguoVerdict = zhenguoRes
@@ -157,8 +166,8 @@ export class EdictPipeline {
     }
 
     // 7. 准奏归档完成
-    context.completedAt = Date.now()
     await this.transitionTo('Done', context)
+    context.completedAt = Date.now()
 
     return context
   }
@@ -168,40 +177,66 @@ export class EdictPipeline {
    */
   static formatReport(context: PipelineContext): string {
     const lines: string[] = []
-    lines.push(`╔══════════════════════════════════════════════════════════════╗`)
-    lines.push(`║       📜 【三省六部 · Edict 确定性执行履职报告】             ║`)
-    lines.push(`╚══════════════════════════════════════════════════════════════╝`)
+    lines.push(
+      `╔══════════════════════════════════════════════════════════════╗`,
+    )
+    lines.push(
+      `║       📜 【三省六部 · Edict 确定性执行履职报告】             ║`,
+    )
+    lines.push(
+      `╚══════════════════════════════════════════════════════════════╝`,
+    )
     lines.push(`任务标的: ${context.spec.title}`)
     lines.push(`任务编号: ${context.spec.taskId}`)
-    lines.push(`优先级: ${context.spec.priority} | 复杂度: ${context.spec.complexity} | 领域: ${context.spec.domain ?? 'general'}`)
+    lines.push(
+      `优先级: ${context.spec.priority} | 复杂度: ${context.spec.complexity} | 领域: ${context.spec.domain ?? 'general'}`,
+    )
     lines.push(`当前状态: [${context.state}]`)
     lines.push(`流转足迹: ${context.stateHistory.join(' -> ')}`)
     lines.push(``)
 
     if (context.feasibility) {
       lines.push(`【🏛️ 丞相可行性评估】`)
-      lines.push(`  - 评估结论: ${context.feasibility.feasible ? '可行' : '不可行'}`)
-      lines.push(`  - 技术栈依赖: ${context.feasibility.dependencies.join(', ') || '无'}`)
+      lines.push(
+        `  - 评估结论: ${context.feasibility.feasible ? '可行' : '不可行'}`,
+      )
+      lines.push(
+        `  - 技术栈依赖: ${context.feasibility.dependencies.join(', ') || '无'}`,
+      )
       if (context.feasibility.riskFactors.length > 0) {
-        lines.push(`  - 风险提示: ${context.feasibility.riskFactors.join('; ')}`)
+        lines.push(
+          `  - 风险提示: ${context.feasibility.riskFactors.join('; ')}`,
+        )
       }
       lines.push(``)
     }
 
     if (context.draftPlan) {
-      lines.push(`【📋 中书省拟旨与门下省审议 (共 ${context.reviewHistory.length} 轮)】`)
+      lines.push(
+        `【📋 中书省拟旨与门下省审议 (共 ${context.reviewHistory.length} 轮)】`,
+      )
       lines.push(`  - 可行性论证: ${context.draftPlan.feasibility}`)
       lines.push(`  - 完备性论证: ${context.draftPlan.completeness}`)
-      lines.push(`  - 安全与回滚方案: ${context.draftPlan.systemRiskAndRollback}`)
+      lines.push(
+        `  - 安全与回滚方案: ${context.draftPlan.systemRiskAndRollback}`,
+      )
       if (context.zhenguoVerdict) {
-        lines.push(`  - 镇国公裁决: ${context.zhenguoVerdict.approved ? '准奏' : '驳回'} (${context.zhenguoVerdict.notes ?? context.zhenguoVerdict.vetoReason ?? '无'})`)
+        lines.push(
+          `  - 镇国公裁决: ${context.zhenguoVerdict.approved ? '准奏' : '驳回'} (${context.zhenguoVerdict.notes ?? context.zhenguoVerdict.vetoReason ?? '无'})`,
+        )
       }
       lines.push(``)
 
       lines.push(`【⚙️ 尚书省六部分工与执行结果】`)
       for (const st of context.draftPlan.subtasks) {
-        const artifact = context.execution?.artifacts.find(a => a.subtaskId === st.id)
-        const statusMark = artifact ? (artifact.status === 'success' ? '✅' : '❌') : '⏳'
+        const artifact = context.execution?.artifacts.find(
+          a => a.subtaskId === st.id,
+        )
+        const statusMark = artifact
+          ? artifact.status === 'success'
+            ? '✅'
+            : '❌'
+          : '⏳'
         lines.push(`  ${statusMark} [${st.dept}] ${st.title}`)
         if (artifact?.output) {
           lines.push(`     └─ 产出: ${artifact.output}`)
@@ -213,11 +248,12 @@ export class EdictPipeline {
     if (context.finalVerdict) {
       lines.push(`【⚖️ 御史台终审会签】`)
       lines.push(`  - 凭证号: ${context.finalVerdict.certId ?? '无'}`)
-      lines.push(`  - 审议裁定: ${context.finalVerdict.accepted ? '合规通过准奏' : '终审驳回'}`)
+      lines.push(
+        `  - 审议裁定: ${context.finalVerdict.accepted ? '合规通过准奏' : '终审驳回'}`,
+      )
       lines.push(`  - 结语: ${context.finalVerdict.summary}`)
     }
 
     return lines.join('\n')
   }
 }
-

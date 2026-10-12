@@ -1,7 +1,7 @@
 import type { Command, LocalCommandCall } from '../../types/command.js'
 import { EdictPipeline } from '../../services/edict/pipeline.js'
 
-const call: LocalCommandCall = async (args) => {
+const call: LocalCommandCall = async args => {
   const input = args.trim()
   if (!input || input === 'help' || input === '-h') {
     return {

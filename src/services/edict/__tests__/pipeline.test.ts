@@ -85,7 +85,9 @@ describe('Edict (三省六部) 阶段单元测试', () => {
     }
     const reviewFlawed = await menxiaStage(flawedPlan, 1)
     expect(reviewFlawed.approved).toBe(false)
-    expect(reviewFlawed.suggestions).toContain('缺少刑部（测试与验收）子任务规划，无法保证质量底线')
+    expect(reviewFlawed.suggestions).toContain(
+      '缺少刑部（测试与验收）子任务规划，无法保证质量底线',
+    )
   })
 
   test('镇国公终局定论：一票否决绝对毁灭性操作', async () => {
@@ -156,7 +158,7 @@ describe('EdictPipeline 端到端综合测试', () => {
   test('全生命周期流转、状态监听与耗时统计', async () => {
     const statesRecorded: EdictTaskState[] = []
     const pipeline = new EdictPipeline({
-      onStateChange: (state) => {
+      onStateChange: state => {
         statesRecorded.push(state)
       },
       executor: async (_id, dept, task) => {
@@ -164,7 +166,9 @@ describe('EdictPipeline 端到端综合测试', () => {
       },
     })
 
-    const result = await pipeline.execute('设计并实现三省六部分布式链路跟踪系统')
+    const result = await pipeline.execute(
+      '设计并实现三省六部分布式链路跟踪系统',
+    )
     expect('state' in result).toBe(true)
     if ('state' in result) {
       expect(result.state).toBe('Done')
@@ -217,6 +221,22 @@ describe('EdictPipeline 端到端综合测试', () => {
       expect(result.execution?.allPassed).toBe(false)
       expect(result.stateHistory).toContain('Review')
       expect(result.stateHistory).not.toContain('Done')
+    }
+  })
+
+  test('阶段耗时统计在每个生命周期均精确记录', async () => {
+    const pipeline = new EdictPipeline({
+      executor: async () => {
+        await new Promise(r => setTimeout(r, 20))
+        return { success: true, output: 'done' }
+      },
+    })
+    const result = await pipeline.execute('优化高并发异步任务队列性能')
+    expect('state' in result).toBe(true)
+    if ('state' in result) {
+      expect(result.stageDurations).toBeDefined()
+      expect(typeof result.stageDurations?.Doing).toBe('number')
+      expect(result.stageDurations!.Doing!).toBeGreaterThanOrEqual(15)
     }
   })
 })

@@ -57,7 +57,9 @@ describe('WebUI Edict API 端到端集成测试', () => {
     expect(body.ok).toBe(true)
 
     // 获取会话消息
-    const msgRes = await fetch(`${WEBUI_BASE}/api/messages?sessionId=${sessionId}`)
+    const msgRes = await fetch(
+      `${WEBUI_BASE}/api/messages?sessionId=${sessionId}`,
+    )
     expect(msgRes.status).toBe(200)
     const messages: any = await msgRes.json()
     expect(messages.length).toBeGreaterThanOrEqual(1)

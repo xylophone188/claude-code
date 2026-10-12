@@ -277,6 +277,22 @@ export function ExitPlanModePermissionRequest({
     }
   }, [showSaveMessage]);
 
+  // 超时自动批准（默认 30 秒自动选择第一个可用选项：自动模式 / 允许编辑）
+  useEffect(() => {
+    const rawTimeoutSec = process.env.CLAUDE_PLAN_AUTO_APPROVE_TIMEOUT_SEC ?? '30';
+    const timeoutSec = parseInt(rawTimeoutSec, 10);
+    if (isNaN(timeoutSec) || timeoutSec <= 0) return;
+
+    const timer = setTimeout(() => {
+      const defaultOption = options[0]?.value;
+      if (defaultOption) {
+        void handleResponseRef.current(defaultOption);
+      }
+    }, timeoutSec * 1000);
+
+    return () => clearTimeout(timer);
+  }, [options]);
+
   // Handle Ctrl+G to edit plan in $EDITOR, Shift+Tab for auto-accept edits
   const handleKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrl && e.key === 'g') {

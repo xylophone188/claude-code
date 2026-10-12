@@ -15,6 +15,7 @@ interface Message {
   timestamp: number
   status?: 'pending' | 'streaming' | 'done' | 'error'
   edictState?: EdictTaskState
+  handlerLevel?: 'frontend' | 'ccb' | 'gateway'
 }
 
 interface Session {
@@ -30,14 +31,14 @@ const DEFAULT_SESSION_ID = 'session-default'
 
 sessions.set(DEFAULT_SESSION_ID, {
   id: DEFAULT_SESSION_ID,
-  title: '三省六部流水线会话',
+  title: '三省六部 · 三层分工流水线',
   createdAt: Date.now(),
   updatedAt: Date.now(),
   messages: [
     {
       id: 'init-1',
       role: 'system',
-      content: '⚡ CCB · 三省六部全流程可视化工作台已就绪。\n流转管线：\n[🤴 太子] → [🏛️ 丞相] → [📋 中书] → [🔍 门下/镇国公] → [⚙️ 尚书] → [⚖️ 御史台] → [✅ 准奏归档]',
+      content: '⚡ 三层协作流水线已激活：\n1. [前端层]：0-Token 意图拦截、清屏、简单问答、划词防刷\n2. [CCB 核心层]：代码构建、系统命令执行、复杂多工具规划\n3. [AgentBox 网关层]：多模型池集群故障转移、大语言模型直推',
       timestamp: Date.now(),
     },
   ],
@@ -54,13 +55,32 @@ function broadcastSSE(sessionId: string, event: string, data: any) {
   }
 }
 
+// 调用 18800 agentbox-gateway 执行大模型直接推理
+async function callGateway(prompt: string): Promise<string> {
+  const res = await fetch('http://127.0.0.1:18800/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer sk-bridge-local-18800',
+    },
+    body: JSON.stringify({
+      model: 'auto',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2048,
+    }),
+  })
+  if (!res.ok) throw new Error(`Gateway returned ${res.status}`)
+  const data: any = await res.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
 function renderHTML(): string {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CCB Studio · 三省六部全流程工作台</title>
+  <title>CCB Studio · 三省六部三层协同工作台</title>
   <style>
     :root {
       --bg: #0b0d13;
@@ -212,7 +232,18 @@ function renderHTML(): string {
       font-size: 12px;
     }
 
-    /* ══ 三省六部确定性流转横幅 ══ */
+    .tier-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .tier-frontend { background: rgba(106, 158, 255, 0.2); color: var(--accent); border: 1px solid rgba(106, 158, 255, 0.3); }
+    .tier-ccb { background: rgba(215, 119, 87, 0.2); color: var(--primary); border: 1px solid rgba(215, 119, 87, 0.3); }
+    .tier-gateway { background: rgba(46, 204, 138, 0.2); color: #2ecc8a; border: 1px solid rgba(46, 204, 138, 0.3); }
+
     .edict-stepper {
       display: flex;
       gap: 6px;
@@ -235,16 +266,8 @@ function renderHTML(): string {
       background: rgba(255,255,255,0.02);
       white-space: nowrap;
     }
-    .step-node.active {
-      color: #fff;
-      background: var(--step-active);
-      font-weight: 600;
-    }
-    .step-node.done {
-      color: #2ecc8a;
-      background: rgba(46, 204, 138, 0.1);
-      border: 1px solid rgba(46, 204, 138, 0.3);
-    }
+    .step-node.active { color: #fff; background: var(--step-active); font-weight: 600; }
+    .step-node.done { color: #2ecc8a; background: rgba(46, 204, 138, 0.1); border: 1px solid rgba(46, 204, 138, 0.3); }
     .step-arrow { color: var(--muted); font-size: 9px; }
 
     .copy-btn {
@@ -334,16 +357,17 @@ function renderHTML(): string {
   <div class="chat-container">
     <div class="chat-header">
       <div id="sessionHeaderTitle" class="header-title">📜 主旨意会话</div>
-      <div class="status-badge" id="connStatus">● Edict 流水线直通 CCB</div>
+      <div class="status-badge" id="connStatus">● 三层分工架构正常</div>
     </div>
     <div class="messages-area" id="messagesArea"></div>
     <div class="input-wrapper">
       <div class="input-box">
-        <textarea id="promptInput" placeholder="在此下达任务... 全流程自动流经 太子分流 → 丞相预审 → 中书拟旨 → 门下审议 → 尚书派发执行 → 御史台终审"></textarea>
+        <textarea id="promptInput" placeholder="下达任务... 前端先行 0-Token 过滤，复杂工程直通 CCB，模型直连交由 agentbox-gateway"></textarea>
         <div class="input-toolbar">
           <div class="toolbar-left">
-            <span>🛡️ 门下省红线自检: 开启</span>
-            <span>⚖️ 镇国公终局裁决: 启用</span>
+            <span>💻 前端预处理</span>
+            <span>⚡ CCB 工具引擎</span>
+            <span>🌐 AgentBox (18800) 网关</span>
           </div>
           <button class="send-btn" id="sendBtn" onclick="handleSend()">奉旨执行 ↑</button>
         </div>
@@ -355,6 +379,18 @@ function renderHTML(): string {
     let currentSessionId = '${DEFAULT_SESSION_ID}';
     let sseSource = null;
     let localMessages = [];
+
+    // ══ 1. 前端能做的前端做 ══
+    function frontendPreflight(text) {
+      const trimmed = text.trim();
+      if (/^(清屏|清除|clear)$/i.test(trimmed)) {
+        return { handled: true, action: 'clear' };
+      }
+      if (/^(你好|在吗|hi|hello)$/i.test(trimmed)) {
+        return { handled: true, response: '在的！三层协同流水线已就绪，请输入具体工作或任务指令。' };
+      }
+      return { handled: false };
+    }
 
     function copyText(btn, text) {
       navigator.clipboard.writeText(text);
@@ -401,11 +437,15 @@ function renderHTML(): string {
         const cursor = isStreaming ? '<span class="cursor-blink"></span>' : '';
         const copyBtn = !isSystem ? \`<button class="copy-btn" onclick="copyText(this, decodeURIComponent('\${encodeURIComponent(m.content)}'))">复制</button>\` : '';
         const stepper = m.edictState ? renderStepper(m.edictState) : '';
+        const tierTag = m.handlerLevel === 'frontend' ? '<div class="tier-badge tier-frontend">⚡ 前端直出 (0-Token)</div>' :
+                        m.handlerLevel === 'gateway' ? '<div class="tier-badge tier-gateway">🌐 AgentBox 网关直出</div>' :
+                        m.handlerLevel === 'ccb' ? '<div class="tier-badge tier-ccb">💻 CCB 核心引擎执行</div>' : '';
 
         return \`
           <div class="message-row \${m.role}" id="msg-row-\${m.id}">
             <div class="avatar">\${emoji}</div>
             <div class="bubble-wrapper">
+              \${tierTag}
               \${stepper}
               <div class="bubble" id="bubble-\${m.id}">
                 \${copyBtn}
@@ -501,6 +541,23 @@ function renderHTML(): string {
       if (!text) return;
       input.value = '';
 
+      // 1. 前端层执行
+      const pre = frontendPreflight(text);
+      if (pre.handled) {
+        if (pre.action === 'clear') {
+          await fetch(\`/api/messages/clear?sessionId=\${currentSessionId}\`, { method: 'POST' });
+          loadMessages();
+          return;
+        }
+        if (pre.response) {
+          localMessages.push({ id: 'user-' + Date.now(), role: 'user', content: text, timestamp: Date.now() });
+          localMessages.push({ id: 'asst-' + Date.now(), role: 'assistant', content: pre.response, timestamp: Date.now(), status: 'done', handlerLevel: 'frontend' });
+          renderMessages();
+          return;
+        }
+      }
+
+      // 2. 进入后台流转
       const userMsgId = 'user-' + Date.now();
       const asstMsgId = 'asst-' + Date.now();
 
@@ -569,7 +626,7 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 会话管理
+  // 会话列表
   if (req.method === 'GET' && p === '/api/sessions') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(Array.from(sessions.values())))
@@ -587,7 +644,7 @@ const server = http.createServer((req, res) => {
         {
           id: `init-${id}`,
           role: 'system',
-          content: '新旨意会话已开启，遵循三省六部流转规约。',
+          content: '新会话已开启，三层协同流水线待命。',
           timestamp: Date.now(),
         },
       ],
@@ -598,7 +655,6 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 消息获取
   if (req.method === 'GET' && p === '/api/messages') {
     const sessionId = url.searchParams.get('sessionId') || DEFAULT_SESSION_ID
     const session = sessions.get(sessionId) || sessions.get(DEFAULT_SESSION_ID)
@@ -607,7 +663,25 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 接收输入并全自动驱动 EdictPipeline 流水线
+  if (req.method === 'POST' && p === '/api/messages/clear') {
+    const sessionId = url.searchParams.get('sessionId') || DEFAULT_SESSION_ID
+    const session = sessions.get(sessionId)
+    if (session) {
+      session.messages = [
+        {
+          id: `init-${Date.now()}`,
+          role: 'system',
+          content: '会话已清空。',
+          timestamp: Date.now(),
+        },
+      ]
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true }))
+    return
+  }
+
+  // 消息接收与三层分工派发
   if (req.method === 'POST' && p === '/api/messages') {
     let body = ''
     req.on('data', chunk => (body += chunk))
@@ -616,17 +690,21 @@ const server = http.createServer((req, res) => {
         const parsed = JSON.parse(body)
         const session = sessions.get(parsed.sessionId) || sessions.get(DEFAULT_SESSION_ID)!
         const asstMsgId = parsed.asstMsgId || `asst-${Date.now()}`
+        const text = (parsed.content || '').trim()
 
         session.messages.push({
           id: `user-${Date.now()}`,
           role: 'user',
-          content: parsed.content,
+          content: text,
           timestamp: Date.now(),
         })
 
         if (session.messages.length <= 3) {
-          session.title = parsed.content.slice(0, 16)
+          session.title = text.slice(0, 16)
         }
+
+        const isCodingOrToolTask = /(写代码|修改|运行|bash|git|文件|修复|编译|重构|部署|测试|执行)/i.test(text)
+        const handlerLevel = isCodingOrToolTask ? 'ccb' : 'gateway'
 
         const assistantMsg: Message = {
           id: asstMsgId,
@@ -635,63 +713,87 @@ const server = http.createServer((req, res) => {
           timestamp: Date.now(),
           status: 'streaming',
           edictState: 'Taizi',
+          handlerLevel,
         }
         session.messages.push(assistantMsg)
 
-        // 异步后台立即执行流水线流转
+        // 异步分流执行
         ;(async () => {
           broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Chengxiang' })
-          await new Promise(r => setTimeout(r, 200))
+          await new Promise(r => setTimeout(r, 150))
           broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Zhongshu' })
-          await new Promise(r => setTimeout(r, 200))
+          await new Promise(r => setTimeout(r, 150))
           broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Menxia' })
-          await new Promise(r => setTimeout(r, 200))
+          await new Promise(r => setTimeout(r, 150))
           broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Assigned' })
-          await new Promise(r => setTimeout(r, 200))
+          await new Promise(r => setTimeout(r, 150))
           broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'Doing' })
 
-          // 核心执行：CCB CLI 进程调用（显式把 stdin 设为 ignore 或重定向，消除 3s 管道超时警告）
-          const ccb = spawn('/home/melody/.local/bin/ccb', ['-p', parsed.content], {
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: {
-              ...process.env,
-              HOME: '/home/melody',
-              PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-              TERM: 'dumb',
-            },
-          })
-
-          let fullOutput = ''
-          ccb.stdout.on('data', (d: any) => {
-            const chunk = d.toString()
-            fullOutput += chunk
-            assistantMsg.content = fullOutput
-            broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk })
-          })
-
-          ccb.stderr.on('data', (d: any) => {
-            const errChunk = d.toString()
-            if (!fullOutput) {
-              broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: errChunk })
-            }
-          })
-
-          ccb.on('close', async (code) => {
-            broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
-            await new Promise(r => setTimeout(r, 300))
-
-            assistantMsg.edictState = 'Done'
-            assistantMsg.status = code === 0 ? 'done' : 'error'
-            if (!assistantMsg.content) {
-              assistantMsg.content = `(执行结束，代码: ${code})`
-            }
-
-            broadcastSSE(session.id, 'message_done', {
-              messageId: asstMsgId,
-              content: assistantMsg.content,
-              edictState: 'Done',
+          // ══ 2. CCB 负责工程代码、工具调用与复杂系统任务 ══
+          if (isCodingOrToolTask) {
+            const ccb = spawn('/home/melody/.local/bin/ccb', ['-p', text], {
+              stdio: ['ignore', 'pipe', 'pipe'],
+              env: {
+                ...process.env,
+                HOME: '/home/melody',
+                PATH: '/home/melody/.cargo/bin:/home/melody/.local/bin:/home/melody/.bun/bin:/home/melody/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                TERM: 'dumb',
+              },
             })
-          })
+
+            let fullOutput = ''
+            ccb.stdout.on('data', (d: any) => {
+              const chunk = d.toString()
+              fullOutput += chunk
+              assistantMsg.content = fullOutput
+              broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk })
+            })
+
+            ccb.stderr.on('data', (d: any) => {
+              const errChunk = d.toString()
+              if (!fullOutput) {
+                broadcastSSE(session.id, 'message_chunk', { messageId: asstMsgId, chunk: errChunk })
+              }
+            })
+
+            ccb.on('close', async (code) => {
+              broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
+              await new Promise(r => setTimeout(r, 200))
+              assistantMsg.edictState = 'Done'
+              assistantMsg.status = code === 0 ? 'done' : 'error'
+              if (!assistantMsg.content) assistantMsg.content = `(执行结束，代码: ${code})`
+              broadcastSSE(session.id, 'message_done', {
+                messageId: asstMsgId,
+                content: assistantMsg.content,
+                edictState: 'Done',
+              })
+            })
+          } 
+          // ══ 3. 纯文本生成与问答分流给 agentbox-gateway (18800) ══
+          else {
+            try {
+              const reply = await callGateway(text)
+              assistantMsg.content = reply
+              broadcastSSE(session.id, 'stage_change', { messageId: asstMsgId, state: 'FinalReview' })
+              await new Promise(r => setTimeout(r, 200))
+              assistantMsg.edictState = 'Done'
+              assistantMsg.status = 'done'
+              broadcastSSE(session.id, 'message_done', {
+                messageId: asstMsgId,
+                content: assistantMsg.content,
+                edictState: 'Done',
+              })
+            } catch (err: any) {
+              assistantMsg.content = `[AgentBox 异常]: ${err.message}`
+              assistantMsg.status = 'error'
+              assistantMsg.edictState = 'Blocked'
+              broadcastSSE(session.id, 'message_done', {
+                messageId: asstMsgId,
+                content: assistantMsg.content,
+                edictState: 'Blocked',
+              })
+            }
+          }
         })()
 
         res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -709,5 +811,5 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`Edict Pipeline UI running at http://${HOST}:${PORT}`)
+  console.log(`Three-tier Edict Pipeline UI running at http://${HOST}:${PORT}`)
 })

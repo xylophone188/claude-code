@@ -74,8 +74,7 @@ export async function readRuntimeSignals(
     ['get', `hot:${provider}:${model}`],
   ]
   const results = await redisPipelineResults(ops)
-  const latency =
-    toNumber(results[1]) ?? toNumber(results[0])
+  const latency = toNumber(results[1]) ?? toNumber(results[0])
   const health = toNumber(results[2]) ?? toNumber(results[3])
   const quota = toNumber(results[4]) ?? toNumber(results[5])
   const coolUntil = toNumber(results[6])
@@ -237,9 +236,7 @@ export async function recordRequestStart(
   return (await redisIncr(`rl:${provider}`, windowSeconds)) ?? 0
 }
 
-export async function isProviderInCooldown(
-  provider: string,
-): Promise<boolean> {
+export async function isProviderInCooldown(provider: string): Promise<boolean> {
   const coolUntil = await redisGet(`cool:${provider}`)
   if (coolUntil == null) return false
   const until = Number(coolUntil)

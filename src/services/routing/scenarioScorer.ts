@@ -197,9 +197,17 @@ export function detectScenario(opts: {
 
   let id: ScenarioId = 'fallback'
   if (opts.hasBugs) id = 'bug_review'
-  else if (opts.hasTestFiles || /\b(test|spec|vitest|jest|pytest|unittest)\b/i.test(prompt))
+  else if (
+    opts.hasTestFiles ||
+    /\b(test|spec|vitest|jest|pytest|unittest)\b/i.test(prompt)
+  )
     id = 'unit_test'
-  else if (opts.hasFileEdits || /\b(edit|fix|patch|refactor|implement|add|create|write|change|update|modify|build|coding)\b/i.test(prompt))
+  else if (
+    opts.hasFileEdits ||
+    /\b(edit|fix|patch|refactor|implement|add|create|write|change|update|modify|build|coding)\b/i.test(
+      prompt,
+    )
+  )
     id = 'code_edit'
   else if (/^generate\b|^write\b|generate a|write a|create a/i.test(prompt))
     id = 'code_generate'
@@ -228,7 +236,10 @@ export async function scoreAndPick(
     loadProvidersFromPG(),
   ])
   const providerStatic = new Map<string, number>(
-    providers.map(p => [p.id, (p.compatRule ?? '') === 'permissive' ? 0.5 : 0.6]),
+    providers.map(p => [
+      p.id,
+      (p.compatRule ?? '') === 'permissive' ? 0.5 : 0.6,
+    ]),
   )
   const weights = WEIGHT_TABLE[scenario.id] ?? WEIGHT_TABLE.fallback
   const batch = await readRuntimeSignalsBatch(
@@ -290,7 +301,9 @@ function computeFactor(
   const capabilityFit = capability
     ? clamp01(
         0.35 +
-          (scenario.wantsReasoning && capability.supportsReasoning ? 0.2 : -0.15) +
+          (scenario.wantsReasoning && capability.supportsReasoning
+            ? 0.2
+            : -0.15) +
           (scenario.wantsTools && capability.supportsTools ? 0.2 : -0.1) +
           (scenario.wantsVision && capability.supportsVision ? 0.15 : 0) +
           (capability.tier >= 3 ? 0.1 : 0),
@@ -299,9 +312,7 @@ function computeFactor(
 
   const ctx = capability?.realContext ?? 0
   const contextFit =
-    ctx > 0
-      ? clamp01(Math.min(1, Math.log2(Math.max(1, ctx / 4000)) / 5))
-      : 0.4
+    ctx > 0 ? clamp01(Math.min(1, Math.log2(Math.max(1, ctx / 4000)) / 5)) : 0.4
 
   const latency = signals.latencyMs ?? 0
   const latencyInv = clamp01(1 - latency / 8000)
@@ -317,11 +328,7 @@ function computeFactor(
       .reduce((acc, r) => acc + r.weight * 0.05, 0),
   )
 
-  const scenarioBias = computeScenarioBias(
-    candidate,
-    scenario,
-    capability,
-  )
+  const scenarioBias = computeScenarioBias(candidate, scenario, capability)
 
   const errorPenalty = signals.inCooldown ? 0.5 : 0
 
@@ -344,29 +351,66 @@ function computeScenarioBias(
   scenario: ScenarioContext,
   capability: ModelCapabilityView | null,
 ): number {
-  const model = candidate.modelId.toLowerCase()
+  const full = `${candidate.providerId}/${candidate.modelId}`.toLowerCase()
+  const tokenBudget = scenario.tokenBudget || 0
+
+  // 杀鸡不用牛刀，杀牛不用鸡刀：多因素感知上下文预算与推理需求
+  const isSmallTask = tokenBudget <= 8000 && !scenario.wantsReasoning
+  const isHeavyTask = tokenBudget >= 32000 || scenario.wantsReasoning
+
   switch (scenario.id) {
     case 'code_edit':
     case 'code_generate': {
       let bias = 0
-      if (/(claude|gpt-5|gpt-6|o3|o4)/.test(model)) bias += 0.15
-      else if (/(glm|deepseek|qwen|sensenova)/.test(model)) bias += 0.08
+      if (isHeavyTask) {
+        // 重大任务 / 复杂代码生成：优先保证智力上限
+        if (/(luna-pro|deepseek-v4-pro|ultra-550b|opus)/.test(full))
+          bias += 0.25
+        else if (/(luna|terra|claude|glm-5)/.test(full)) bias += 0.15
+        else if (/(flash-lite|space-bunny)/.test(full)) bias -= 0.1
+      } else if (isSmallTask) {
+        // 小任务 / 机械代码操作：优先走零成本高吞吐池
+        if (/(lightning|super-120b|space-bunny|flash-lite|laguna)/.test(full))
+          bias += 0.25
+        else if (/(luna-pro|ultra-550b)/.test(full)) bias -= 0.15
+      } else {
+        if (/(nemotron|glm|deepseek|qwen|sensenova|space-bunny)/.test(full))
+          bias += 0.15
+      }
       return clamp01(bias)
     }
-    case 'unit_test':
-      return clamp01(/(flash|lite|fast|groq|cerebras)/.test(model) ? 0.12 : 0)
+    case 'unit_test': {
+      let bias = 0
+      if (/(flash|lite|fast|groq|cerebras|lightning|laguna)/.test(full))
+        bias += 0.2
+      if (isSmallTask && /(space-bunny|flash-lite)/.test(full)) bias += 0.15
+      return clamp01(bias)
+    }
     case 'long_context': {
       let bias = 0
-      if ((capability?.realContext ?? 0) >= 128_000) bias += 0.15
-      if (/(1m|128k|claude|gemini)/.test(model)) bias += 0.1
+      if ((capability?.realContext ?? 0) >= 128_000) bias += 0.2
+      if (/(1m|128k|luna|terra|sensenova|deepseek)/.test(full)) bias += 0.15
       return clamp01(bias)
     }
-    case 'chat':
-      return clamp01(/(flash|lite|fast|groq)/.test(model) ? 0.12 : 0)
+    case 'chat': {
+      let bias = 0
+      // chat-pool: P0 SenseNova 6.8 Flash / GLM-4.7 / Qwen / Codex Terra
+      if (
+        /(sensenova-6\.8-flash|glm-4\.7|deepseek-v4-flash|gpt-5\.6-terra|qwen)/.test(
+          full,
+        )
+      )
+        bias += 0.25
+      else if (/(lightning|super|space-bunny)/.test(full)) bias += 0.12
+      else if (/(luna-pro|ultra-550b)/.test(full)) bias -= 0.1
+      return clamp01(bias)
+    }
     case 'bug_review': {
       let bias = 0
-      if (/(gpt-5|gpt-6|claude|opus)/.test(model)) bias += 0.15
-      if (/(review|opus|hy3)/.test(model)) bias += 0.08
+      // review/advisor: P0 Codex Luna-Pro, DeepSeek-Pro, Nemotron Ultra 550b
+      if (/(luna-pro|deepseek-v4-pro|ultra-550b|opus)/.test(full)) bias += 0.3
+      else if (/(luna|terra|glm-5\.2|glm-5\.3)/.test(full)) bias += 0.15
+      else if (/(flash-lite|space-bunny|lightning)/.test(full)) bias -= 0.15
       return clamp01(bias)
     }
     default:
@@ -400,9 +444,12 @@ function summarizeReason(
     `health=${pick.factors.health.toFixed(2)}`,
     `ctx=${cap?.realContext ?? 0}`,
   ]
-  if (pick.factors.ruleBoost > 0) parts.push(`ruleBoost=${pick.factors.ruleBoost.toFixed(2)}`)
-  if (pick.factors.scenarioBias > 0) parts.push(`bias=${pick.factors.scenarioBias.toFixed(2)}`)
-  if (weights.errorPenalty > 0) parts.push(`errPen=${pick.factors.errorPenalty.toFixed(2)}`)
+  if (pick.factors.ruleBoost > 0)
+    parts.push(`ruleBoost=${pick.factors.ruleBoost.toFixed(2)}`)
+  if (pick.factors.scenarioBias > 0)
+    parts.push(`bias=${pick.factors.scenarioBias.toFixed(2)}`)
+  if (weights.errorPenalty > 0)
+    parts.push(`errPen=${pick.factors.errorPenalty.toFixed(2)}`)
   return `${pick.candidate.providerId}/${pick.candidate.modelId} (${parts.join(',')})`
 }
 
@@ -428,7 +475,12 @@ export function candidatesFromProviders(
     defaultModel?: string
     models?: string[]
     compatRule?: string
-    accounts?: Array<{ id?: string; apiKey?: string; model?: string; enabled?: boolean }>
+    accounts?: Array<{
+      id?: string
+      apiKey?: string
+      model?: string
+      enabled?: boolean
+    }>
     timeoutMs?: number
     headers?: Record<string, string>
     noAuth?: boolean

@@ -124,7 +124,7 @@ function canonicalize(value: unknown): string {
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>
     const keys = Object.keys(obj).sort()
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(obj[k])}`).join(',')}}`
+    return `{${keys.map(k => `${JSON.stringify(k)}:${canonicalize(obj[k])}`).join(',')}}`
   }
   return JSON.stringify(value)
 }
@@ -153,8 +153,14 @@ export function buildShadowReceipt(
     scenario,
     scenarioOrigin: 'metadata-only' as const,
     profileVersion: SHADOW_RECEIPT_PROFILE_VERSION,
-    factors: input.factors ?? { kind: 'unavailable' as const, reason: 'legacy' as const },
-    candidates: input.candidates ?? { kind: 'unavailable' as const, reason: 'legacy' as const },
+    factors: input.factors ?? {
+      kind: 'unavailable' as const,
+      reason: 'legacy' as const,
+    },
+    candidates: input.candidates ?? {
+      kind: 'unavailable' as const,
+      reason: 'legacy' as const,
+    },
     legacySelectedRoute: {
       provider: input.provider,
       model: input.model,
@@ -179,12 +185,12 @@ export function makeShadowReceipt(
 export function formatShadowReceipt(receipt: ShadowReceipt): string {
   const factors =
     receipt.factors.kind === 'versions'
-      ? receipt.factors.factors.map((f) => `${f.id}@${f.version}`).join(',')
+      ? receipt.factors.factors.map(f => `${f.id}@${f.version}`).join(',')
       : `${receipt.factors.reason}`
   const candidates =
     receipt.candidates.kind === 'ranking'
       ? receipt.candidates.candidates
-          .map((c) => {
+          .map(c => {
             const score = c.score === undefined ? '' : `:${c.score}`
             const src = c.source === undefined ? '' : `@${c.source}`
             return `#${c.rank}${c.model}${score}${src}`

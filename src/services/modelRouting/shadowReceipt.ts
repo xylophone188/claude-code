@@ -82,9 +82,7 @@ const PROFILES: Record<KnownScenario, ScenarioProfile> = {
   qa: makeProfile(),
 }
 
-export function getScenarioProfile(
-  scenario: Scenario,
-): ScenarioProfile | null {
+export function getScenarioProfile(scenario: Scenario): ScenarioProfile | null {
   if (scenario === 'unknown') return null
   return PROFILES[scenario] ?? null
 }
@@ -138,12 +136,9 @@ export function buildSelectionReceipt(
     scenarioOrigin: origin,
     profileVersion: profile?.version ?? SCENARIO_PROFILES_VERSION,
     scenarioCatalogVersion: SCENARIO_CATALOG_VERSION,
-    factorVersion:
-      profile?.factorVersion.factors ?? 'unavailable',
-    factorSnapshot:
-      input.factorSnapshot ?? 'unavailable',
-    candidateSummary:
-      input.candidateSummary ?? 'legacy-unavailable',
+    factorVersion: profile?.factorVersion.factors ?? 'unavailable',
+    factorSnapshot: input.factorSnapshot ?? 'unavailable',
+    candidateSummary: input.candidateSummary ?? 'legacy-unavailable',
     legacySelectedRoute:
       input.legacySelectedRoute?.routeId ??
       input.selectedRouteId ??

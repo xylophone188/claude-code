@@ -3,6 +3,7 @@ import { loadProviders } from '../providerRegistry/loader.js'
 import {
   currentFreeOpenCodeModels,
   DEFAULT_AUTO_CANDIDATES,
+  filterOpenCodeCandidates,
   getAutoCandidateTiers,
 } from './autoScoring.js'
 
@@ -22,10 +23,13 @@ const RACE_CAPS = {
 
 /** Allowed NVIDIA models for direct tool-call races. */
 const ALLOWED_NVIDIA_MODELS = new Set([
-  'deepseek-ai/deepseek-v4-pro-0813',
-  'moonshotai/kimi-k3',
+  'nemotron-3.5-lightning-30b-a3b',
+  'nvidia/nemotron-3.5-lightning-30b-a3b',
+  'nemotron-3-super-120b-a12b',
+  'nvidia/nemotron-3-super-120b-a12b',
+  'nemotron-3-ultra-550b-a55b',
   'nvidia/nemotron-3-ultra-550b-a55b',
-  'deepseek-ai/deepseek-v4-flash-0731',
+  'moonshotai/kimi-k3',
 ])
 
 /** Free models are read through autoScoring's validated 8-hour cache owner. */
@@ -54,7 +58,10 @@ function addSpec(
 
 /** Strip up to one leading "nvidia/" provider prefix and canonicalize. */
 function canonicalNvidiaModel(model: string): string {
-  return model.trim().replace(/^nvidia\//i, '')
+  const trimmed = model.trim()
+  return trimmed.toLowerCase().startsWith('nvidia/')
+    ? trimmed
+    : 'nvidia/' + trimmed
 }
 
 /** Bounded L1 selection: up to 4 OpenCode free models and up to 4 NVIDIA
@@ -72,7 +79,9 @@ export function selectRaceSpecs(
     opencode: 0,
     nvidia: 0,
   }
-  for (const candidate of l1) {
+  // Retired models are never eligible to race, whatever the candidate source.
+  const eligibleL1 = filterOpenCodeCandidates(l1)
+  for (const candidate of eligibleL1) {
     if (isOpencodeSpec(candidate)) {
       addSpec(
         specs,
@@ -83,10 +92,10 @@ export function selectRaceSpecs(
       )
     }
   }
-  for (const model of freshOpenCodeModels)
+  for (const model of filterOpenCodeCandidates(freshOpenCodeModels))
     addSpec(specs, seen, counts, 'opencode', model)
-  const nvidiaCandidates = [...l1, ...nvidiaExtraCandidates].filter(candidate =>
-    candidate.toLowerCase().startsWith('nvidia/'),
+  const nvidiaCandidates = [...eligibleL1, ...nvidiaExtraCandidates].filter(
+    candidate => candidate.toLowerCase().startsWith('nvidia/'),
   )
   let nvidiaMatched = false
   for (const candidate of nvidiaCandidates) {

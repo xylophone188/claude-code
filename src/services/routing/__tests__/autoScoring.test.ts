@@ -54,7 +54,7 @@ describe('getAutoCandidates', () => {
     const pool = getAutoCandidates()
     expect(pool.length).toBeGreaterThan(0)
     expect(pool).toContain('nvidia/*')
-      })
+  })
 
   it('supports explicit environment candidate override', () => {
     process.env.CCB_AUTO_CANDIDATES = 'opencode/gemini-3.8-flash'

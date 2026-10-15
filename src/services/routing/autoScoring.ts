@@ -90,8 +90,21 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
  * 零硬编码动态服务发现池 (Zero-Hardcoding Dynamic Auto-Discovery Pool)
  * 拒绝硬编码任何具体模型字符串，100% 依赖上游动态端点与服务发现展开活模型！
  */
-export const DEFAULT_AUTO_CANDIDATES = ['opencode/*', 'nvidia/*']
-const DEFAULT_AUTO_L2_CANDIDATES = ['sensenova/*']
+export const DEFAULT_AUTO_CANDIDATES = [
+  'sensenova/*',
+  'nvidia/*',
+  'opencode/*',
+  'glm-cn/*',
+  'groq/*',
+  'codex-bridge/*',
+  'cx/*',
+]
+const DEFAULT_AUTO_L2_CANDIDATES = [
+  'sensenova/*',
+  'nvidia/*',
+  'codex-bridge/*',
+  'cx/*',
+]
 const DEFAULT_AUTO_L3_CANDIDATES: string[] = []
 const DEFAULT_AUTO_L4_CANDIDATES: string[] = []
 const DEFAULT_AUTO_L5_CANDIDATES: string[] = []
@@ -119,7 +132,19 @@ const OPENCODE_MODELS_CACHE_FILE =
 const OPENCODE_MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const OPENCODE_MODELS_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
-const FALLBACK_OPENCODE_MODEL = 'deepseek-v4-flash-free'
+
+/**
+ * Models that are no longer free on OpenCode Zen and must never be raced or
+ * fallback-routed. deepseek-v4-flash-free lost its free tier in 2026; keep
+ * adding retired ids here so a stale cache can never resurrect them.
+ */
+const RETIRED_OPENCODE_MODELS = new Set(['deepseek-v4-flash-free'])
+
+/** Filter a cache list down to genuinely-free models. Central guard so every
+ *  candidate path (active_pool, L1 race, fallback) shares one retirement list. */
+export function filterRetiredOpenCodeModels(models: string[]): string[] {
+  return models.filter(model => !RETIRED_OPENCODE_MODELS.has(model))
+}
 
 type AutoCandidateTiers = {
   l1: string[]
@@ -155,8 +180,6 @@ function candidateList(value: unknown): string[] {
 /** Read the candidate pool from ccb's own config file. Returns null when the
  *  file is absent, malformed, or empty so the built-in default still applies. */
 function readAutoCandidatesFile(): AutoCandidateTiers | null {
-  // 彻底废弃外部历史静态文件，杜绝过时的 candidates (file) 覆盖多级容灾梯队
-  return null
   try {
     if (!existsSync(AUTO_CANDIDATES_FILE)) return null
     const parsed = JSON.parse(
@@ -205,19 +228,22 @@ function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
 }
 
 function cachedOpenCodeModels(): string[] {
-  return readOpenCodeModelsCache()?.models ?? [FALLBACK_OPENCODE_MODEL]
+  // Never fall back to a hardcoded model: an empty cache means OpenCode simply
+  // contributes no candidate, instead of silently reviving a retired id.
+  return filterRetiredOpenCodeModels(readOpenCodeModelsCache()?.models ?? [])
 }
 
 /** Free OpenCode models currently available for racing. Returns an empty array
  *  when the cache is missing or stale, so directRacePool skips OpenCode instead
- *  of racing a hardcoded model the cache no longer vouches for. */
+ *  of racing a hardcoded model the cache no longer vouches for. Retired models
+ *  are dropped even when the cache still lists them. */
 export function currentFreeOpenCodeModels(): string[] {
   const cache = readOpenCodeModelsCache()
   if (!cache) return []
   const updatedAt = Date.parse(cache.updatedAt)
   if (!Number.isFinite(updatedAt)) return []
   if (Date.now() - updatedAt >= OPENCODE_MODELS_CACHE_TTL_MS) return []
-  return cache.models
+  return filterRetiredOpenCodeModels(cache.models)
 }
 
 export function invalidateOpenCodeModelsCache(): void {
@@ -239,11 +265,29 @@ function hasOpenCodeWildcard(): boolean {
 }
 
 function expandOpenCodeModels(candidates: string[]): string[] {
-  return candidates.flatMap(candidate =>
+  const expanded = candidates.flatMap(candidate =>
     candidate === 'opencode/*'
       ? cachedOpenCodeModels().map(model => `opencode/${model}`)
       : candidate,
   )
+  return filterOpenCodeCandidates(expanded)
+}
+
+/** Drop retired OpenCode models wherever they come from — wildcard expansion,
+ *  env-var CCB_AUTO_CANDIDATES, or an explicit `opencode/<model>` entry. This
+ *  is the final gate on the active_pool. */
+export function filterOpenCodeCandidates(candidates: string[]): string[] {
+  return candidates.filter(candidate => {
+    const lower = candidate.toLowerCase().trim()
+    if (lower.startsWith('opencode/')) {
+      return !RETIRED_OPENCODE_MODELS.has(
+        lower.slice('opencode/'.length).trim(),
+      )
+    }
+    // Bare names may belong to other providers, but a bare retired id must not
+    // survive either.
+    return !RETIRED_OPENCODE_MODELS.has(lower)
+  })
 }
 
 async function refreshOpenCodeModels(): Promise<void> {
@@ -307,12 +351,14 @@ export function getAutoCandidates(): string[] {
   const candidates = raw
     ? candidateList(raw.split(','))
     : [...DEFAULT_AUTO_CANDIDATES]
-  const resolved = expandOpenCodeModels(
-    candidates.length ? candidates : [...DEFAULT_AUTO_CANDIDATES],
+  const resolved = filterOpenCodeCandidates(
+    expandOpenCodeModels(
+      candidates.length ? candidates : [...DEFAULT_AUTO_CANDIDATES],
+    ),
   )
 
   if (!autoCandidatesLogged) {
-    routeLog('candidates', 'active_pool', resolved.join(','))
+    // routeLog('candidates', 'active_pool', resolved.join(','))
     autoCandidatesLogged = true
   }
   return resolved

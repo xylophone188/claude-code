@@ -39,6 +39,9 @@ describe('createAdapter', () => {
 
     process.env.WEB_SEARCH_ADAPTER = 'tavily'
     expect(createAdapter().constructor.name).toBe('TavilySearchAdapter')
+
+    process.env.WEB_SEARCH_ADAPTER = 'omniroute'
+    expect(createAdapter().constructor.name).toBe('OmnirouteSearchAdapter')
   })
 
   test('reuses the same instance when the selected backend does not change', () => {
@@ -72,6 +75,7 @@ describe('createAdapter', () => {
       'BraveSearchAdapter',
       'ExaSearchAdapter',
       'TavilySearchAdapter',
+      'OmnirouteSearchAdapter',
     ]
     expect(validTypes).toContain(adapter.constructor.name)
   })

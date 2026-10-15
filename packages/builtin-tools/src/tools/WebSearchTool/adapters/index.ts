@@ -12,6 +12,7 @@ import { ApiSearchAdapter } from './apiAdapter.js'
 import { BingSearchAdapter } from './bingAdapter.js'
 import { BraveSearchAdapter } from './braveAdapter.js'
 import { ExaSearchAdapter } from './exaAdapter.js'
+import { OmnirouteSearchAdapter } from './omnirouteAdapter.js'
 import { TavilySearchAdapter } from './tavilyAdapter.js'
 import type { WebSearchAdapter } from './types.js'
 
@@ -22,7 +23,13 @@ export type {
   WebSearchAdapter,
 } from './types.js'
 
-export type SearchAdapterKey = 'api' | 'bing' | 'brave' | 'exa' | 'tavily'
+export type SearchAdapterKey =
+  | 'api'
+  | 'bing'
+  | 'brave'
+  | 'exa'
+  | 'tavily'
+  | 'omniroute'
 
 let cachedAdapter: WebSearchAdapter | null = null
 let cachedAdapterKey: SearchAdapterKey | null = null
@@ -38,13 +45,15 @@ export function createAdapter(): WebSearchAdapter {
     envAdapter === 'bing' ||
     envAdapter === 'brave' ||
     envAdapter === 'exa' ||
-    envAdapter === 'tavily'
+    envAdapter === 'tavily' ||
+    envAdapter === 'omniroute'
       ? envAdapter
       : settingsAdapter === 'api' ||
           settingsAdapter === 'bing' ||
           settingsAdapter === 'brave' ||
           settingsAdapter === 'exa' ||
-          settingsAdapter === 'tavily'
+          settingsAdapter === 'tavily' ||
+          settingsAdapter === 'omniroute'
         ? settingsAdapter
         : 'tavily' // 3. Default
 
@@ -62,6 +71,9 @@ export function createAdapter(): WebSearchAdapter {
       break
     case 'exa':
       cachedAdapter = new ExaSearchAdapter()
+      break
+    case 'omniroute':
+      cachedAdapter = new OmnirouteSearchAdapter()
       break
     case 'tavily':
     default:

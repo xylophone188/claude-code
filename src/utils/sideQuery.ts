@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages.js'
+import { randomUUID } from 'crypto'
 import {
   getLastApiCompletionTimestamp,
   getSessionId,
@@ -764,11 +765,23 @@ async function sideQueryViaOpenAICompatible(
             yield {
               type: 'response.completed',
               response: {
+                id: `resp_${randomUUID().replace(/-/g, '').slice(0, 22)}`,
+                object: 'response',
+                created_at: Math.floor(Date.now() / 1000),
+                model: openaiModel,
                 status: 'completed',
+                output_text: '',
+                output: [],
                 usage: {
                   input_tokens: fallback.usage.input_tokens,
                   output_tokens: fallback.usage.output_tokens,
+                  input_tokens_details: { cached_tokens: 0 },
                 },
+                error: null,
+                incomplete_details: null,
+                instructions: null,
+                metadata: null,
+                parallel_tool_calls: true,
               },
             }
           }

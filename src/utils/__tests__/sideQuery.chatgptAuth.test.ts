@@ -335,7 +335,7 @@ describe('sideQuery OpenAI ChatGPT OAuth path', () => {
 
   test('routes virtual advisor through Codex Responses, not its placeholder route', async () => {
     process.env.OPENAI_AUTH_MODE = 'chatgpt'
-    process.env.CCB_AUTO_CANDIDATES = 'opencode/deepseek-v4-flash-free'
+    process.env.CCB_AUTO_CANDIDATES = 'nvidia/*'
     const { sideQuery } = await import('../sideQuery.js')
 
     const result = await sideQuery({

@@ -4,45 +4,104 @@
   ],
   "output": [
     {
-      "uuid": "UUID-0",
-      "requestId": "REQUEST_ID",
-      "timestamp": "2026-08-05T14:00:58.520Z",
-      "message": {
-        "id": "b33b05aa-bf13-4668-8fff-51c43b02ba29",
-        "container": null,
-        "model": "<synthetic>",
-        "role": "assistant",
-        "stop_reason": "stop_sequence",
-        "stop_sequence": "",
-        "type": "message",
+      "type": "stream_event",
+      "event": {
+        "type": "message_start",
+        "message": {
+          "id": "msg_180080c0b58848ddafef94fa",
+          "type": "message",
+          "role": "assistant",
+          "content": [],
+          "model": "agy/claude-haiku-4-5-20251001",
+          "stop_reason": null,
+          "stop_sequence": null,
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        }
+      },
+      "ttftMs": 2
+    },
+    {
+      "type": "stream_event",
+      "event": {
+        "type": "content_block_start",
+        "index": 0,
+        "content_block": {
+          "type": "text",
+          "text": ""
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "event": {
+        "type": "content_block_delta",
+        "index": 0,
+        "delta": {
+          "type": "text_delta",
+          "text": "auto fallback"
+        }
+      }
+    },
+    {
+      "type": "stream_event",
+      "event": {
+        "type": "content_block_stop",
+        "index": 0
+      }
+    },
+    {
+      "type": "stream_event",
+      "event": {
+        "type": "message_delta",
+        "delta": {
+          "stop_reason": "end_turn",
+          "stop_sequence": null
+        },
         "usage": {
           "input_tokens": 0,
           "output_tokens": 0,
           "cache_creation_input_tokens": 0,
-          "cache_read_input_tokens": 0,
-          "server_tool_use": {
-            "web_search_requests": 0,
-            "web_fetch_requests": 0
-          },
-          "service_tier": null,
-          "cache_creation": {
-            "ephemeral_1h_input_tokens": 0,
-            "ephemeral_5m_input_tokens": 0
-          },
-          "inference_geo": null,
-          "iterations": null,
-          "speed": null
-        },
+          "cache_read_input_tokens": 0
+        }
+      }
+    },
+    {
+      "uuid": "UUID-5",
+      "requestId": "REQUEST_ID",
+      "timestamp": "2026-10-15T11:12:51.140Z",
+      "message": {
+        "id": "msg_180080c0b58848ddafef94fa",
+        "type": "message",
+        "role": "assistant",
         "content": [
           {
             "type": "text",
-            "text": "API Error: ChatGPT Responses API request failed (401): {\"detail\":\"Could not parse your authentication token. Please try signing in again.\"}",
+            "text": "auto fallback",
             "citations": []
           }
         ],
-        "context_management": null
+        "model": "agy/claude-haiku-4-5-20251001",
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0
+        }
       },
       "type": "assistant"
+    },
+    {
+      "type": "stream_event",
+      "event": {
+        "type": "message_stop"
+      }
     }
   ]
 }

@@ -80,7 +80,7 @@ describe('retired opencode models are excluded from the candidate pool', () => {
     writeFileSync(cacheFile, JSON.stringify(FRESH_WITH_RETIRED))
     const pool = getAutoCandidates()
     expect(pool.some(candidate => candidate.includes(RETIRED))).toBe(false)
-    expect(pool).toContain('opencode/space-bunny-free')
+    expect(pool).toContain('agentbox-gateway/auto')
   })
 
   test('drops it from a stale cache too', () => {

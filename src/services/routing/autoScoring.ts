@@ -120,9 +120,13 @@ const COLD_START_PROVIDER_ORDER = [
 const AUTO_CANDIDATES_FILE =
   process.env.CCB_AUTO_CANDIDATES_FILE ??
   join(homedir(), '.ccb-embed', 'auto-candidates.json')
-const OPENCODE_MODELS_CACHE_FILE =
-  process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
-  join(homedir(), '.ccb-embed', 'opencode-free-models.json')
+function getOpenCodeModelsCacheFile(): string {
+  return (
+    process.env.CCB_OPENCODE_MODELS_CACHE_FILE ??
+    join(homedir(), '.ccb-embed', 'opencode-free-models.json')
+  )
+}
+const OPENCODE_MODELS_CACHE_FILE = getOpenCodeModelsCacheFile()
 const OPENCODE_MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const OPENCODE_MODELS_URL =
   process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1'
@@ -208,7 +212,7 @@ function readAutoCandidatesFile(): AutoCandidateTiers | null {
 function readOpenCodeModelsCache(): OpenCodeModelsCache | undefined {
   try {
     const parsed = JSON.parse(
-      readFileSync(OPENCODE_MODELS_CACHE_FILE, 'utf8'),
+      readFileSync(getOpenCodeModelsCacheFile(), 'utf8'),
     ) as unknown
     if (!parsed || typeof parsed !== 'object') return undefined
     const record = parsed as Record<string, unknown>

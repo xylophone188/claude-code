@@ -9,7 +9,10 @@
  */
 
 import { ProviderBackendRegistry } from '../providerRegistry/registry.js'
-import { LegacyBackend, ResourcePlaneBackend } from '../providerRegistry/backend.js'
+import {
+  LegacyBackend,
+  ResourcePlaneBackend,
+} from '../providerRegistry/backend.js'
 import { logForDebugging } from '../../utils/debug.js'
 
 export async function bootstrapProviders(): Promise<void> {

@@ -82,7 +82,6 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true })
 })
 
-
 describe('detectAndroid', () => {
   test('returns true on android platform', () => {
     const real = process.platform
@@ -292,15 +291,20 @@ describe('runSuCmd (root command dispatch)', () => {
     'a$b c$HOME',
     'a"b"c',
     "a'b'c",
-    "a b 'c' d\"e\" f",
+    'a b \'c\' d"e" f',
     '100%',
   ]
 
-  test.each(HOSTILE)('%j: script is passed verbatim as su\'s argv', async name => {
+  test.each(
+    HOSTILE,
+  )("%j: script is passed verbatim as su's argv", async name => {
     const script = `pm install -r ${quoteShell(name)}`
     handler = (cmd, args) => {
       expect(cmd, 'dispatches su').toBe('su')
-      expect(args, 'script is argv[1], not a shell string').toEqual(['-c', script])
+      expect(args, 'script is argv[1], not a shell string').toEqual([
+        '-c',
+        script,
+      ])
       return { stdout: '', stderr: '', exitCode: 0 }
     }
     await runSuCmd(script, { timeout: 5_000 })
@@ -311,9 +315,11 @@ describe('runSuCmd (root command dispatch)', () => {
   const sh = (argv: string[], env: NodeJS.ProcessEnv = process.env) =>
     new Promise<{ out: string; err: string; code: number }>(resolve => {
       const p = Bun.spawn(argv, { env, stdout: 'pipe', stderr: 'pipe' })
-      Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]).then(
-        ([out, err, code]) => resolve({ out, err, code }),
-      )
+      Promise.all([
+        new Response(p.stdout).text(),
+        new Response(p.stderr).text(),
+        p.exited,
+      ]).then(([out, err, code]) => resolve({ out, err, code }))
     })
 
   test('shell-string nesting corrupts $HOME and backslash paths, argv dispatch does not', async () => {
@@ -324,7 +330,13 @@ describe('runSuCmd (root command dispatch)', () => {
     // Legacy path: script embedded in a shell string the outer shell parses,
     // so it expands $ and backslashes before su ever runs.
     const before = await sh(
-      ['/bin/bash', '--noprofile', '--norc', '-c', `${stub}; su -c ${JSON.stringify(script)}`],
+      [
+        '/bin/bash',
+        '--noprofile',
+        '--norc',
+        '-c',
+        `${stub}; su -c ${JSON.stringify(script)}`,
+      ],
       { HOME: home },
     )
 
@@ -336,7 +348,13 @@ describe('runSuCmd (root command dispatch)', () => {
     })
     const received = (await runSuCmd(script, { timeout: 5_000 })).stdout
     const after = await sh(
-      ['/bin/bash', '--noprofile', '--norc', '-c', `${stub}; printf %s "$SCRIPT"`],
+      [
+        '/bin/bash',
+        '--noprofile',
+        '--norc',
+        '-c',
+        `${stub}; printf %s "$SCRIPT"`,
+      ],
       { HOME: home, SCRIPT: received },
     )
 

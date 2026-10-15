@@ -308,7 +308,7 @@ export class InboxConsumer {
       }>(
         `SELECT event_id, source_node_id, event_type, payload, received_at, applied_at, apply_error
          FROM resource_plane.inbox_events
-         WHERE applied_at IS NULL
+         WHERE applied_at IS NULL AND apply_error IS NULL
          ORDER BY received_at ASC
          LIMIT $1`,
         [this.batchSize],
@@ -317,11 +317,15 @@ export class InboxConsumer {
       if (res.rows.length === 0) return
 
       for (const row of res.rows) {
-        const event: InboxEvent = {
+        const event: InboxEvent & { event_type?: string } = {
           eventId: row.event_id,
           sourceNodeId: row.source_node_id,
           eventType: row.event_type,
-          payload: row.payload as Record<string, unknown>,
+          event_type: row.event_type,
+          payload:
+            typeof row.payload === 'string'
+              ? JSON.parse(row.payload)
+              : (row.payload as Record<string, unknown>),
           receivedAt: row.received_at,
           appliedAt: row.applied_at,
           applyError: row.apply_error,

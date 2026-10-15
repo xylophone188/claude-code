@@ -101,6 +101,16 @@ describe('migration definitions', () => {
   })
 })
 
+interface MockPool {
+  statements: string[]
+  connect(): Promise<{
+    query(text: string, params?: unknown[]): Promise<{ rows: unknown[] }>
+    release(): Promise<void>
+  }>
+  query(): Promise<{ rows: unknown[] }>
+  end(): Promise<void>
+}
+
 function mockPool(appliedVersions: number[] = []) {
   const statements: string[] = []
   const client = {
@@ -120,7 +130,7 @@ function mockPool(appliedVersions: number[] = []) {
     },
     async release() {},
   }
-  const pool = {
+  return {
     statements,
     async connect() {
       return client
@@ -129,15 +139,18 @@ function mockPool(appliedVersions: number[] = []) {
       return { rows: [] }
     },
     async end() {},
-  }
-  return pool as unknown as Parameters<typeof runResourcePlaneMigrations>[0]
+    on: () => {},
+    totalCount: 0,
+    idleCount: 0,
+    waitingCount: 0,
+  } as any
 }
 
 describe('migration runner', () => {
   test('applies all migrations in one transaction when none are applied', async () => {
     const pool = mockPool()
     const result = await runResourcePlaneMigrations(pool)
-    expect(result.applied).toEqual([1, 2, 3, 4, 5])
+    expect(result.applied).toEqual([1, 2, 3, 4, 5, 6])
     expect(result.skipped).toEqual([])
     const ordered = pool.statements.join('\n').toLowerCase()
     const begin = ordered.indexOf('begin')
@@ -148,9 +161,9 @@ describe('migration runner', () => {
   })
 
   test('is idempotent: re-run skips already applied versions and stays a no-op', async () => {
-    const pool = mockPool([1, 2, 3, 4, 5])
+    const pool = mockPool([1, 2, 3, 4, 5, 6])
     const result = await runResourcePlaneMigrations(pool)
-    expect(result).toEqual({ applied: [], skipped: [1, 2, 3, 4, 5] })
+    expect(result).toEqual({ applied: [], skipped: [1, 2, 3, 4, 5, 6] })
     const joined = pool.statements.join('\n').toLowerCase().replace(/\s+/g, ' ')
     expect(joined).not.toContain(
       'create table resource_plane.provider_accounts',
@@ -162,7 +175,7 @@ describe('migration runner', () => {
   test('applies only the missing migrations in the middle of the sequence', async () => {
     const pool = mockPool([1])
     const result = await runResourcePlaneMigrations(pool)
-    expect(result).toEqual({ applied: [2, 3, 4, 5], skipped: [1] })
+    expect(result).toEqual({ applied: [2, 3, 4, 5, 6], skipped: [1] })
     const joined = pool.statements.join('\n').toLowerCase()
     expect(joined).toContain('not valid')
     expect(joined).not.toContain(

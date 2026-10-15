@@ -59,9 +59,9 @@ describe('Phase 3.3: LegacyBackend (CCB_RESOURCE_PLANE=0)', () => {
     await bootstrapProviders()
     expect(ProviderBackendRegistry.isInitialized()).toBe(true)
     expect(ProviderBackendRegistry.getBackend()).toBeInstanceOf(LegacyBackend)
-    expect(
-      ProviderBackendRegistry.getBackend(),
-    ).not.toBeInstanceOf(ResourcePlaneBackend)
+    expect(ProviderBackendRegistry.getBackend()).not.toBeInstanceOf(
+      ResourcePlaneBackend,
+    )
   })
 
   test('LegacyBackend.loadProvidersSync() returns built-in providers', async () => {
@@ -107,7 +107,9 @@ describe('Phase 3.3: ResourcePlaneBackend (CCB_RESOURCE_PLANE=1)', () => {
 
     await bootstrapProviders()
     expect(ProviderBackendRegistry.isInitialized()).toBe(true)
-    expect(ProviderBackendRegistry.getBackend()).toBeInstanceOf(ResourcePlaneBackend)
+    expect(ProviderBackendRegistry.getBackend()).toBeInstanceOf(
+      ResourcePlaneBackend,
+    )
   })
 
   test('ResourcePlaneBackend.loadProvidersSync() returns resourcePlane data', async () => {
@@ -134,7 +136,10 @@ describe('Phase 3.3: ResourcePlaneBackend (CCB_RESOURCE_PLANE=1)', () => {
     expect(typeof backend.resolveCredential).toBe('function')
 
     // Non-existent account → undefined, no throw
-    const result = await backend.resolveCredential!('nonexistent', 'nonexistent')
+    const result = await backend.resolveCredential!(
+      'nonexistent',
+      'nonexistent',
+    )
     expect(result).toBeUndefined()
 
     // Existing provider account → string or undefined, no throw

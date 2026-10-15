@@ -62,7 +62,14 @@ export async function appendAuditEntry(
   const keyMaterial = await getResourceSecretKeyAsync()
   try {
     const id = randomUUID()
-    const prevHash = await chainHash({} as SignedAuditEntry)
+
+    // Get the latest entry's hash to chain
+    const { rows: previousRows } = await client.query<{ hash: string }>(
+      'SELECT hash FROM resource_plane.audit_events ORDER BY created_at DESC, id DESC LIMIT 1',
+    )
+    const prevHash = previousRows.length > 0 ? previousRows[0].hash : null
+
+    // Create canonical payload including prevHash for integrity
     const payload = canonical({
       id,
       prevHash,
@@ -73,14 +80,17 @@ export async function appendAuditEntry(
       metadata: input.metadata ?? {},
       createdAt: new Date().toISOString(),
     })
-    const hash = sha256Hex(payload)
+
+    const entryHash = sha256Hex(payload)
     const signature = createHmac('sha256', keyMaterial)
-      .update(hash)
+      .update(entryHash)
       .digest('hex')
 
+    // Insert with all required columns
     await client.query(
-      `INSERT INTO resource_plane.audit_events (id, actor_node_id, action, target_type, target_id, metadata, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      `INSERT INTO resource_plane.audit_events
+       (id, actor_node_id, action, target_type, target_id, metadata, prev_hash, hash, signature, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())`,
       [
         id,
         input.actorNodeId,
@@ -88,10 +98,13 @@ export async function appendAuditEntry(
         input.targetType,
         input.targetId,
         JSON.stringify(input.metadata ?? {}),
+        prevHash,
+        entryHash,
+        signature,
       ],
     )
 
-    const entry: SignedAuditEntry = {
+    return {
       id,
       actorNodeId: input.actorNodeId,
       action: input.action,
@@ -99,24 +112,10 @@ export async function appendAuditEntry(
       targetId: input.targetId,
       metadata: input.metadata ?? {},
       prevHash,
-      hash,
+      hash: entryHash,
       signature,
       createdAt: new Date().toISOString(),
     }
-
-    // Store chained hash + signature in the same row for tamper-evidence
-    await client.query(
-      `UPDATE resource_plane.audit_events SET metadata = $1 WHERE id = $2`,
-      [
-        JSON.stringify({
-          ...input.metadata,
-          _chain: { prevHash, hash, signature },
-        }),
-        id,
-      ],
-    )
-
-    return entry
   } finally {
     client.release()
   }

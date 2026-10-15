@@ -18,6 +18,7 @@
  */
 import { loadProviders } from '../src/services/providerRegistry/loader.js'
 import {
+  filterRetiredOpenCodeModels,
   selectFreeOpenCodeModels,
   writeOpenCodeModelsCache,
 } from '../src/services/routing/autoScoring.js'
@@ -32,7 +33,11 @@ if (!list.ok) {
   console.error(`models list failed: HTTP ${list.status}`)
   process.exit(1)
 }
-const candidates = selectFreeOpenCodeModels(await list.json())
+// Retired (no-longer-free) models are dropped before probing so a stale
+// upstream listing can never write them back into the cache.
+const candidates = filterRetiredOpenCodeModels(
+  selectFreeOpenCodeModels(await list.json()),
+)
 console.log(`listed -free candidates: ${candidates.length}`)
 
 const key =

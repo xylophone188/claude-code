@@ -8,7 +8,8 @@ import { encryptTypedCredential } from '../credentials.js'
 
 describe('Resource Plane Read Adapter (Phase 3.1)', () => {
   beforeEach(() => {
-    process.env['CCB_RESOURCE_PLANE_KEY'] = 'test-resource-plane-key-material-32'
+    process.env['CCB_RESOURCE_PLANE_KEY'] =
+      'test-resource-plane-key-material-32'
     invalidateResourcePlaneCache()
   })
 
@@ -185,10 +186,20 @@ describe('Resource Plane Read Adapter (Phase 3.1)', () => {
       },
     }
 
-    const token = await resolveTransportCredential('codex', 'acc-work', 'accessToken', mockClient)
+    const token = await resolveTransportCredential(
+      'codex',
+      'acc-work',
+      'accessToken',
+      mockClient,
+    )
     expect(token).toBe('ey-oauth-transport-token-999')
 
-    const notFound = await resolveTransportCredential('non-existent', 'default', undefined, mockClient)
+    const notFound = await resolveTransportCredential(
+      'non-existent',
+      'default',
+      undefined,
+      mockClient,
+    )
     expect(notFound).toBeUndefined()
   })
 
@@ -199,7 +210,9 @@ describe('Resource Plane Read Adapter (Phase 3.1)', () => {
       },
     }
 
-    const providers = await loadProvidersFromResourcePlane({ pool: failingClient })
+    const providers = await loadProvidersFromResourcePlane({
+      pool: failingClient,
+    })
     expect(providers).toEqual([])
   })
 })

@@ -12,6 +12,15 @@ describe('Phase 5.0: Active-Active Replication', () => {
     resetActiveActiveForTest()
     resetSyncEngineForTest()
     await runResourcePlaneMigrations()
+    // Clear sync_nodes to ensure test isolation
+    const { getPgPool } = await import('../../pg/pool.js')
+    const pool = getPgPool()
+    const client = await pool.connect()
+    try {
+      await client.query('DELETE FROM resource_plane.sync_nodes')
+    } finally {
+      client.release()
+    }
   })
 
   test('ActiveActiveReplication registers two regions and reports metrics', async () => {
@@ -70,13 +79,25 @@ describe('Phase 5.0: Active-Active Replication', () => {
     })
 
     const nodes = await engine.listNodes()
+    // Debug: log all nodes and their epochs
+    console.log(
+      'All nodes:',
+      nodes.map(n => ({
+        nodeId: n.nodeId,
+        region: n.region,
+        gfe: n.globalFencingEpoch,
+      })),
+    )
+    const euWestNodes = nodes.filter(n => n.region === 'eu-west-1')
+    console.log(
+      'EU West nodes:',
+      euWestNodes.map(n => ({ nodeId: n.nodeId, gfe: n.globalFencingEpoch })),
+    )
     const replica = new ActiveActiveReplication(engine, {
       localRegion: 'us-east-1',
     })
     // @ts-expect-error private method under test
-    const leader = replica._selectLeader(
-      nodes.filter(n => n.region === 'eu-west-1'),
-    )
+    const leader = replica._selectLeader(euWestNodes)
     expect(leader).not.toBeNull()
     expect(leader!.nodeId).toBe('remote-b')
 

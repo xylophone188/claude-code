@@ -106,12 +106,12 @@ export async function loadProvidersFromPG(): Promise<ProviderConfig[]> {
     )
 
     const providerPlanMap = new Map<string, ProviderConfig>(
-      providerRows.map(r => [
-        String(r.id ?? ''),
-        rowToProviderConfig(r),
-      ]),
+      providerRows.map(r => [String(r.id ?? ''), rowToProviderConfig(r)]),
     )
-    const planOverrides = new Map<string, { priority: number; active: boolean }>(
+    const planOverrides = new Map<
+      string,
+      { priority: number; active: boolean }
+    >(
       planRows.map(r => [
         String(r.provider_id ?? ''),
         {
@@ -183,8 +183,8 @@ export async function loadProvidersFromPG(): Promise<ProviderConfig[]> {
       loadedAt: Date.now(),
     }
 
-    const merged: Array<ProviderConfig & { __disabled?: boolean }> = cache.providers.map(
-      p => {
+    const merged: Array<ProviderConfig & { __disabled?: boolean }> =
+      cache.providers.map(p => {
         const override = planOverrides.get(p.id)
         const accounts = accountsByProvider.get(p.id)
         return {
@@ -192,8 +192,7 @@ export async function loadProvidersFromPG(): Promise<ProviderConfig[]> {
           ...(override && !override.active ? { __disabled: true } : {}),
           ...(accounts && accounts.length ? { accounts } : {}),
         }
-      },
-    )
+      })
 
     return merged
       .filter(p => !p.__disabled)
@@ -206,7 +205,9 @@ export async function loadProvidersFromPG(): Promise<ProviderConfig[]> {
   }
 }
 
-export async function loadCapabilitiesFromPG(): Promise<Record<string, ModelCapabilityView>> {
+export async function loadCapabilitiesFromPG(): Promise<
+  Record<string, ModelCapabilityView>
+> {
   if (!cache) {
     await loadProvidersFromPG()
   }
@@ -245,7 +246,8 @@ export function getPGLoaderCache(): {
   loadedAt: number
 } | null {
   if (!cache) return null
-  if (CACHE_TTL_FORCED_MS === 0 && Date.now() - cache.loadedAt >= CACHE_TTL_MS) return null
+  if (CACHE_TTL_FORCED_MS === 0 && Date.now() - cache.loadedAt >= CACHE_TTL_MS)
+    return null
   return cache
 }
 
@@ -262,11 +264,10 @@ export function hasDecryptionConfigured(): boolean {
 function rowToProviderConfig(r: Record<string, unknown>): ProviderConfig {
   const id = String(r.id ?? '')
   const baseUrl = asString(r.base_url) || ''
-  const compatRule =
-    (asString(r.compat_rule) || 'permissive') as ProviderConfig['compatRule']
+  const compatRule = (asString(r.compat_rule) ||
+    'permissive') as ProviderConfig['compatRule']
   const models = parseModelList(r.models)
-  const defaultModel =
-    asString(r.default_model) || models[0] || `${id}/default`
+  const defaultModel = asString(r.default_model) || models[0] || `${id}/default`
   const apiKeyEnv = asString(r.api_key_env) || undefined
   const headers =
     r.headers && typeof r.headers === 'object' && !Array.isArray(r.headers)

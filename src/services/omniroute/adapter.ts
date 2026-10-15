@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 /**
  * OmniRoute adapter — replaces the legacy ccbRouter runtime path.
  *
@@ -74,31 +77,74 @@ export function resolveDirectRoutes(
   spec: string,
   prompt?: string,
 ): DirectRoute[] {
-  const raw = spec.trim()
+  const raw = (spec || '').trim()
   if (!raw) return []
-  if (process.env.CCB_INTERNAL_ROUTER === '1') {
-    return resolveViaInternalRouter(raw)
-  }
-  const config = getOmniRouteConfig()
-  if (!config) return []
-  // Preserve native ChatGPT/Codex and Anthropic paths for bare model names and
-  // virtual advisor aliases. OmniRoute owns explicit CCB/auto/race/provider
-  // routes only; otherwise it would silently bypass OAuth Responses routing.
-  const isGatewayRoute =
-    /^(?:ccb\/|auto(?:\/|$)|race(?:\/|$)|.*-pool$)/i.test(raw) ||
-    (raw.includes('/') &&
-      !/^(?:advisor|lite|full|ultra|review|smart|opus)$/i.test(raw))
-  if (!isGatewayRoute) return []
-  return resolveViaOmniRoute(spec, prompt, config)
+  const baseUrl = normalizeDirectBaseUrl(
+    process.env.OPENAI_BASE_URL ??
+      process.env.OMNIRUTE_URL ??
+      process.env.OMNIROUTE_BASE_URL ??
+      'http://127.0.0.1:18800/v1',
+  )
+  const apiKey =
+    process.env.OPENAI_API_KEY ??
+    process.env.OMNIRUTE_API_KEY ??
+    process.env.OMNIROUTE_API_KEY ??
+    'sk-bridge-local-18800'
+  return [
+    {
+      providerId: 'agentbox-gateway',
+      baseURL: baseUrl,
+      model: raw,
+      apiKey,
+      kind: 'provider',
+    },
+  ]
 }
 
+export const INTERNAL_POOL_MODELS: Record<string, string[]> = {
+  'chat-pool': ['auto'],
+  'worker-pool': ['auto'],
+  'advisor-pool': ['auto'],
+  'review-pool': ['auto'],
+}
+INTERNAL_POOL_MODELS['v8'] = INTERNAL_POOL_MODELS['chat-pool']
+INTERNAL_POOL_MODELS['auto'] = INTERNAL_POOL_MODELS['chat-pool']
+
 const INTERNAL_POOL_ORDER = {
-  v8: ['sensenova', 'nvidia', 'opencode'],
-  auto: ['sensenova', 'nvidia', 'opencode'],
-  'worker-pool': ['nvidia', 'opencode', 'sensenova'],
-  'chat-pool': ['sensenova', 'qwen', 'glm', 'nvidia'],
-  'advisor-pool': ['sensenova', 'deepseek', 'nvidia', 'codex'],
-  'review-pool': ['sensenova', 'deepseek', 'nvidia', 'codex'],
+  v8: ['sensenova', 'glm-cn', 'groq', 'codex-bridge', 'nvidia', 'opencode'],
+  auto: ['sensenova', 'glm-cn', 'groq', 'codex-bridge', 'nvidia', 'opencode'],
+  'worker-pool': [
+    'nvidia',
+    'opencode',
+    'sensenova',
+    'glm-cn',
+    'groq',
+    'codex-bridge',
+  ],
+  'chat-pool': [
+    'sensenova',
+    'glm-cn',
+    'groq',
+    'codex-bridge',
+    'nvidia',
+    'opencode',
+  ],
+  'advisor-pool': [
+    'codex-bridge',
+    'sensenova',
+    'nvidia',
+    'glm-cn',
+    'groq',
+    'opencode',
+  ],
+  'review-pool': [
+    'codex-bridge',
+    'sensenova',
+    'nvidia',
+    'glm-cn',
+    'groq',
+    'opencode',
+  ],
 } as const
 
 function normalizeDirectBaseUrl(baseUrl: string): string {
@@ -126,60 +172,7 @@ function providerKeys(
 }
 
 function resolveViaInternalRouter(spec: string): DirectRoute[] {
-  const trimmed = spec.replace(/^ccb\//i, '')
-  const poolName = trimmed.toLowerCase() as keyof typeof INTERNAL_POOL_ORDER
-  const providers = loadProviders().filter(
-    provider => provider.kind === 'openai-compat',
-  )
-  const requestedProvider = trimmed.includes('/')
-    ? trimmed.slice(0, trimmed.indexOf('/'))
-    : trimmed
-  const requestedModel = trimmed.includes('/')
-    ? trimmed.slice(trimmed.indexOf('/') + 1)
-    : undefined
-  const ordered = INTERNAL_POOL_ORDER[poolName]
-  const selected = ordered
-    ? [...providers].sort(
-        (a, b) =>
-          (ordered.indexOf(a.id as never) + 1 || 99) -
-          (ordered.indexOf(b.id as never) + 1 || 99),
-      )
-    : providers.filter(provider => provider.id === requestedProvider)
-  const routes: DirectRoute[] = []
-  for (const provider of selected) {
-    const keys = providerKeys(provider)
-    const models = requestedModel
-      ? [requestedModel]
-      : [
-          ...new Set(
-            (provider.accounts ?? [])
-              .map(account => account.model)
-              .filter(Boolean)
-              .concat(provider.models ?? [], provider.defaultModel),
-          ),
-        ]
-    for (const key of keys) {
-      for (const model of models) {
-        if (!model) continue
-        const effectiveModel =
-          provider.id === 'nvidia' && !model.includes('/')
-            ? 'nvidia/' + model
-            : model
-        routes.push({
-          providerId: provider.id,
-          baseURL: normalizeDirectBaseUrl(provider.baseUrl),
-          model: effectiveModel,
-          apiKey: key.apiKey,
-          headers: provider.headers,
-          timeoutMs: provider.timeoutMs,
-          compatRule: provider.compatRule,
-          accountId: key.id,
-          kind: 'provider',
-        })
-      }
-    }
-  }
-  return routes
+  return resolveDirectRoutes(spec)
 }
 
 export function isInternalRouterEnabled(): boolean {
@@ -197,45 +190,9 @@ export function resetDirectRouteStateForTests(): void {
 function resolveViaOmniRoute(
   spec: string,
   _prompt: string | undefined,
-  config: OmniRouteConfig,
+  _config?: OmniRouteConfig,
 ): DirectRoute[] {
-  // OmniRoute acts as an OpenAI-compatible gateway: it accepts any
-  // provider/model spec and routes to the appropriate upstream.
-  const trimmed = spec.trim()
-  if (!trimmed) return []
-  const stripped = trimmed.replace(/^ccb\//i, '')
-  const modelSpec = /^(?:auto|race)$/i.test(stripped) ? 'auto/smart' : stripped
-  if (/^(?:auto|race)(?:\/|$)/i.test(modelSpec)) {
-    if (config.serverSideRouting) {
-      return [
-        {
-          providerId: 'omniroute',
-          baseURL: config.baseUrl,
-          model: modelSpec,
-          apiKey: config.apiKey,
-          kind: 'provider',
-        },
-      ]
-    }
-    return [
-      {
-        providerId: 'omniroute',
-        baseURL: config.baseUrl,
-        model: modelSpec,
-        apiKey: config.apiKey,
-        kind: 'provider',
-      },
-    ]
-  }
-  return [
-    {
-      providerId: 'omniroute',
-      baseURL: config.baseUrl,
-      model: modelSpec,
-      apiKey: config.apiKey,
-      kind: 'provider',
-    },
-  ]
+  return resolveDirectRoutes(spec)
 }
 
 // ── Provider Model Listing ─────────────────────────────────────────
@@ -404,6 +361,18 @@ let activeCcbRoute: ActiveCcbRoute | null = null
 
 export function setActiveCcbRoute(provider: string, model: string): void {
   activeCcbRoute = { provider, model }
+  try {
+    const embedDir = join(homedir(), '.ccb-embed')
+    mkdirSync(embedDir, { recursive: true })
+    writeFileSync(
+      join(embedDir, 'last-resolved.json'),
+      JSON.stringify({
+        provider,
+        model,
+        at: Date.now(),
+      }),
+    )
+  } catch {}
 }
 
 export function getActiveCcbRoute(): ActiveCcbRoute | null {

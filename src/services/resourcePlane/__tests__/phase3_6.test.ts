@@ -29,6 +29,16 @@ describe('Phase 3.6: Event-driven synchronization', () => {
     }
     process.env[KEY_ENV] = 'test-resource-plane-key-material-for-testing'
     resetEventBusForTest()
+    const pool = getPgPool()
+    const client = await pool.connect()
+    try {
+      await client.query('DELETE FROM resource_plane.inbox_events')
+      await client.query('DELETE FROM resource_plane.outbox_events')
+    } catch {
+      // ignore table missing in mock environments
+    } finally {
+      client.release()
+    }
   })
 
   describe('OutboxProducer', () => {
@@ -54,7 +64,9 @@ describe('Phase 3.6: Event-driven synchronization', () => {
           [eventId],
         )
         expect(res.rows.length).toBe(1)
-        expect(res.rows[0].event_type).toBe(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED)
+        expect(res.rows[0].event_type).toBe(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED,
+        )
         expect(res.rows[0].delivered_at).toBeNull()
       } finally {
         client.release()
@@ -149,7 +161,10 @@ describe('Phase 3.6: Event-driven synchronization', () => {
           sourceNodeId: 'test-node',
         })
 
-        const consumer = new OutboxConsumer({ pollIntervalMs: 10, maxRetries: 3 })
+        const consumer = new OutboxConsumer({
+          pollIntervalMs: 10,
+          maxRetries: 3,
+        })
         let publishCalled = 0
         const publisher = async () => {
           publishCalled++
@@ -185,9 +200,12 @@ describe('Phase 3.6: Event-driven synchronization', () => {
         const consumer = new InboxConsumer({ pollIntervalMs: 10 })
         let processedEvent: any = null
 
-        consumer.registerHandler(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED, async (event) => {
-          processedEvent = event
-        })
+        consumer.registerHandler(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED,
+          async event => {
+            processedEvent = event
+          },
+        )
 
         consumer.start()
 
@@ -205,11 +223,14 @@ describe('Phase 3.6: Event-driven synchronization', () => {
         )
 
         // Wait for processing
+        await (consumer as any)._poll()
         await new Promise(resolve => setTimeout(resolve, 50))
         await consumer.stop()
 
         expect(processedEvent).not.toBeNull()
-        expect(processedEvent?.event_type).toBe(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED)
+        expect(processedEvent?.event_type).toBe(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED,
+        )
         expect(processedEvent.payload.providerId).toBe('test-provider')
       } finally {
         client.release()
@@ -235,9 +256,12 @@ describe('Phase 3.6: Event-driven synchronization', () => {
 
         const consumer = new InboxConsumer({ pollIntervalMs: 10 })
         let handlerCalled = false
-        consumer.registerHandler(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED, async () => {
-          handlerCalled = true
-        })
+        consumer.registerHandler(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED,
+          async () => {
+            handlerCalled = true
+          },
+        )
 
         consumer.start()
         await new Promise(resolve => setTimeout(resolve, 50))
@@ -275,9 +299,12 @@ describe('Phase 3.6: Event-driven synchronization', () => {
         )
 
         const consumer = new InboxConsumer({ pollIntervalMs: 10 })
-        consumer.registerHandler(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED, async () => {
-          throw new Error('Processing failed')
-        })
+        consumer.registerHandler(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_CREATED,
+          async () => {
+            throw new Error('Processing failed')
+          },
+        )
 
         consumer.start()
         await new Promise(resolve => setTimeout(resolve, 50))
@@ -321,7 +348,9 @@ describe('Phase 3.6: Event-driven synchronization', () => {
         expect(res.rows.length).toBe(1)
         expect(res.rows[0].aggregate_type).toBe('provider')
         expect(res.rows[0].aggregate_id).toBe('test-provider-123')
-        expect(res.rows[0].event_type).toBe(RESOURCE_PLANE_EVENT_TYPES.PROVIDER_UPDATED)
+        expect(res.rows[0].event_type).toBe(
+          RESOURCE_PLANE_EVENT_TYPES.PROVIDER_UPDATED,
+        )
         expect(res.rows[0].payload).toContain('updatedField')
         expect(Number(res.rows[0].revision)).toBe(5)
         expect(res.rows[0].source_node_id).toBe('emit-test-node')
@@ -355,8 +384,12 @@ describe('Phase 3.6: Event-driven synchronization', () => {
         )
         expect(res.rows.length).toBe(1)
         expect(res.rows[0].aggregate_type).toBe('credential')
-        expect(res.rows[0].aggregate_id).toBe('cred-provider:cred-account:apiKey')
-        expect(res.rows[0].event_type).toBe(RESOURCE_PLANE_EVENT_TYPES.CREDENTIAL_ROTATED)
+        expect(res.rows[0].aggregate_id).toBe(
+          'cred-provider:cred-account:apiKey',
+        )
+        expect(res.rows[0].event_type).toBe(
+          RESOURCE_PLANE_EVENT_TYPES.CREDENTIAL_ROTATED,
+        )
         expect(res.rows[0].payload).toContain('rotated')
         expect(Number(res.rows[0].revision)).toBe(3)
         expect(res.rows[0].source_node_id).toBe('cred-emit-node')

@@ -51,7 +51,11 @@ export interface DirectCompletionRequest {
 
 export interface DirectCompletionResult {
   content: string
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number }
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
   provider: string
   model: string
   latencyMs: number
@@ -90,12 +94,16 @@ export async function sendDirectCompletion(
   } = {},
 ): Promise<DirectCompletionResult> {
   const providers = opts.providers ?? (await loadProvidersFromPG())
-  const { candidatesFromProviders } = await import('../routing/scenarioScorer.js')
+  const { candidatesFromProviders } = await import(
+    '../routing/scenarioScorer.js'
+  )
   const candidates = candidatesFromProviders(providers)
   if (!candidates.length) {
     throw new Error('No upstream candidates available for direct completion.')
   }
-  const scenario = detectScenario(opts.scenarioHint ?? { prompt: req.messages.at(-1)?.content })
+  const scenario = detectScenario(
+    opts.scenarioHint ?? { prompt: req.messages.at(-1)?.content },
+  )
   const pick = await scoreAndPick(candidates, scenario)
   if (!pick) {
     throw new Error('Scenario scorer returned no viable candidate.')
@@ -135,7 +143,10 @@ export async function sendToCandidate(
   const start = performance.now()
   const url = `${candidate.baseUrl.replace(/\/+$/, '')}/chat/completions`
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), req.timeoutMs ?? candidate.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const timeout = setTimeout(
+    () => controller.abort(),
+    req.timeoutMs ?? candidate.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  )
   const onOuterAbort = () => controller.abort()
   if (req.signal) {
     if (req.signal.aborted) controller.abort()
@@ -177,7 +188,9 @@ export async function sendToCandidate(
     if (req.signal) req.signal.removeEventListener('abort', onOuterAbort)
     recordFailure(candidate.providerId, candidate.modelId, { severity: 0.6 })
     const message = err instanceof Error ? err.message : String(err)
-    throw new Error(`Direct completion to ${candidate.providerId}/${candidate.modelId} failed: ${message}`)
+    throw new Error(
+      `Direct completion to ${candidate.providerId}/${candidate.modelId} failed: ${message}`,
+    )
   }
   const latencyMs = Math.round(performance.now() - start)
 
@@ -245,7 +258,10 @@ async function* streamToCandidate(
 ): AsyncGenerator<ChatCompletionChunk> {
   const start = performance.now()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), req.timeoutMs ?? candidate.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const timeout = setTimeout(
+    () => controller.abort(),
+    req.timeoutMs ?? candidate.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  )
   const onOuterAbort = () => controller.abort()
   if (req.signal) {
     if (req.signal.aborted) controller.abort()
@@ -293,7 +309,8 @@ async function* streamToCandidate(
     if (req.signal) req.signal.removeEventListener('abort', onOuterAbort)
     if (response.status === 429)
       recordRateLimit(candidate.providerId, candidate.accountId)
-    else recordFailure(candidate.providerId, candidate.modelId, { severity: 0.5 })
+    else
+      recordFailure(candidate.providerId, candidate.modelId, { severity: 0.5 })
     throw new Error(
       `Direct stream ${candidate.providerId}/${candidate.modelId} HTTP ${response.status}: ${text.slice(0, 400)}`,
     )
@@ -331,7 +348,9 @@ async function* streamToCandidate(
     if (req.signal) req.signal.removeEventListener('abort', onOuterAbort)
     const latencyMs = Math.round(performance.now() - start)
     recordLatency(candidate.providerId, candidate.modelId, latencyMs)
-    recordSuccess(candidate.providerId, candidate.modelId).catch(() => undefined)
+    recordSuccess(candidate.providerId, candidate.modelId).catch(
+      () => undefined,
+    )
     void lastChunkAt
   }
 }

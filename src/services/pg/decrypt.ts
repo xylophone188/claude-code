@@ -47,7 +47,9 @@ export function decryptCredential(value: string | null | undefined): string {
 }
 
 /** Best-effort decrypt for pool loading: returns '' on failure, never throws. */
-export function decryptCredentialSafe(value: string | null | undefined): string {
+export function decryptCredentialSafe(
+  value: string | null | undefined,
+): string {
   if (!value) return ''
   if (!value.startsWith(OMNIROUTE_CREDENTIAL_PREFIX)) return value
   try {

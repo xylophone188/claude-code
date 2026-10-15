@@ -19,7 +19,7 @@ export const ProviderBackendRegistry = {
   getBackend(): ProviderBackend {
     if (!_backend) {
       throw new Error(
-        'ProviderBackendRegistry not initialized. Call bootstrapProviders() before using loadProviders().'
+        'ProviderBackendRegistry not initialized. Call bootstrapProviders() before using loadProviders().',
       )
     }
     return _backend

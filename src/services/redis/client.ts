@@ -83,6 +83,7 @@ async function ensureConnected(): Promise<boolean> {
 
 /** Best-effort connection check. Never throws. */
 export async function redisIsAvailable(): Promise<boolean> {
+  if (process.env.CCB_REDIS_DISABLED === '1') return false
   try {
     const c = getRedisClient()
     if (c.status === 'wait') await c.connect()
@@ -142,7 +143,10 @@ export async function redisIncr(
   }
 }
 
-export async function redisExpire(key: string, ttlSeconds: number): Promise<void> {
+export async function redisExpire(
+  key: string,
+  ttlSeconds: number,
+): Promise<void> {
   try {
     if (!(await ensureConnected())) return
     await getRedisClient().expire(key, ttlSeconds)
@@ -171,7 +175,7 @@ export async function redisPipelineResults(
       const [cmd, ...args] = op
       const callable = (pipe as unknown as Record<string, unknown>)[cmd]
       if (typeof callable === 'function') {
-        (callable as (...a: unknown[]) => void)(...(args as []))
+        ;(callable as (...a: unknown[]) => void)(...(args as []))
       }
     }
     const execResult = await pipe.exec()

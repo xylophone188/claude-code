@@ -10,10 +10,7 @@ import {
   loadProvidersFromResourcePlane,
   resolveTransportCredential,
 } from '../resourcePlane/readAdapter.js'
-import {
-  loadProvidersLegacyRaw,
-  _invalidateProviderCache,
-} from './loader.js'
+import { loadProvidersLegacyRaw, _invalidateProviderCache } from './loader.js'
 
 // ── ProviderBackend interface ─────────────────────────────────────────────────
 
@@ -28,7 +25,10 @@ export interface ProviderBackend {
   invalidateCache(): void
 
   /** Optional: single-credential resolution at transport boundary. */
-  resolveCredential?(providerId: string, accountId: string): Promise<string | undefined>
+  resolveCredential?(
+    providerId: string,
+    accountId: string,
+  ): Promise<string | undefined>
 }
 
 // ── LegacyBackend: reads providers.json + built-ins (current behavior) ────────
@@ -92,7 +92,7 @@ export class ResourcePlaneBackend implements ProviderBackend {
 
   async resolveCredential(
     providerId: string,
-    accountId: string
+    accountId: string,
   ): Promise<string | undefined> {
     return resolveTransportCredential(providerId, accountId)
   }

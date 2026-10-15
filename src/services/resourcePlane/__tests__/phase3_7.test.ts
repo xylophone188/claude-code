@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { DistributedLockManager, getLockManager, resetLockManagerForTest } from '../lock.js'
+import {
+  DistributedLockManager,
+  getLockManager,
+  resetLockManagerForTest,
+} from '../lock.js'
 import { getPgPool } from '../../pg/pool.js'
 
 describe('Phase 3.7: Distributed lock service', () => {
@@ -35,7 +39,7 @@ describe('Phase 3.7: Distributed lock service', () => {
   describe('DistributedLockManager', () => {
     test('acquires and releases lock with tryLock', async () => {
       const manager = new DistributedLockManager({ nodeId: 'test-node-1' })
-      
+
       const result = await manager.tryLock('test-resource-1')
       expect(result.acquired).toBe(true)
       expect(result.fencingToken).toBeDefined()
@@ -60,7 +64,7 @@ describe('Phase 3.7: Distributed lock service', () => {
       await manager.tryLock('test-resource-1', { timeoutMs: 100 }) // Try to get it again
       // Wait for the previous lock to be released by trying again
       await new Promise(resolve => setTimeout(resolve, 100))
-      
+
       // The lock should still be held by the same node (fencing token higher)
       const result2 = await manager.tryLock('test-resource-1')
       expect(result2.acquired).toBe(true)
@@ -77,14 +81,22 @@ describe('Phase 3.7: Distributed lock service', () => {
       expect(result1.fencingToken).toBeDefined()
 
       // Node B tries non-blocking - should fail
-      const result2 = await manager2.tryLock('shared-resource', { timeoutMs: 0 })
+      const result2 = await manager2.tryLock('shared-resource', {
+        timeoutMs: 0,
+      })
       expect(result2.acquired).toBe(false)
       expect(result2.error).toBeDefined()
     }, 10_000)
 
     test('blocking lock waits and acquires when released', async () => {
-      const manager1 = new DistributedLockManager({ nodeId: 'test-node-c', leaseMs: 5000 })
-      const manager2 = new DistributedLockManager({ nodeId: 'test-node-d', leaseMs: 5000 })
+      const manager1 = new DistributedLockManager({
+        nodeId: 'test-node-c',
+        leaseMs: 5000,
+      })
+      const manager2 = new DistributedLockManager({
+        nodeId: 'test-node-d',
+        leaseMs: 5000,
+      })
 
       // Node C acquires lock
       const result1 = await manager1.lock('wait-resource')
@@ -93,9 +105,14 @@ describe('Phase 3.7: Distributed lock service', () => {
 
       // Node D starts trying to lock (blocking with timeout)
       let lockAcquired = false
-      const promise = manager2.lock('wait-resource', { timeoutMs: 2000 })
-        .then(() => { lockAcquired = true })
-        .catch(() => { lockAcquired = false })
+      const promise = manager2
+        .lock('wait-resource', { timeoutMs: 2000 })
+        .then(() => {
+          lockAcquired = true
+        })
+        .catch(() => {
+          lockAcquired = false
+        })
 
       // Give Node D time to start waiting
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -109,7 +126,10 @@ describe('Phase 3.7: Distributed lock service', () => {
     }, 10_000)
 
     test('fencing token prevents stale lock updates', async () => {
-      const manager1 = new DistributedLockManager({ nodeId: 'fencing-node-1', leaseMs: 100 })
+      const manager1 = new DistributedLockManager({
+        nodeId: 'fencing-node-1',
+        leaseMs: 100,
+      })
       const manager2 = new DistributedLockManager({ nodeId: 'fencing-node-2' })
 
       // Node 1 acquires lock and releases it quickly
@@ -122,7 +142,9 @@ describe('Phase 3.7: Distributed lock service', () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Node 2 should now be able to acquire (lease expired)
-      const result2 = await manager2.tryLock('fencing-test', { timeoutMs: 1000 })
+      const result2 = await manager2.tryLock('fencing-test', {
+        timeoutMs: 1000,
+      })
       expect(result2.acquired).toBe(true)
       await manager2.tryLock('fencing-test', { timeoutMs: 0 })
     }, 5_000)
@@ -167,17 +189,17 @@ describe('Phase 3.7: Distributed lock service', () => {
     }, 10_000)
 
     test('lock manager shutdown cleans up timers', async () => {
-      const manager = new DistributedLockManager({ 
+      const manager = new DistributedLockManager({
         nodeId: 'shutdown-node',
         leaseMs: 5000,
         renewIntervalMs: 100,
       })
 
       await manager.lock('shutdown-test')
-      
+
       // Shutdown should stop all renewal timers
       manager.shutdown()
-      
+
       // Try to use lock - should fail or be safe
       // (lock object itself might still think it's held, but no more renewals)
       expect(true).toBe(true) // Just verify shutdown doesn't throw

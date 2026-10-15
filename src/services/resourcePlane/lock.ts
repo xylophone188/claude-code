@@ -60,15 +60,21 @@ export class DistributedLockManager {
   private readonly defaultTimeoutMs: number
   private renewTimers: Map<string, ReturnType<typeof setInterval>> = new Map()
 
-  constructor(options: {
-    nodeId?: string
-    leaseMs?: number
-    renewIntervalMs?: number
-    timeoutMs?: number
-  } = {}) {
-    this.nodeId = options.nodeId ?? process.env.HOSTNAME ?? `node-${Math.random().toString(36).substr(2, 9)}`
+  constructor(
+    options: {
+      nodeId?: string
+      leaseMs?: number
+      renewIntervalMs?: number
+      timeoutMs?: number
+    } = {},
+  ) {
+    this.nodeId =
+      options.nodeId ??
+      process.env.HOSTNAME ??
+      `node-${Math.random().toString(36).substr(2, 9)}`
     this.defaultLeaseMs = options.leaseMs ?? 30_000
-    this.defaultRenewIntervalMs = options.renewIntervalMs ?? this.defaultLeaseMs / 3
+    this.defaultRenewIntervalMs =
+      options.renewIntervalMs ?? this.defaultLeaseMs / 3
     this.defaultTimeoutMs = options.timeoutMs ?? 0
   }
 
@@ -78,7 +84,10 @@ export class DistributedLockManager {
    * @param options Lock options (overrides instance defaults)
    * @returns Promise resolving to LockResult
    */
-  async tryLock(resource: string, options: LockOptions = {}): Promise<LockResult> {
+  async tryLock(
+    resource: string,
+    options: LockOptions = {},
+  ): Promise<LockResult> {
     const {
       nodeId = this.nodeId,
       leaseMs = this.defaultLeaseMs,
@@ -125,7 +134,11 @@ export class DistributedLockManager {
 
         // Check if we got the lock (either inserted new or updated)
         const row = res.rows[0]
-        if (row && row.owner_node_id === nodeId && String(row.fencing_epoch) === String(fencingToken)) {
+        if (
+          row &&
+          row.owner_node_id === nodeId &&
+          String(row.fencing_epoch) === String(fencingToken)
+        ) {
           await client.query('COMMIT')
 
           const lock: Lock = {
@@ -134,17 +147,28 @@ export class DistributedLockManager {
             fencingToken: row.fencing_epoch,
             expiresAt: row.lease_until,
             renew: async () => {
-              await this._renewLock(resource, nodeId, row.fencing_epoch, leaseMs)
+              await this._renewLock(
+                resource,
+                nodeId,
+                row.fencing_epoch,
+                leaseMs,
+              )
             },
             unlock: async () => {
               await this._releaseLock(resource, nodeId, row.fencing_epoch)
               this._stopRenewal(resource)
             },
-            isHeld: () => this._isLocallyHeld(resource, nodeId, row.fencing_epoch),
+            isHeld: () =>
+              this._isLocallyHeld(resource, nodeId, row.fencing_epoch),
           }
 
           // Start automatic renewal
-          this._startRenewal(resource, nodeId, row.fencing_epoch, renewIntervalMs)
+          this._startRenewal(
+            resource,
+            nodeId,
+            row.fencing_epoch,
+            renewIntervalMs,
+          )
 
           return { acquired: true, fencingToken: Number(row.fencing_epoch) }
         }
@@ -161,7 +185,9 @@ export class DistributedLockManager {
         }
 
         // Wait a bit before retrying (exponential backoff capped at 100ms)
-        await new Promise(resolve => setTimeout(resolve, Math.min(10 * attempt, 100)))
+        await new Promise(resolve =>
+          setTimeout(resolve, Math.min(10 * attempt, 100)),
+        )
       } catch (err) {
         await client.query('ROLLBACK')
         if (err instanceof Error && err.message.includes('deadlock detected')) {
@@ -172,7 +198,9 @@ export class DistributedLockManager {
           if (Date.now() >= endTime) {
             return { acquired: false, error: 'Lock acquisition timeout' }
           }
-          await new Promise(resolve => setTimeout(resolve, Math.min(10 * attempt, 100)))
+          await new Promise(resolve =>
+            setTimeout(resolve, Math.min(10 * attempt, 100)),
+          )
           continue
         }
         return { acquired: false, error: String(err) }
@@ -211,16 +239,27 @@ export class DistributedLockManager {
         fencingToken: Number(row.fencing_epoch),
         expiresAt: row.lease_until,
         renew: async () => {
-          await this._renewLock(resource, this.nodeId, row.fencing_epoch, options.leaseMs ?? this.defaultLeaseMs)
+          await this._renewLock(
+            resource,
+            this.nodeId,
+            row.fencing_epoch,
+            options.leaseMs ?? this.defaultLeaseMs,
+          )
         },
         unlock: async () => {
           await this._releaseLock(resource, this.nodeId, row.fencing_epoch)
           this._stopRenewal(resource)
         },
-        isHeld: () => this._isLocallyHeld(resource, this.nodeId, row.fencing_epoch),
+        isHeld: () =>
+          this._isLocallyHeld(resource, this.nodeId, row.fencing_epoch),
       }
       // Start renewal
-      this._startRenewal(resource, this.nodeId, row.fencing_epoch, options.renewIntervalMs ?? this.defaultRenewIntervalMs)
+      this._startRenewal(
+        resource,
+        this.nodeId,
+        row.fencing_epoch,
+        options.renewIntervalMs ?? this.defaultRenewIntervalMs,
+      )
       return lock
     } finally {
       client.release()
@@ -233,7 +272,7 @@ export class DistributedLockManager {
     resource: string,
     nodeId: string,
     fencingToken: number,
-    leaseMs: number
+    leaseMs: number,
   ): Promise<void> {
     const pool = getPgPool()
     const client = await pool.connect()
@@ -252,7 +291,11 @@ export class DistributedLockManager {
     }
   }
 
-  private async _releaseLock(resource: string, nodeId: string, fencingToken: number): Promise<void> {
+  private async _releaseLock(
+    resource: string,
+    nodeId: string,
+    fencingToken: number,
+  ): Promise<void> {
     const pool = getPgPool()
     const client = await pool.connect()
     try {
@@ -272,7 +315,7 @@ export class DistributedLockManager {
     resource: string,
     nodeId: string,
     fencingToken: number,
-    intervalMs: number
+    intervalMs: number,
   ): void {
     const key = `${resource}:${nodeId}:${fencingToken}`
     if (this.renewTimers.has(key)) return
@@ -294,9 +337,17 @@ export class DistributedLockManager {
           this._stopRenewal(resource)
           return
         }
-        await this._renewLock(resource, nodeId, fencingToken, this.defaultLeaseMs)
+        await this._renewLock(
+          resource,
+          nodeId,
+          fencingToken,
+          this.defaultLeaseMs,
+        )
       } catch (err) {
-        console.error(`[LockManager] Failed to renew lock for ${resource}:`, err)
+        console.error(
+          `[LockManager] Failed to renew lock for ${resource}:`,
+          err,
+        )
         // Continue trying; next renewal might succeed
       } finally {
         client.release()
@@ -320,7 +371,11 @@ export class DistributedLockManager {
     }
   }
 
-  private _isLocallyHeld(resource: string, nodeId: string, fencingToken: number): boolean {
+  private _isLocallyHeld(
+    resource: string,
+    nodeId: string,
+    fencingToken: number,
+  ): boolean {
     // This is a best-effort check; we don't want to query DB every time.
     // We'll rely on the fact that if we have a renewal timer running, we likely hold it.
     // For safety, we could check DB, but for simplicity we assume correctness.

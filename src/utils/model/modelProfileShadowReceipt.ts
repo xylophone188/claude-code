@@ -8,7 +8,12 @@
  * `default@v1` (never `coding`).
  */
 
-export type ShadowScenario = 'coding' | 'analysis' | 'writing' | 'design' | 'default'
+export type ShadowScenario =
+  | 'coding'
+  | 'analysis'
+  | 'writing'
+  | 'design'
+  | 'default'
 
 export type FactorVersion = {
   stateVersion: string | null
@@ -55,7 +60,8 @@ export function makeModelSelectionShadowReceipt(
       : UNKNOWN_PROFILE_VERSION
   return {
     scenario,
-    scenarioOrigin: input.resolvedScenario === scenario ? 'resolved' : 'unknown',
+    scenarioOrigin:
+      input.resolvedScenario === scenario ? 'resolved' : 'unknown',
     profileVersion,
     factorVersion: {
       stateVersion:
@@ -82,7 +88,11 @@ export const MODEL_SELECTION_SHADOW_RECEIPT: {
     bypassDetected: boolean,
   ) => void
 } = {
-  emit(receipt: ModelSelectionShadowReceipt, context: string, bypassDetected: boolean): void {
+  emit(
+    receipt: ModelSelectionShadowReceipt,
+    context: string,
+    bypassDetected: boolean,
+  ): void {
     if (!process.env.CCB_SHADOW_RECEIPT_DEBUG) return
     console.error(
       `[shadow-receipt][${context}] scenario=${receipt.scenario} origin=${receipt.scenarioOrigin} profile=${receipt.profileVersion} route=${receipt.legacySelectedRoute} bypass=${String(bypassDetected)}`,

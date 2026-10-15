@@ -584,14 +584,26 @@ function maskModelCodename(baseName: string): string {
 }
 
 export function renderModelName(model: ModelName): string {
+  const isAbstract =
+    model === 'auto' ||
+    model === 'v8' ||
+    model === 'chat-pool' ||
+    model === 'worker-pool' ||
+    model.startsWith('auto/') ||
+    model.includes('pool') ||
+    model.endsWith('-pool')
+  if (isAbstract) {
+    const ccbResolved = getCcbResolvedModel()
+    if (ccbResolved) {
+      return ccbResolved
+    }
+  }
   const publicName = getPublicModelDisplayName(model)
   if (publicName) {
     return publicName
   }
-  // CCB auto-routing: show the actual resolved provider/model instead of the
-  // abstract auto/ variant. Read from the file ccb-router writes on each request.
   const ccbResolved = getCcbResolvedModel()
-  if (ccbResolved && model.startsWith('auto/')) {
+  if (ccbResolved && (model.startsWith('auto/') || isAbstract)) {
     return ccbResolved
   }
   if (process.env.USER_TYPE === 'ant') {
@@ -752,8 +764,6 @@ export function isLegacyModelRemapEnabled(): boolean {
 }
 
 function getCcbResolvedModel(): string | null {
-  // Read the last-resolved model written by ccb-router (CCB_SHOW_MODEL=1 feature).
-  if (!isEnvTruthy(process.env.CCB_SHOW_MODEL)) return null
   const resolvedFile = join(homedir(), '.ccb-embed', 'last-resolved.json')
   try {
     const raw = readFileSync(resolvedFile, 'utf8')
@@ -762,10 +772,10 @@ function getCcbResolvedModel(): string | null {
       model?: string
       at?: number
     }
-    if (!parsed.provider || !parsed.model) return null
-    // Reject stale entries (>30 min) to avoid showing an old model after a restart
+    if (!parsed.model) return null
     if (parsed.at && Date.now() - parsed.at > 30 * 60 * 1000) return null
-    return `${parsed.provider}/${parsed.model}`
+    if (parsed.model.includes('/')) return parsed.model
+    return (parsed.provider ? parsed.provider + '/' : '') + parsed.model
   } catch {
     return null
   }
@@ -787,9 +797,18 @@ export function modelDisplayString(model: ModelSetting): string {
   // actual provider/model that the router last resolved. This makes the status
   // line readable (e.g. "cohere/command-a-03-2025") instead of "auto/best-chat".
   const ccbResolved = getCcbResolvedModel()
+  const isAbstract =
+    model === 'auto' ||
+    model === 'v8' ||
+    model === 'chat-pool' ||
+    model === 'worker-pool' ||
+    (typeof model === 'string' &&
+      (model.startsWith('auto/') || model.includes('pool')))
   if (
     ccbResolved &&
-    (model === 'auto/best-chat' || model.startsWith('auto/'))
+    (isAbstract ||
+      model === 'auto/best-chat' ||
+      (typeof model === 'string' && model.startsWith('auto/')))
   ) {
     return ccbResolved
   }

@@ -4,15 +4,15 @@ import { isModelAllowed } from '../modelAllowlist.js'
 
 describe('opencode model routing', () => {
   test('recognizes prefixed models case-insensitively', () => {
-    expect(isOpencodeModel('opencode/deepseek-v4-flash-free')).toBe(true)
+    expect(isOpencodeModel('opencode/space-bunny-free')).toBe(true)
     expect(isOpencodeModel('OpenCode/mimo-v2.5-free')).toBe(true)
-    expect(isOpencodeModel('deepseek-v4-flash-free')).toBe(false)
+    expect(isOpencodeModel('space-bunny-free')).toBe(false)
     expect(isOpencodeModel('opencode/')).toBe(false)
   })
 
   test('removes only routing prefix and preserves model name', () => {
-    expect(getOpencodeModelName('opencode/deepseek-v4-flash-free')).toBe(
-      'deepseek-v4-flash-free',
+    expect(getOpencodeModelName('opencode/space-bunny-free')).toBe(
+      'space-bunny-free',
     )
     expect(getOpencodeModelName('OpenCode/MiMo-V2.5-Free')).toBe(
       'MiMo-V2.5-Free',
@@ -21,7 +21,7 @@ describe('opencode model routing', () => {
   })
 
   test('allows non-empty OpenCode models regardless of provider allowlist', () => {
-    expect(isModelAllowed('opencode/deepseek-v4-flash-free')).toBe(true)
+    expect(isModelAllowed('opencode/space-bunny-free')).toBe(true)
     expect(isModelAllowed('opencode/')).toBe(false)
   })
 })

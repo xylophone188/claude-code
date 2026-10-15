@@ -34,14 +34,14 @@ import {
 
 describe('isGatewayModel', () => {
   test('routes provider-prefixed ids to the gateway', () => {
-    expect(isGatewayModel('oc/deepseek-v4-flash-free')).toBe(true)
+    expect(isGatewayModel('oc/space-bunny-free')).toBe(true)
     expect(isGatewayModel('openrouter/gemini-3.5-flash-lite')).toBe(true)
     expect(isGatewayModel('cf/llama-4')).toBe(true)
     expect(isGatewayModel('github-models/gpt-5.6-sol')).toBe(true)
   })
 
   test('keeps opencode/* and openai/* on their curated paths', () => {
-    expect(isGatewayModel('opencode/deepseek-v4-flash-free')).toBe(false)
+    expect(isGatewayModel('opencode/space-bunny-free')).toBe(false)
     expect(isGatewayModel('openai/gpt-5.6-sol')).toBe(false)
   })
 
@@ -62,7 +62,7 @@ describe('isGatewayModel', () => {
 
 describe('buildGroups', () => {
   const ids = [
-    'oc/deepseek-v4-flash-free',
+    'oc/space-bunny-free',
     'oc/ling-3.0-flash-free',
     'oc/nemotron-3-ultra-free',
     'openai/gpt-5.6-sol',
@@ -79,14 +79,17 @@ describe('buildGroups', () => {
 
   const groups = buildGroups(ids)
 
-  test('oc group contains only free models with deepseek first', () => {
+  test('oc group contains only free models, sorted alphabetically', () => {
     const oc = groups.find(g => g.id === 'oc')
     expect(oc).toBeDefined()
     expect(oc!.models.length).toBe(3)
-    expect(oc!.models[0]!.value).toBe('opencode/deepseek-v4-flash-free')
-    // rest alphabetical by label
-    const rest = oc!.models.slice(1).map(m => m.value)
-    expect([...rest].sort()).toEqual(rest)
+    const values = oc!.models.map(m => m.value)
+    // no hardcoded favorite ordering: purely alphabetical by label
+    expect(values).toEqual([
+      'opencode/ling-3.0-flash-free',
+      'opencode/nemotron-3-ultra-free',
+      'opencode/space-bunny-free',
+    ])
   })
 
   test('family keyword groups fold into anthropic/gemini/grok', () => {
@@ -164,9 +167,7 @@ describe('getProviderModelGroups resilience', () => {
     const groups = await getProviderModelGroups()
     expect(groups.some(g => g.id === 'ccb')).toBe(true)
     const oc = groups.find(g => g.id === 'oc')
-    expect(oc?.models.map(m => m.value)).toEqual([
-      'opencode/deepseek-v4-flash-free',
-    ])
+    expect(oc?.models.map(m => m.value)).toEqual(['opencode/space-bunny-free'])
   })
 })
 

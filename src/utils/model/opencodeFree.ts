@@ -224,15 +224,10 @@ export function buildGroups(ids: string[]): ProviderModelGroup[] {
     more.push(id)
   }
 
-  // Sort OpenCode models: deepseek-v4-flash-free first, then alphabetically.
+  // Sort OpenCode models alphabetically.
   const oc = groups.get('oc')
   if (oc) {
-    oc.models.sort((a, b) => {
-      const aFree = (a.value ?? '').includes('deepseek-v4-flash-free') ? 0 : 1
-      const bFree = (b.value ?? '').includes('deepseek-v4-flash-free') ? 0 : 1
-      if (aFree !== bFree) return aFree - bFree
-      return a.label.localeCompare(b.label)
-    })
+    oc.models.sort((a, b) => a.label.localeCompare(b.label))
   }
 
   const result = [...groups.values()].sort((a, b) => {
@@ -496,7 +491,7 @@ function fallbackGroups(): ProviderModelGroup[] {
       label: 'OpenCode',
       models: [
         ocModelToOption(
-          `oc/${process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'}`,
+          `oc/${process.env.OPENCODE_FREE_MODEL ?? 'space-bunny-free'}`,
         ),
       ],
     },
@@ -523,9 +518,7 @@ export async function getProviderModelGroups(): Promise<ProviderModelGroup[]> {
     const ids = [...gatewayIds, ...ccbIds]
     // Keep the default OpenCode free model selectable.
     if (gatewayIds.length === 0) {
-      ids.push(
-        `oc/${process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'}`,
-      )
+      ids.push(`oc/${process.env.OPENCODE_FREE_MODEL ?? 'space-bunny-free'}`)
     }
     groups = buildGroups(ids)
   }

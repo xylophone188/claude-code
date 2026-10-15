@@ -1,6 +1,6 @@
 import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { capitalize } from '../stringUtils.js'
-import { MODEL_ALIASES, type ModelAlias } from './aliases.js'
+import { MODEL_ALIASES } from './aliases.js'
 import { applyBedrockRegionPrefix, getBedrockRegionPrefix } from './bedrock.js'
 import {
   getCanonicalName,
@@ -37,11 +37,21 @@ export function getDefaultSubagentModel(): string {
 export function getAgentModel(
   agentModel: string | undefined,
   parentModel: string,
-  toolSpecifiedModel?: ModelAlias,
+  toolSpecifiedModel?: string,
   permissionMode?: PermissionMode,
 ): string {
   if (process.env.CLAUDE_CODE_SUBAGENT_MODEL) {
-    return parseUserSpecifiedModel(process.env.CLAUDE_CODE_SUBAGENT_MODEL)
+    // CLAUDE_CODE_SUBAGENT_MODEL is a global override for subagent models.
+    // Pass it through when it's a known alias (sonnet, opus, haiku, best)
+    // or a concrete model ID (claude-*, anthropic.*, arn:*, etc.).
+    // Routing tokens from the CCB ecosystem ('auto/best-chat', 'inherit')
+    // contain '/' or are reserved keywords — they must NOT be sent to the
+    // API as a literal model string. Fall through to parent inheritance
+    // so subagents use the same model resolution as the main loop.
+    const subagentModel = process.env.CLAUDE_CODE_SUBAGENT_MODEL
+    if (subagentModel !== 'inherit' && !subagentModel.includes('/')) {
+      return parseUserSpecifiedModel(subagentModel)
+    }
   }
 
   // Extract Bedrock region prefix from parent model to inherit for subagents.

@@ -335,7 +335,7 @@ const MaxHaiku45Option: ModelOption = {
 }
 
 function getOpencodeFreeOption(): ModelOption {
-  const model = process.env.OPENCODE_FREE_MODEL ?? 'deepseek-v4-flash-free'
+  const model = process.env.OPENCODE_FREE_MODEL ?? 'space-bunny-free'
   const value = `opencode/${model}`
   return {
     value,

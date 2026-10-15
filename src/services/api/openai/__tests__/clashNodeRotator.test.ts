@@ -330,7 +330,7 @@ describe('retryDirectProviderStream triggers clash rotation on opencode 429', ()
   const opencodeRoute: DirectRoute = {
     providerId: 'opencode',
     baseURL: 'https://opencode.test/v1',
-    model: 'deepseek-v4-flash-free',
+    model: 'space-bunny-free',
     apiKey: 'public',
     kind: 'opencode',
   }

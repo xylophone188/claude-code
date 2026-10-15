@@ -210,9 +210,36 @@ test('adapts direct fallback text stream to Responses events', async () => {
       } as ChatCompletionChunk
     },
   }
-  expect(await Array.fromAsync(chatCompletionsToResponses(source))).toEqual([
+  const events = await Array.fromAsync(
+    chatCompletionsToResponses(source, 'gpt-5'),
+  )
+  expect(events).toEqual([
     { type: 'response.output_text.delta', delta: 'PONG' },
-    { type: 'response.completed', response: { status: 'completed' } },
+    {
+      type: 'response.completed',
+      response: {
+        id: expect.stringMatching(/^resp_/),
+        object: 'response',
+        created_at: expect.any(Number),
+        model: 'gpt-5',
+        status: 'completed',
+        output_text: 'PONG',
+        output: [
+          {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'PONG' }],
+            status: 'completed',
+          },
+        ],
+        usage: expect.any(Object),
+        error: null,
+        incomplete_details: null,
+        instructions: null,
+        metadata: null,
+        parallel_tool_calls: true,
+      },
+    },
   ])
 })
 

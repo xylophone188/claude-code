@@ -17,7 +17,7 @@ const UPSTREAM_CUSTOM_ERROR_PATTERNS: RegExp[] = [
   // Generic "cannot answer, please retry" refusal wording
   /无法响应(?:您|你)的请求.{0,20}(?:请.{0,10}(?:检查|重新输入|重试|稍后再试))/,
   // Quota, Balance & Rate limit fake 200 errors
-  /(?:^|)(?:配额不足|余额不足|额度耗尽|账户余额不足|账户欠费|insufficient_quota|quota_exceeded|rate_limit_exceeded|TPM limit exceeded|RPM limit exceeded)(?:|[。！,.!])/i,
+  /(?:^|\b)(?:配额不足|余额不足|额度耗尽|账户余额不足|账户欠费|insufficient_quota|quota_exceeded|rate_limit_exceeded|TPM limit exceeded|RPM limit exceeded)(?:\b|[。！,.!])/i,
   // Gateway JSON error objects masquerading as text completions
   /^s*{s*"(?:error|errcode|error_code|status|code)"s*:s*(?:{|"[^"]+"|d+)/,
   // Gateway HTML error pages served with HTTP 200

@@ -11,6 +11,41 @@ import {
 } from './chatgptAuth.js'
 import { routeError, routeLog } from '../../routing/stageLog.js'
 
+/** Build a minimal valid OpenAI Responses API Response object for completion events. */
+function buildCompletedResponse(
+  model: string,
+  outputText: string,
+  status: 'completed' | 'incomplete',
+): Record<string, unknown> {
+  return {
+    id: `resp_${randomUUID().replace(/-/g, '').slice(0, 22)}`,
+    object: 'response',
+    created_at: Math.floor(Date.now() / 1000),
+    model,
+    status,
+    output_text: outputText,
+    output: [
+      {
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: outputText }],
+        status,
+      },
+    ],
+    usage: {
+      input_tokens: 0,
+      output_tokens: 0,
+      input_tokens_details: { cached_tokens: 0 },
+    },
+    error: null,
+    incomplete_details:
+      status === 'incomplete' ? { reason: 'max_tokens' } : null,
+    instructions: null,
+    metadata: null,
+    parallel_tool_calls: true,
+  }
+}
+
 type ResponsesInputItem = Record<string, unknown>
 type ResponsesTool = Record<string, unknown>
 const CHATGPT_ACCOUNT_FAILURE_LOG_LIMIT = 12
@@ -77,9 +112,11 @@ function upstreamUnavailableText(
  * consumed by the existing Anthropic stream adapter. */
 export async function* chatCompletionsToResponses(
   stream: AsyncIterable<ChatCompletionChunk>,
+  model?: string,
 ): AsyncGenerator<Record<string, unknown>, void> {
   const tools = new Map<number, { id: string; name: string }>()
   let completed = false
+  let outputText = ''
   for await (const chunk of stream) {
     const choice = chunk.choices[0]
     if (!choice) continue
@@ -93,6 +130,7 @@ export async function* chatCompletionsToResponses(
       }
     }
     if (delta.content) {
+      outputText += delta.content
       yield { type: 'response.output_text.delta', delta: delta.content }
     }
     for (const tool of delta.tool_calls ?? []) {
@@ -122,19 +160,30 @@ export async function* chatCompletionsToResponses(
       for (const outputIndex of tools.keys()) {
         yield { type: 'response.output_item.done', output_index: outputIndex }
       }
+      const status =
+        choice.finish_reason === 'length' ? 'incomplete' : 'completed'
       yield {
         type: 'response.completed',
-        response: {
-          status:
-            choice.finish_reason === 'length' ? 'incomplete' : 'completed',
-        },
+        response: buildCompletedResponse(
+          model ?? 'unknown',
+          outputText,
+          status,
+        ),
       }
       completed = true
       return
     }
   }
-  if (!completed)
-    yield { type: 'response.completed', response: { status: 'completed' } }
+  if (!completed) {
+    yield {
+      type: 'response.completed',
+      response: buildCompletedResponse(
+        model ?? 'unknown',
+        outputText,
+        'completed',
+      ),
+    }
+  }
 }
 
 type ResponsesRequest = {

@@ -7,7 +7,9 @@ mock.module('src/services/providerRegistry/loader.ts', () => ({
   loadProviders: () => [],
 }))
 
-const { retryCcbOpenAIStream, StreamAttemptTimeoutError } = await import('../index.js')
+const { retryCcbOpenAIStream, StreamAttemptTimeoutError } = await import(
+  '../index.js'
+)
 const { RetryBudgetExhaustedError } = await import('../../withRetry.js')
 
 function streamOf(
@@ -144,8 +146,7 @@ describe('retryCcbOpenAIStream', () => {
       retryCcbOpenAIStream(
         async () => {
           attempts++
-          if (attempts === 1)
-            throw new StreamAttemptTimeoutError('first')
+          if (attempts === 1) throw new StreamAttemptTimeoutError('first')
           return streamOf(textChunk('ok after timeout'), finishChunk)
         },
         new AbortController().signal,

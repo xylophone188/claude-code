@@ -11,7 +11,7 @@ import {
 const opencodeRoute: DirectRoute = {
   providerId: 'opencode',
   baseURL: 'https://opencode.ai/zen/v1',
-  model: 'deepseek-v4-flash-free',
+  model: 'space-bunny-free',
   apiKey: 'public',
   kind: 'opencode',
 }
@@ -94,7 +94,7 @@ describe('opencode fallback chain', () => {
     const dedicated = expanded.find(
       route => route.providerId === 'opencode-dedicated',
     )
-    expect(dedicated?.model).toBe('deepseek-v4-flash-free')
+    expect(dedicated?.model).toBe('space-bunny-free')
   })
 
   test('omits the dedicated exit but keeps NVIDIA when unconfigured', () => {
@@ -130,7 +130,7 @@ describe('opencode fallback chain', () => {
     )
     expect(nvidiaKeys.size).toBe(nvidia.length)
     // Both public routes come first; the single fallback group trails them.
-    expect(expanded[0]?.model).toBe('deepseek-v4-flash-free')
+    expect(expanded[0]?.model).toBe('space-bunny-free')
     expect(expanded[1]?.model).toBe('glm-5-free')
     expect(expanded[2]?.providerId).toBe('opencode-dedicated')
   })

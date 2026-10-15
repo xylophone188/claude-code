@@ -660,8 +660,15 @@ function shouldRetryCcbOpenAIError(error: unknown): boolean {
   if (error instanceof StreamAttemptTimeoutError) return true
   if (error instanceof APIConnectionError) return true
   if (error instanceof APIError) return isTransientCcbStatus(error.status)
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
-  if (message.includes('terminated') || message.includes('econnreset') || message.includes('socket hang up')) {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase()
+  if (
+    message.includes('terminated') ||
+    message.includes('econnreset') ||
+    message.includes('socket hang up')
+  ) {
     return true
   }
   return false
@@ -825,26 +832,29 @@ export async function* retryDirectProviderStream(
             events.push(event)
             const eventMeaningful = isMeaningfulOpenAIEvent(event)
             if (typeof event.model === 'string' && event.model) {
-              actualModel = event.model;
-              let provider = route.providerId;
-              if (actualModel.includes("/")) {
-                provider = actualModel.split("/")[0];
-              } else if (actualModel.startsWith("sensenova")) {
-                provider = "sensenova";
-              } else if (actualModel.startsWith("deepseek")) {
-                provider = "deepseek";
-              } else if (actualModel.startsWith("glm")) {
-                provider = "glm-cn";
-              } else if (actualModel.startsWith("gpt-")) {
-                provider = "codex";
-              } else if (actualModel.startsWith("claude") || actualModel.startsWith("gemini")) {
-                provider = "agy";
-              } else if (actualModel.startsWith("qwen")) {
-                provider = "qwen";
-              } else if (actualModel.startsWith("nvidia")) {
-                provider = "nvidia";
+              actualModel = event.model
+              let provider = route.providerId
+              if (actualModel.includes('/')) {
+                provider = actualModel.split('/')[0]
+              } else if (actualModel.startsWith('sensenova')) {
+                provider = 'sensenova'
+              } else if (actualModel.startsWith('deepseek')) {
+                provider = 'deepseek'
+              } else if (actualModel.startsWith('glm')) {
+                provider = 'glm-cn'
+              } else if (actualModel.startsWith('gpt-')) {
+                provider = 'codex'
+              } else if (
+                actualModel.startsWith('claude') ||
+                actualModel.startsWith('gemini')
+              ) {
+                provider = 'agy'
+              } else if (actualModel.startsWith('qwen')) {
+                provider = 'qwen'
+              } else if (actualModel.startsWith('nvidia')) {
+                provider = 'nvidia'
               }
-              setActiveCcbRoute(provider, actualModel);
+              setActiveCcbRoute(provider, actualModel)
             }
             if (!meaningful && eventMeaningful) {
               meaningful = true
@@ -982,7 +992,10 @@ export async function* retryDirectProviderStream(
             continue
           }
         }
-        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
+        if (
+          attempt < attempts &&
+          String((error as any)?.message || '').includes('empty stream')
+        ) {
           routeLog('retry', 'empty stream retry', {
             attempt,
             maxAttempts: attempts,
@@ -992,11 +1005,18 @@ export async function* retryDirectProviderStream(
           })
           continue
         }
-        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
-          routeLog('retry', route.providerId + '/' + route.model + ' empty stream retry', {
-            attempt,
-            maxAttempts: attempts,
-          })
+        if (
+          attempt < attempts &&
+          String((error as any)?.message || '').includes('empty stream')
+        ) {
+          routeLog(
+            'retry',
+            route.providerId + '/' + route.model + ' empty stream retry',
+            {
+              attempt,
+              maxAttempts: attempts,
+            },
+          )
           await sleep(Math.min(1000, 100 * attempt), signal, {
             abortError: () => new APIUserAbortError(),
           })
@@ -2355,11 +2375,13 @@ export async function* queryModelOpenAI(
           // Anthropic SDK path. Real usage (input + output tokens) is available
           // here and injected so tokenCountWithEstimation() can read it.
           if (partialMessage) {
-            const activeRoute = getActiveCcbRoute();
+            const activeRoute = getActiveCcbRoute()
             if (activeRoute?.model) {
-              partialMessage.model = activeRoute.model.includes("/")
+              partialMessage.model = activeRoute.model.includes('/')
                 ? activeRoute.model
-                : (activeRoute.provider ? (activeRoute.provider + "/" + activeRoute.model) : activeRoute.model);
+                : activeRoute.provider
+                  ? activeRoute.provider + '/' + activeRoute.model
+                  : activeRoute.model
             }
             for (const output of assembleFinalAssistantOutputs({
               partialMessage,

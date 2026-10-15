@@ -53,7 +53,7 @@ describe('getAutoCandidates', () => {
     delete process.env.CCB_AUTO_CANDIDATES
     const pool = getAutoCandidates()
     expect(pool.length).toBeGreaterThan(0)
-    expect(pool).toContain('nvidia/*')
+    expect(pool).toContain('agentbox-gateway/auto')
   })
 
   it('supports explicit environment candidate override', () => {

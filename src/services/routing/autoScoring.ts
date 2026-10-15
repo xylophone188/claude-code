@@ -91,13 +91,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
  * 拒绝硬编码任何具体模型字符串，100% 依赖上游动态端点与服务发现展开活模型！
  */
 export const DEFAULT_AUTO_CANDIDATES = [
-  'sensenova/*',
-  'nvidia/*',
-  'opencode/*',
-  'glm-cn/*',
-  'groq/*',
-  'codex-bridge/*',
-  'cx/*',
+  'agentbox-gateway/auto',
 ]
 const DEFAULT_AUTO_L2_CANDIDATES = [
   'sensenova/*',

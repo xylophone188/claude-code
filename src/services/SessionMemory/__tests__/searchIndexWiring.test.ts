@@ -15,41 +15,41 @@ let sessionMemoryDirCounter = 0
 
 mock.module('bun:bundle', () => ({ feature: () => false }))
 
-const actualState = await import('src/bootstrap/state.ts')
-mock.module('src/bootstrap/state.ts', () => ({
+const actualState = await import('../../../bootstrap/state.js')
+mock.module('../../../bootstrap/state.js', () => ({
   ...actualState,
   getIsRemoteMode: () => false,
   getSessionId: () => 'test-session-id-123',
 }))
 
-const actualLog = await import('src/utils/log.ts')
-mock.module('src/utils/log.ts', () => ({
+const actualLog = await import('../../../utils/log.js')
+mock.module('../../../utils/log.js', () => ({
   ...actualLog,
   logError: () => {},
 }))
 
-const actualDebug = await import('src/utils/debug.ts')
-mock.module('src/utils/debug.ts', () => ({
+const actualDebug = await import('../../../utils/debug.js')
+mock.module('../../../utils/debug.js', () => ({
   ...actualDebug,
   logForDebugging: () => {},
 }))
 
-const actualErrors = await import('src/utils/errors.ts')
-mock.module('src/utils/errors.ts', () => ({
+const actualErrors = await import('../../../utils/errors.js')
+mock.module('../../../utils/errors.js', () => ({
   ...actualErrors,
   errorMessage: (e: unknown) => String(e),
   getErrnoCode: () => undefined,
 }))
 
-const actualFsOps = await import('src/utils/fsOperations.ts')
-mock.module('src/utils/fsOperations.ts', () => ({
+const actualFsOps = await import('../../../utils/fsOperations.js')
+mock.module('../../../utils/fsOperations.js', () => ({
   ...actualFsOps,
   getFsImplementation: () => require('node:fs/promises'),
   safeResolvePath: (p: string) => p,
 }))
 
-const actualFsPerms = await import('src/utils/permissions/filesystem.ts')
-mock.module('src/utils/permissions/filesystem.ts', () => ({
+const actualFsPerms = await import('../../../utils/permissions/filesystem.js')
+mock.module('../../../utils/permissions/filesystem.js', () => ({
   ...actualFsPerms,
   getSessionMemoryDir: () => sessionMemoryDir + '/',
   getSessionMemoryPath: () => sessionMemoryPath,

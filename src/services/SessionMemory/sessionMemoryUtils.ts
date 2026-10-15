@@ -8,6 +8,12 @@ import { getFsImplementation } from '../../utils/fsOperations.js'
 import { getSessionMemoryPath } from '../../utils/permissions/filesystem.js'
 import { sleep } from '../../utils/sleep.js'
 import { logEvent } from '../analytics/index.js'
+import { getSessionMemoryCached } from '../searchEngine/sessionMemoryCache.js'
+import {
+  unifiedMemoryKernel,
+  UnifiedMemoryKernel,
+  type MemoryFact,
+} from '../unifiedMemory/index.js'
 
 const EXTRACTION_WAIT_TIMEOUT_MS = 15000
 const EXTRACTION_STALE_THRESHOLD_MS = 60000 // 1 minute
@@ -108,21 +114,15 @@ export async function waitForSessionMemoryExtraction(): Promise<void> {
  * Get the current session memory content
  */
 export async function getSessionMemoryContent(): Promise<string | null> {
-  const fs = getFsImplementation()
-  const memoryPath = getSessionMemoryPath()
+  // Cache-aside: Redis first, disk fallback, backfill. Redis failure is a
+  // no-op — the disk read below is authoritative.
+  const content = await getSessionMemoryCached()
+  if (content === null) return null
 
-  try {
-    const content = await fs.readFile(memoryPath, { encoding: 'utf-8' })
-
-    logEvent('tengu_session_memory_loaded', {
-      content_length: content.length,
-    })
-
-    return content
-  } catch (e: unknown) {
-    if (isFsInaccessible(e)) return null
-    throw e
-  }
+  logEvent('tengu_session_memory_loaded', {
+    content_length: content.length,
+  })
+  return content
 }
 
 /**
@@ -204,4 +204,29 @@ export function resetSessionMemoryState(): void {
   sessionMemoryInitialized = false
   lastSummarizedMessageId = undefined
   extractionStartedAt = undefined
+}
+
+/**
+ * Bridges SessionMemory with the Unified Memory Kernel (UMK).
+ * Allows recording and querying declarative facts from session contexts.
+ */
+export async function syncSessionFactToUmk(fact: {
+  canonicalKey: string
+  entity: string
+  predicate: string
+  object: string
+  content: string
+  scope?: MemoryFact['scope']
+}): Promise<MemoryFact | null> {
+  if (!UnifiedMemoryKernel.isEnabled()) {
+    return null
+  }
+  return unifiedMemoryKernel.recordFact({
+    ...fact,
+    sourceType: 'session_extraction',
+  })
+}
+
+export function getUmkInstance() {
+  return unifiedMemoryKernel
 }

@@ -43,6 +43,12 @@ import { getTokenUsage, tokenCountWithEstimation } from '../../utils/tokens.js'
 import { logEvent } from '../analytics/index.js'
 import { isAutoCompactEnabled } from '../compact/autoCompact.js'
 import {
+  ensureSessionMemorySearchIndex,
+  indexSessionMemoryFireAndForget,
+} from '../searchEngine/sessionMemoryIndex.js'
+import { invalidateSessionMemoryCache } from '../searchEngine/sessionMemoryCache.js'
+import { upsertSessionMemoryToPg } from '../searchEngine/sessionMemoryStore.js'
+import {
   buildSessionMemoryUpdatePrompt,
   loadSessionMemoryTemplate,
 } from './prompts.js'
@@ -331,6 +337,13 @@ const extractSessionMemory = sequential(async function (
     overrides: { readFileState: setupContext.readFileState },
   })
 
+  // Fire-and-forget Elasticsearch (IK) mirror of the freshly extracted
+  // summary. Never awaited: a missing/unreachable cluster degrades to a log
+  // line and the markdown file above remains the source of truth.
+  void indexSessionMemoryFireAndForget({ memoryPath })
+  invalidateSessionMemoryCache()
+  void upsertSessionMemoryToPg({ memoryPath })
+
   // Log extraction event for tracking frequency
   // Use the token usage from the last message in the conversation
   const lastMessage = messages[messages.length - 1]
@@ -376,6 +389,10 @@ export function initSessionMemory(): void {
   if (!autoCompactEnabled) {
     return
   }
+
+  // Best-effort ES/IK index warm-up for the Session Memory mirror.
+  // Fire-and-forget so a missing cluster can never delay startup.
+  void ensureSessionMemorySearchIndex()
 
   // Register hook unconditionally - gate check happens lazily when hook runs
   registerPostSamplingHook(extractSessionMemory)
@@ -438,6 +455,11 @@ export async function manuallyExtractSessionMemory(
       forkLabel: 'session_memory_manual',
       overrides: { readFileState: setupContext.readFileState },
     })
+
+    // Fire-and-forget Elasticsearch (IK) mirror, same as the hook path.
+    void indexSessionMemoryFireAndForget({ memoryPath })
+    invalidateSessionMemoryCache()
+    void upsertSessionMemoryToPg({ memoryPath })
 
     // Log manual extraction event
     logEvent('tengu_session_memory_manual_extraction', {})

@@ -24,6 +24,7 @@ import {
 } from './compact.js'
 import { runPostCompactCleanup } from './postCompactCleanup.js'
 import { trySessionMemoryCompaction } from './sessionMemoryCompact.js'
+import { protectRawContextBeforeCompaction } from '../resource/rawContextProtection.js'
 
 // Reserve this many tokens for output during compaction
 // Based on p99.99 of compact summary output being 17,387 tokens.
@@ -37,7 +38,12 @@ export function getEffectiveContextWindowSize(model: string): number {
   )
   let contextWindow = getContextWindowForModel(model, getSdkBetas())
 
-  const autoCompactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
+  // Env wins over settings so users can override per-invocation without editing config.
+  const autoCompactWindow =
+    process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW ??
+    (getGlobalConfig().autoCompactWindow !== undefined
+      ? String(getGlobalConfig().autoCompactWindow)
+      : undefined)
   if (autoCompactWindow) {
     const parsed = parseInt(autoCompactWindow, 10)
     if (!isNaN(parsed) && parsed > 0) {
@@ -312,6 +318,13 @@ export async function autoCompactIfNeeded(
     autoCompactThreshold: getAutoCompactThreshold(model),
     querySource,
   }
+
+  // Preserve raw messages before either session-memory or summary compaction can
+  // discard tool output. Archival failures are intentionally non-blocking.
+  await protectRawContextBeforeCompaction(
+    messages,
+    toolUseContext.agentId ?? 'unknown-session',
+  ).catch(() => undefined)
 
   // EXPERIMENT: Try session memory compaction first
   const sessionMemoryResult = await trySessionMemoryCompaction(

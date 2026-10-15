@@ -2,6 +2,11 @@ import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
 
+import {
+  isTodoV2Enabled,
+  listExecutionOwnedOpenTasks,
+} from '../../utils/tasks.js'
+
 /* eslint-disable @typescript-eslint/no-require-imports */
 const sessionTranscriptModule = feature('KAIROS')
   ? (require('../sessionTranscript/sessionTranscript.js') as typeof import('../sessionTranscript/sessionTranscript.js'))
@@ -340,6 +345,8 @@ export interface CompactionResult {
   hookResults: HookResultMessage[]
   messagesToKeep?: Message[]
   userDisplayMessage?: string
+  /** Optional pending task state re-injected after compaction. */
+  taskListBlock?: UserMessage
   preCompactTokenCount?: number
   postCompactTokenCount?: number
   truePostCompactTokenCount?: number
@@ -365,12 +372,39 @@ export type RecompactionInfo = {
  * Order: boundaryMarker, summaryMessages, messagesToKeep, attachments, hookResults
  */
 export function buildPostCompactMessages(result: CompactionResult): Message[] {
+  const tasks = result.taskListBlock ? [result.taskListBlock] : []
   return ([result.boundaryMarker] as Message[]).concat(
     result.summaryMessages,
+    tasks,
     stripToolUseResults(result.messagesToKeep),
     result.attachments,
     result.hookResults,
   )
+}
+
+/**
+ * Reads the task list and returns a UserMessage summarizing open tasks, or
+ * undefined if none exist. Injected after compaction so the model doesn't lose
+ * pending work when the summary omits or misremembers task state.
+ *
+ * "Execution-owned" = no owner field OR owner matches the current session's
+ * agent ID. Other agents' unclaimed/unassigned tasks are ignored; they are
+ * not this execution's to complete.
+ */
+async function buildPendingTaskListBlock(
+  agentId: string | undefined,
+): Promise<UserMessage | undefined> {
+  if (!isTodoV2Enabled()) return undefined
+  const open = await listExecutionOwnedOpenTasks(agentId)
+  if (open.length === 0) return undefined
+  const lines = open
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map(t => `- #${t.id} [${t.status}] ${t.subject}`)
+    .join('\n')
+  const content =
+    `**Task State (authoritative, re-injected after compaction):**\n` +
+    `These tasks are owned by this session and MUST be completed. Call TaskList to refresh authoritative state before acting.\n\n${lines}`
+  return createUserMessage({ content, isCompactSummary: true })
 }
 
 /** Release large tool result payloads from kept messages after compaction.
@@ -701,6 +735,14 @@ export async function compactConversation(
       }),
     ]
 
+    // Re-inject execution-owned open task state after compaction. The compact
+    // summary prompt asks the model to write a "Pending Tasks" section, but it
+    // is free-form — the model may omit or misremember tasks. The task files
+    // (~/.claude/tasks/<list>/<id>.json) are the authoritative source; a task
+    // list block here guarantees a pending task survives compaction, which the
+    // task continuation guard in query.ts reads on the next turn end.
+    const taskListBlock = await buildPendingTaskListBlock(context.agentId)
+
     // Previously "postCompactTokenCount" — renamed because this is the
     // compact API call's total usage (input_tokens ≈ preCompactTokenCount),
     // NOT the size of the resulting context. Kept for event-field continuity.
@@ -715,6 +757,7 @@ export async function compactConversation(
     const truePostCompactTokenCount = roughTokenCountEstimationForMessages([
       boundaryMarker,
       ...summaryMessages,
+      ...(taskListBlock ? [taskListBlock] : []),
       ...postCompactFileAttachments,
       ...hookMessages,
     ] as Parameters<typeof roughTokenCountEstimationForMessages>[0])
@@ -818,6 +861,7 @@ export async function compactConversation(
     return {
       boundaryMarker,
       summaryMessages,
+      taskListBlock,
       attachments: postCompactFileAttachments,
       hookResults: hookMessages,
       userDisplayMessage: combinedUserDisplayMessage || undefined,
@@ -1590,7 +1634,23 @@ export async function createPostCompactFileAttachments(
     if (result === null) {
       return false
     }
-    const attachmentTokens = roughTokenCountEstimation(jsonStringify(result))
+    // Estimate token cost from content length directly instead of serialising
+    // the full AttachmentMessage with jsonStringify — which was redundant since
+    // roughTokenCountEstimation only divides by 4.  For file attachments the
+    // content string dominates; for compact_file_reference (just a path) the
+    // overhead is tiny and we add a small fixed overhead for JSON scaffolding.
+    const att = result.attachment as {
+      type: string
+      filename?: string
+      content?: { file?: { content?: string } }
+    }
+    const contentLen =
+      att.type === 'file' || att.type === 'already_read_file'
+        ? (att.content?.file?.content?.length ?? 0) +
+          (att.filename?.length ?? 0) +
+          80
+        : (att.filename?.length ?? 0) + 60
+    const attachmentTokens = Math.round(contentLen / 4)
     if (usedTokens + attachmentTokens <= POST_COMPACT_TOKEN_BUDGET) {
       usedTokens += attachmentTokens
       return true

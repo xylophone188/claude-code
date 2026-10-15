@@ -13,7 +13,11 @@ export function useBackgroundAgentTasks(): LocalAgentTaskState[] {
       .filter(isLocalAgentTask)
       .filter(t => t.agentType !== 'main-session')
       .filter(t => t.isBackgrounded !== false)
-      .filter(t => t.status === 'running' || (t.evictAfter === undefined ? !t.notified : t.evictAfter > now))
+      .filter(
+        t =>
+          t.status === 'running' ||
+          (t.evictAfter === undefined ? !t.notified : t.evictAfter > now),
+      )
       .sort((a, b) => a.startTime - b.startTime)
   }, [tasks])
 }

@@ -238,6 +238,7 @@ export type GlobalConfig = {
   bypassPermissionsModeAccepted?: boolean
   hasUsedBackslashReturn?: boolean
   autoCompactEnabled: boolean // Controls whether auto-compact is enabled
+  autoCompactWindow?: number // Override effective context window (upper bound) for auto-compact. Env CLAUDE_CODE_AUTO_COMPACT_WINDOW still wins when set.
   contextCompressionRemoteUrl?: string // Optional remote compressor for Termux
   showTurnDuration: boolean // Controls whether to show turn duration message (e.g., "Cooked for 1m 6s")
   /**
@@ -645,6 +646,7 @@ export const GLOBAL_CONFIG_KEYS = [
   'editorMode',
   'hasUsedBackslashReturn',
   'autoCompactEnabled',
+  'autoCompactWindow',
   'contextCompressionRemoteUrl',
   'showTurnDuration',
   'diffTool',

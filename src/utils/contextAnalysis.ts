@@ -10,7 +10,67 @@ import type {
   UserMessage,
 } from '../types/message.js'
 import { normalizeMessagesForAPI } from './messages.js'
-import { jsonStringify } from './slowOperations.js'
+
+/**
+ * Estimates the byte-length of JSON.stringify(value) without materializing the
+ * full string.  roughTokenCountEstimation divides by 4, so we only need the
+ * character count — not the actual serialized bytes.  This eliminates the
+ * hundreds-of-MB of temporary string allocations that jsonStringify(block)
+ * caused when analyzeContext walked thousands of tool-result blocks.
+ *
+ * Accuracy: within ~5 % of the real serialized length for typical API
+ * content blocks.  The savings in GC pressure and main-thread time are
+ * the goal — precision matching JSON.stringify is not required here.
+ */
+function estimateJsonByteLength(value: unknown): number {
+  if (value === null) return 4 // "null"
+  switch (typeof value) {
+    case 'boolean':
+      return value ? 4 : 5 // "true" / "false"
+    case 'number':
+      return String(value).length
+    case 'string': {
+      // Account for surrounding quotes and common escape sequences.
+      // For large strings (file content, base64 images) the inner length
+      // dominates; the overhead of counting escapes is negligible vs. the
+      // cost of materialising the full JSON string.
+      let len = 2 // opening + closing quote
+      for (let i = 0; i < value.length; i++) {
+        const c = value.charCodeAt(i)
+        if (c === 0x22 || c === 0x5c || c < 0x20) {
+          len += 2 // escaped char (\\", \\\\, \\n, etc.)
+        } else {
+          len += 1
+        }
+      }
+      return len
+    }
+    case 'object': {
+      if (Array.isArray(value)) {
+        let len = 2 // [ ]
+        for (let i = 0; i < value.length; i++) {
+          if (i > 0) len += 1 // comma
+          len += estimateJsonByteLength(value[i])
+        }
+        return len
+      }
+      // Plain object
+      const keys = Object.keys(value as object)
+      let len = 2 // { }
+      let first = true
+      for (const key of keys) {
+        const v = (value as Record<string, unknown>)[key]
+        if (v === undefined) continue // JSON.stringify skips undefined values
+        if (!first) len += 1 // comma
+        first = false
+        len += estimateJsonByteLength(key) + 1 + estimateJsonByteLength(v) // "key":value
+      }
+      return len
+    }
+    default:
+      return 0 // undefined, function, symbol — JSON.stringify omits these
+  }
+}
 
 type TokenStats = {
   toolRequests: Map<string, number>
@@ -104,7 +164,11 @@ function processBlock(
   readToolPaths: Map<string, string>,
   fileReads: Map<string, { count: number; totalTokens: number }>,
 ): void {
-  const tokens = countTokens(jsonStringify(block))
+  // Estimate serialized JSON character count without materialising the full
+  // string. roughTokenCountEstimation is simply charCount/4, so we compute
+  // the token count directly from our byte estimator, paying zero allocation
+  // cost vs. jsonStringify(block) which created hundreds of MB of temp strings.
+  const tokens = Math.round(estimateJsonByteLength(block) / 4)
   stats.total += tokens
 
   switch (block.type) {

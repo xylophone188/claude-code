@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   // Ordinary CCB sessions use the ordered L1-L6 provider chain. Advisor is
   // opt-in; defaulting here to advisor incorrectly forced the Codex backend.
   if (!args.some(arg => arg === '--model' || arg.startsWith('--model='))) {
-    process.argv.push('--model', 'ccb');
+    process.argv.push('--model', 'auto');
   }
 
   // For all other paths, load the startup profiler

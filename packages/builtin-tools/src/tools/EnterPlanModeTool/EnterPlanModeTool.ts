@@ -54,6 +54,17 @@ export const EnterPlanModeTool: Tool<InputSchema, Output> = buildTool({
   },
   shouldDefer: true,
   isEnabled() {
+    // When in non-interactive / print mode (-p / --print) or remote mode, ExitPlanMode
+    // approval dialog cannot be shown to a user. Disable entry too so plan mode isn't
+    // a trap the model can enter but never leave.
+    if (
+      process.argv.includes('-p') ||
+      process.argv.includes('--print') ||
+      Boolean(process.env.CCB_REMOTE_MODE) ||
+      Boolean(process.env.CLAUDE_CODE_SIMPLE)
+    ) {
+      return false
+    }
     // When --channels is active, ExitPlanMode is disabled (its approval
     // dialog needs the terminal). Disable entry too so plan mode isn't a
     // trap the model can enter but never leave.

@@ -123,6 +123,7 @@ import {
 } from './bootstrap/state.js'
 import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
+import { isTodoV2Enabled, listExecutionOwnedOpenTasks } from './utils/tasks.js'
 import {
   createTrace,
   endTrace,
@@ -235,6 +236,15 @@ function getAutonomyTurnOutcome(params: {
   }
 }
 
+/**
+ * Returns task-list entries owned by this execution that are not yet
+ * completed. "Owned" means either no owner (unclaimed; a fresh task list
+ * created by the current session) or owner matching the current agent ID.
+ * Other agents' assigned tasks are excluded — they are not this session's
+ * responsibility.
+ */
+export const getExecutionOwnedOpenTasks = listExecutionOwnedOpenTasks
+
 export const DEFAULT_MAIN_THREAD_MAX_TURNS = 500
 export const DEFAULT_SUBAGENT_MAX_TURNS = 50
 
@@ -280,6 +290,10 @@ type State = {
   maxOutputTokensOverride: number | undefined
   pendingToolUseSummary: Promise<ToolUseSummaryMessage | null> | undefined
   stopHookActive: boolean | undefined
+  // How many times this query() call already injected a pending-task nudge.
+  // Capped so a task the model keeps refusing to finish can't spin the loop.
+  // Undefined on first iteration.
+  taskContinuationCount?: number
   turnCount: number
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
@@ -448,6 +462,7 @@ async function* queryLoop(
     hasAttemptedReactiveCompact: false,
     turnCount: 1,
     pendingToolUseSummary: undefined,
+    taskContinuationCount: 0,
     transition: undefined,
   }
   const budgetTracker = feature('TOKEN_BUDGET') ? createBudgetTracker() : null
@@ -1664,6 +1679,48 @@ async function* queryLoop(
             queryChainId: queryChainIdForAnalytics,
             queryDepth: queryTracking.depth,
           })
+        }
+      }
+
+      // Pending-task continuation guard: if execution-owned tasks remain open,
+      // nudge the model once to finish them instead of returning completed.
+      // Fix A (post-compact task injection) plus Fix B together close the gap
+      // where a compact erases task awareness and the runner accepts "done".
+      // Capped at 1 nudge per query() — repeated refusal should stop, not spin.
+      if (
+        isTodoV2Enabled() &&
+        state.taskContinuationCount === undefined &&
+        !stopHookActive
+      ) {
+        const open = await getExecutionOwnedOpenTasks(toolUseContext.agentId)
+        if (open.length > 0) {
+          const taskLines = open
+            .sort((a, b) => Number(a.id) - Number(b.id))
+            .map(t => `- #${t.id} [${t.status}] ${t.subject}`)
+            .join('\n')
+          const nudge = createUserMessage({
+            content: `Task state check: your previous turn ended with these execution-owned tasks still open:\n\n${taskLines}\n\nContinue working on them now — call TaskList to refresh authoritative state, then finish the remaining work. Do not stop until they are complete.`,
+            isMeta: true,
+          })
+          logEvent('tengu_task_continuation_injected', {
+            taskCount: open.length,
+            queryChainId: queryChainIdForAnalytics,
+            queryDepth: queryTracking.depth,
+          })
+          state = {
+            messages: [...messagesForQuery, ...assistantMessages, nudge],
+            toolUseContext,
+            autoCompactTracking: tracking,
+            maxOutputTokensRecoveryCount: 0,
+            hasAttemptedReactiveCompact: false,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: undefined,
+            taskContinuationCount: 1,
+            turnCount,
+            transition: { reason: 'task_continuation' },
+          }
+          continue
         }
       }
 

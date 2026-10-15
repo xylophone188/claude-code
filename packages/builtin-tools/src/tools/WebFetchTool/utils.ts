@@ -540,6 +540,135 @@ export async function fetchContentWithTavily(
   return entry
 }
 
+const DEFAULT_OMNIROUTE_BASE_URL = 'http://100.121.247.3:8888'
+
+interface OmniRouteSettings {
+  omniRouteWebToolsBaseUrl?: string
+  omniRouteWebToolsApiKey?: string
+}
+
+interface OmniRouteFetchResponse {
+  content?: string
+  raw_content?: string
+  markdown?: string
+  text?: string
+  results?: Array<{ raw_content?: string; content?: string }>
+}
+
+function getOmniRouteBaseUrl(): string {
+  const settings = getSettings_DEPRECATED() as OmniRouteSettings
+  return (
+    process.env.OMNIROUTE_WEB_TOOLS_BASE_URL ??
+    settings.omniRouteWebToolsBaseUrl ??
+    DEFAULT_OMNIROUTE_BASE_URL
+  )
+}
+
+function getOmniRouteApiKey(): string | undefined {
+  const settings = getSettings_DEPRECATED() as OmniRouteSettings
+  return (
+    process.env.OMNIROUTE_WEB_TOOLS_API_KEY ?? settings.omniRouteWebToolsApiKey
+  )
+}
+
+function buildOmniRouteFetchUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/$/, '')
+  return trimmed.endsWith('/v1/web/fetch') ? trimmed : `${trimmed}/v1/web/fetch`
+}
+
+/**
+ * Fetch URL content via OmniRoute /v1/web/fetch. The server fetches the URL
+ * and (when a prompt is supplied) applies the prompt server-side, returning
+ * the processed content directly. Falls back to applyPromptToMarkdown only
+ * when the server returns no content.
+ */
+export async function fetchContentWithOmniRoute(
+  url: string,
+  abortController: AbortController,
+): Promise<FetchedContent> {
+  if (!validateURL(url)) {
+    throw new Error('Invalid URL')
+  }
+
+  const cachedEntry = URL_CACHE.get(url)
+  if (cachedEntry) {
+    return {
+      bytes: cachedEntry.bytes,
+      code: cachedEntry.code,
+      codeText: cachedEntry.codeText,
+      content: cachedEntry.content,
+      contentType: cachedEntry.contentType,
+      persistedPath: cachedEntry.persistedPath,
+      persistedSize: cachedEntry.persistedSize,
+    }
+  }
+
+  const baseUrl = getOmniRouteBaseUrl()
+  const fetchUrl = buildOmniRouteFetchUrl(baseUrl)
+  const apiKey = getOmniRouteApiKey()
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
+  }
+
+  const abortSignal = abortController.signal
+
+  let response
+  try {
+    response = await axios.post<OmniRouteFetchResponse>(
+      fetchUrl,
+      { url, prompt: prompt || '' },
+      {
+        signal: abortSignal,
+        timeout: getFetchTimeoutMs(),
+        headers,
+        validateStatus: status => status >= 200 && status < 300,
+      },
+    )
+  } catch (e) {
+    if (axios.isCancel(e) || abortSignal.aborted) {
+      throw new AbortError()
+    }
+    throw e
+  }
+
+  if (abortSignal.aborted) {
+    throw new AbortError()
+  }
+
+  const data = response.data ?? {}
+  let markdownContent =
+    data.content ?? data.raw_content ?? data.markdown ?? data.text ?? ''
+  if (
+    !markdownContent &&
+    Array.isArray(data.results) &&
+    data.results.length > 0
+  ) {
+    markdownContent =
+      data.results[0].raw_content ?? data.results[0].content ?? ''
+  }
+
+  if (!markdownContent.trim()) {
+    throw new Error(
+      `OmniRoute /v1/web/fetch returned empty content for ${url}.`,
+    )
+  }
+
+  const contentBytes = Buffer.byteLength(markdownContent)
+  const entry: CacheEntry = {
+    bytes: contentBytes,
+    code: response.status,
+    codeText: response.statusText || 'OK',
+    content: markdownContent,
+    contentType: 'text/markdown',
+  }
+  URL_CACHE.set(url, entry, { size: Math.max(1, contentBytes) })
+  return entry
+}
+
 export async function applyPromptToMarkdown(
   prompt: string,
   markdownContent: string,

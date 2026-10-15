@@ -1,4 +1,4 @@
-import React, { type ReactNode, useCallback, useMemo, useState } from 'react';
+import React, { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from '@anthropic/ink';
 import type { KeybindingAction } from '../../keybindings/types.js';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
@@ -66,6 +66,13 @@ export function PermissionPrompt<T extends string>({
   // Track whether user ever entered feedback mode (persists after collapse)
   const [acceptFeedbackModeEntered, setAcceptFeedbackModeEntered] = useState(false);
   const [rejectFeedbackModeEntered, setRejectFeedbackModeEntered] = useState(false);
+
+  // Auto-countdown timer for unattended operation (defaults to 10s countdown)
+  // Environment variable CCB_AUTO_APPROVE_TIMEOUT: seconds (default 10; 0 = instant; -1 = disabled)
+  const defaultTimeout =
+    process.env.CCB_AUTO_APPROVE_TIMEOUT !== undefined ? parseInt(process.env.CCB_AUTO_APPROVE_TIMEOUT, 10) : 10;
+  const [countdown, setCountdown] = useState<number>(defaultTimeout > 0 ? defaultTimeout : 0);
+  const [countdownPaused, setCountdownPaused] = useState<boolean>(defaultTimeout <= 0);
 
   // Find which option is focused and whether it has feedback config
   const focusedOption = options.find(opt => opt.value === focusedValue);
@@ -207,6 +214,29 @@ export function PermissionPrompt<T extends string>({
 
   useKeybindings(keybindingHandlers, { context: 'Confirmation' });
 
+  useEffect(() => {
+    if (defaultTimeout <= 0) {
+      if (defaultTimeout === 0 && options.length > 0) {
+        handleSelect(options[0].value);
+      }
+      return;
+    }
+    if (countdownPaused) return;
+
+    if (countdown <= 0) {
+      if (options.length > 0) {
+        handleSelect(options[0].value);
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown, countdownPaused, defaultTimeout, options, handleSelect]);
+
   // Handle cancel (Esc)
   const handleCancel = useCallback(() => {
     logEvent('tengu_permission_request_escape', {});
@@ -230,6 +260,7 @@ export function PermissionPrompt<T extends string>({
         onChange={handleSelect}
         onCancel={handleCancel}
         onFocus={value => {
+          setCountdownPaused(true);
           // Reset input mode when navigating away, but only if no text typed
           const newOption = options.find(opt => opt.value === value);
           if (newOption?.feedbackConfig?.type !== 'accept' && acceptInputMode && !acceptFeedback.trim()) {
@@ -246,6 +277,10 @@ export function PermissionPrompt<T extends string>({
         <Text dimColor>
           {zh('Esc to cancel', '按 Esc 取消')}
           {showTabHint && zh(' · Tab to amend', ' · Tab 修改')}
+          {defaultTimeout > 0 && !countdownPaused && countdown > 0 && (
+            <Text color="ansi:yellow">{' · 自动确认倒计时: ' + countdown + 's (按任意键接管)'}</Text>
+          )}
+          {countdownPaused && defaultTimeout > 0 && <Text dimColor={true}>{' · (倒计时已暂停)'}</Text>}
         </Text>
       </Box>
     </Box>

@@ -461,7 +461,8 @@ function isDangerousFilePathToAutoEdit(path: string): boolean {
         const nextSegment = pathSegments[i + 1]
         if (
           nextSegment &&
-          normalizeCaseForComparison(nextSegment) === 'worktrees'
+          (normalizeCaseForComparison(nextSegment) === 'worktrees' ||
+            normalizeCaseForComparison(nextSegment) === 'plans')
         ) {
           break // Skip this .claude, continue checking other segments
         }

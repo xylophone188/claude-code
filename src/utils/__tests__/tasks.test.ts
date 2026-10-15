@@ -36,6 +36,7 @@ import {
   updateTask,
   deleteTask,
   listTasks,
+  listExecutionOwnedOpenTasks,
   blockTask,
   claimTask,
   resetTaskList,
@@ -53,12 +54,15 @@ import {
 let configDir: string
 const ORIGINAL_CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
 
+const ORIGINAL_TASK_LIST_ID = process.env.CLAUDE_CODE_TASK_LIST_ID
+
 beforeEach(async () => {
   configDir = join(
     tmpdir(),
     `claude-test-tasks-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   )
   process.env.CLAUDE_CONFIG_DIR = configDir
+  process.env.CLAUDE_CODE_TASK_LIST_ID = 'test-list'
   // Reset memoize cache by changing env
   const { getClaudeConfigHomeDir } = await import('src/utils/envUtils')
   getClaudeConfigHomeDir.cache.clear?.()
@@ -69,6 +73,11 @@ afterEach(async () => {
     process.env.CLAUDE_CONFIG_DIR = ORIGINAL_CONFIG_DIR
   } else {
     delete process.env.CLAUDE_CONFIG_DIR
+  }
+  if (ORIGINAL_TASK_LIST_ID !== undefined) {
+    process.env.CLAUDE_CODE_TASK_LIST_ID = ORIGINAL_TASK_LIST_ID
+  } else {
+    delete process.env.CLAUDE_CODE_TASK_LIST_ID
   }
   const { getClaudeConfigHomeDir } = await import('src/utils/envUtils')
   getClaudeConfigHomeDir.cache.clear?.()
@@ -348,6 +357,73 @@ describe('listTasks', () => {
     expect(tasks).toHaveLength(2)
     const subjects = tasks.map(t => t.subject).sort()
     expect(subjects).toEqual(['A', 'B'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// listExecutionOwnedOpenTasks
+// ---------------------------------------------------------------------------
+describe('listExecutionOwnedOpenTasks', () => {
+  test('returns open tasks with no owner or matching owner', async () => {
+    const unclaimed = await createTask(TASK_LIST_ID, {
+      subject: 'Unclaimed',
+      description: '',
+      status: 'pending',
+      blocks: [],
+      blockedBy: [],
+    })
+    const mine = await createTask(TASK_LIST_ID, {
+      subject: 'Mine',
+      description: '',
+      status: 'in_progress',
+      blocks: [],
+      blockedBy: [],
+    })
+    await createTask(TASK_LIST_ID, {
+      subject: 'Completed',
+      description: '',
+      status: 'completed',
+      blocks: [],
+      blockedBy: [],
+    })
+    const otherId = await createTask(TASK_LIST_ID, {
+      subject: 'Other agent',
+      description: '',
+      status: 'pending',
+      blocks: [],
+      blockedBy: [],
+    })
+    await updateTask(TASK_LIST_ID, otherId, { owner: 'other-agent' })
+
+    const open = await listExecutionOwnedOpenTasks('my-agent')
+
+    const subjects = open.map(t => t.subject).sort()
+    expect(subjects).toEqual(['Mine', 'Unclaimed'])
+    const ids = open.map(t => t.id)
+    expect(ids).toContain(unclaimed)
+    expect(ids).toContain(mine)
+    expect(ids).not.toContain(otherId)
+  })
+
+  test('returns empty when no open owned tasks', async () => {
+    const id = await createTask(TASK_LIST_ID, {
+      subject: 'Done',
+      description: '',
+      status: 'completed',
+      blocks: [],
+      blockedBy: [],
+    })
+    const otherId = await createTask(TASK_LIST_ID, {
+      subject: 'Other agent',
+      description: '',
+      status: 'in_progress',
+      blocks: [],
+      blockedBy: [],
+    })
+    await updateTask(TASK_LIST_ID, otherId, { owner: 'someone-else' })
+
+    const open = await listExecutionOwnedOpenTasks('my-agent')
+    expect(open).toEqual([])
   })
 })
 

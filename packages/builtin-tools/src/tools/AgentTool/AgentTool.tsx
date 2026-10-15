@@ -136,11 +136,15 @@ function getAutoBackgroundMs(): number {
 // Base input schema without multi-agent parameters
 const baseInputSchema = lazySchema(() =>
   z.object({
-    description: z.string().describe('A short (3-5 word) description of the task'),
-    prompt: z.string().describe('The task for the agent to perform'),
+    description: z.string().optional().default('Subagent task').describe('A short (3-5 word) description of the task'),
+    prompt: z.string().optional().default('').describe('The task for the agent to perform'),
+    task: z.string().optional(),
+    instruction: z.string().optional(),
+    query: z.string().optional(),
+    message: z.string().optional(),
     subagent_type: z.string().optional().describe('The type of specialized agent to use for this task'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku'])
+      .string()
       .optional()
       .describe(
         "Optional model override for this agent. Takes precedence over the agent definition's model frontmatter. If omitted, uses the agent definition's model, or inherits from the parent.",
@@ -319,11 +323,18 @@ export const AgentTool = buildTool({
   get outputSchema(): OutputSchema {
     return outputSchema();
   },
-  async call(
-    {
-      prompt,
+  async call(rawInput: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
+    const prompt =
+      rawInput.prompt ||
+      rawInput.task ||
+      rawInput.instruction ||
+      rawInput.query ||
+      rawInput.message ||
+      (rawInput.subagent_type ? `Execute ${rawInput.subagent_type} exploration` : 'Execute task');
+    const description =
+      rawInput.description || rawInput.task || rawInput.instruction || rawInput.subagent_type || 'Subagent task';
+    const {
       subagent_type,
-      description,
       model: modelParam,
       run_in_background,
       name,
@@ -331,12 +342,7 @@ export const AgentTool = buildTool({
       mode: spawnMode,
       isolation,
       cwd,
-    }: AgentToolInput,
-    toolUseContext,
-    canUseTool,
-    assistantMessage,
-    onProgress?,
-  ) {
+    } = rawInput;
     const startTime = Date.now();
     const model = isCoordinatorMode() ? undefined : modelParam;
 

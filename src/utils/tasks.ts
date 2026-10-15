@@ -455,6 +455,29 @@ export async function listTasks(taskListId: string): Promise<Task[]> {
   return results.filter((t): t is Task => t !== null)
 }
 
+/**
+ * Returns non-completed tasks owned by the given execution. "Owned" means
+ * either no owner (unclaimed; fresh task list from this session) or owner
+ * matching the agent ID. Other agents' assigned tasks are excluded — they
+ * are not this session's responsibility.
+ *
+ * Shared by:
+ * - compact.ts: re-inject task state into post-compact messages so the
+ *   model doesn't lose pending work when the summary omits it.
+ * - query.ts: pending-task continuation guard — if the model ends a turn
+ *   with owned tasks still open, nudge it once before returning completed.
+ */
+export async function listExecutionOwnedOpenTasks(
+  agentId: string | undefined,
+): Promise<Task[]> {
+  const tasks = await listTasks(getTaskListId())
+  return tasks.filter(
+    t =>
+      t.status !== 'completed' &&
+      (t.owner === undefined || t.owner === agentId),
+  )
+}
+
 export async function blockTask(
   taskListId: string,
   fromTaskId: string,

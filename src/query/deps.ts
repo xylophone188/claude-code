@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto'
 import { queryModelWithStreaming } from '../services/api/claude.js'
 import { autoCompactIfNeeded } from '../services/compact/autoCompact.js'
 import { microcompactMessages } from '../services/compact/microCompact.js'
+import { getRemoteCompressionUrl } from '../services/context/runtime.js'
+import { remoteCompress } from '../services/context/remote.js'
 import type { CompressionDecisionInput } from '../services/context/decision.js'
 
 // -- deps
@@ -34,7 +36,23 @@ export type QueryDeps = {
 export function productionDeps(): QueryDeps {
   return {
     callModel: queryModelWithStreaming,
-    microcompact: microcompactMessages,
+    microcompact: async (...args: Parameters<typeof microcompactMessages>) => {
+      const url = getRemoteCompressionUrl()
+      const [messages, ...rest] = args
+      if (!url) return microcompactMessages(messages, ...rest)
+      let base = messages
+      try {
+        base = (await remoteCompress(url, messages)) as typeof messages
+      } catch {
+        // A dead bridge must never break a query — local microcompact gets the
+        // original messages and the query continues.
+      }
+      try {
+        return await microcompactMessages(base, ...rest)
+      } catch {
+        return { messages: base }
+      }
+    },
     autocompact: autoCompactIfNeeded,
     uuid: randomUUID,
   }

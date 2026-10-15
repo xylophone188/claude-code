@@ -143,6 +143,14 @@ export {
   resolveOpenAIMaxTokens,
   buildOpenAIRequestBody,
 }
+import {
+  isLocalGateway18800Error,
+  healAgentboxGateway,
+} from './agentboxGatewayWatchdog.js'
+export {
+  isLocalGateway18800Error,
+  healAgentboxGateway,
+}
 import { getModelMaxOutputTokens } from '../../../utils/context.js'
 import type { Options } from '../claude.js'
 import { randomUUID } from 'crypto'
@@ -189,6 +197,13 @@ export class StreamAttemptTimeoutError extends Error {
   ) {
     super(`upstream stream ${phase} timeout`)
     this.name = 'StreamAttemptTimeoutError'
+  }
+}
+
+export class EmptyCcbOpenAIStreamError extends Error {
+  constructor() {
+    super('OpenAI-compatible route returned an empty stream')
+    this.name = 'EmptyCcbOpenAIStreamError'
   }
 }
 
@@ -658,8 +673,10 @@ function isTransientCcbStatus(status: number): boolean {
 function shouldRetryCcbOpenAIError(error: unknown): boolean {
   if (!isEnvTruthy(process.env.CCB_INTERNAL_ROUTER)) return false
   if (error instanceof StreamAttemptTimeoutError) return true
+  if (error instanceof EmptyCcbOpenAIStreamError) return true
   if (error instanceof APIConnectionError) return true
   if (error instanceof APIError) return isTransientCcbStatus(error.status)
+  if (isLocalGateway18800Error(error)) return true
   const message =
     error instanceof Error
       ? error.message.toLowerCase()
@@ -667,7 +684,10 @@ function shouldRetryCcbOpenAIError(error: unknown): boolean {
   if (
     message.includes('terminated') ||
     message.includes('econnreset') ||
-    message.includes('socket hang up')
+    message.includes('socket hang up') ||
+    message.includes('econnrefused') ||
+    message.includes('connection refused') ||
+    message.includes('fetch failed')
   ) {
     return true
   }
@@ -697,11 +717,14 @@ export async function* retryCcbOpenAIStream(
     try {
       const events: ChatCompletionChunk[] = []
       const streamText = { text: '' }
+      let meaningful = false
 
       for await (const event of await createStream()) {
         events.push(event)
+        meaningful ||= isMeaningfulOpenAIEvent(event)
         throwIfUpstreamBlocked(event, streamText)
       }
+      if (!meaningful) throw new EmptyCcbOpenAIStreamError()
       if (isInvalidProviderText(streamText.text)) {
         throw new ProviderOutputError(
           'OpenAI-compatible route returned invalid provider text',
@@ -712,11 +735,17 @@ export async function* retryCcbOpenAIStream(
     } catch (error) {
       if (signal.aborted) throw new APIUserAbortError()
       lastError = error
-      // When output validation fails on a transient stream, retry within budget
-      // rather than aborting the entire turn immediately.
-      const isOutputValidationFailure = error instanceof ProviderOutputError
-      if (!isOutputValidationFailure && !shouldRetryCcbOpenAIError(error)) {
-        throw error
+      if (error instanceof ProviderOutputError) throw error
+      if (!shouldRetryCcbOpenAIError(error)) throw error
+
+      if (isLocalGateway18800Error(error)) {
+        const healed = await healAgentboxGateway({ signal })
+        if (healed) {
+          logForDebugging(
+            '[OpenAI] agentbox-gateway self-healed on 127.0.0.1:18800, retrying immediately',
+          )
+          continue
+        }
       }
 
       const remainingBudgetMs = Math.max(0, deadlineMs - Date.now())
@@ -832,29 +861,26 @@ export async function* retryDirectProviderStream(
             events.push(event)
             const eventMeaningful = isMeaningfulOpenAIEvent(event)
             if (typeof event.model === 'string' && event.model) {
-              actualModel = event.model
-              let provider = route.providerId
-              if (actualModel.includes('/')) {
-                provider = actualModel.split('/')[0]
-              } else if (actualModel.startsWith('sensenova')) {
-                provider = 'sensenova'
-              } else if (actualModel.startsWith('deepseek')) {
-                provider = 'deepseek'
-              } else if (actualModel.startsWith('glm')) {
-                provider = 'glm-cn'
-              } else if (actualModel.startsWith('gpt-')) {
-                provider = 'codex'
-              } else if (
-                actualModel.startsWith('claude') ||
-                actualModel.startsWith('gemini')
-              ) {
-                provider = 'agy'
-              } else if (actualModel.startsWith('qwen')) {
-                provider = 'qwen'
-              } else if (actualModel.startsWith('nvidia')) {
-                provider = 'nvidia'
+              actualModel = event.model;
+              let provider = route.providerId;
+              if (actualModel.includes("/")) {
+                provider = actualModel.split("/")[0];
+              } else if (actualModel.startsWith("sensenova")) {
+                provider = "sensenova";
+              } else if (actualModel.startsWith("deepseek")) {
+                provider = "deepseek";
+              } else if (actualModel.startsWith("glm")) {
+                provider = "glm-cn";
+              } else if (actualModel.startsWith("gpt-")) {
+                provider = "codex";
+              } else if (actualModel.startsWith("claude") || actualModel.startsWith("gemini")) {
+                provider = "agy";
+              } else if (actualModel.startsWith("qwen")) {
+                provider = "qwen";
+              } else if (actualModel.startsWith("nvidia")) {
+                provider = "nvidia";
               }
-              setActiveCcbRoute(provider, actualModel)
+              setActiveCcbRoute(provider, actualModel);
             }
             if (!meaningful && eventMeaningful) {
               meaningful = true
@@ -992,10 +1018,22 @@ export async function* retryDirectProviderStream(
             continue
           }
         }
-        if (
-          attempt < attempts &&
-          String((error as any)?.message || '').includes('empty stream')
-        ) {
+        if (isLocalGateway18800Error(error, route.baseURL)) {
+          const healed = await healAgentboxGateway({ signal })
+          if (healed) {
+            routeLog(
+              'retry',
+              'agentbox-gateway self-healed on 127.0.0.1:18800, retrying route',
+              {
+                attempt,
+                maxAttempts: attempts,
+                route: `${route.providerId}/${route.model}`,
+              },
+            )
+            continue
+          }
+        }
+        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
           routeLog('retry', 'empty stream retry', {
             attempt,
             maxAttempts: attempts,
@@ -1005,18 +1043,11 @@ export async function* retryDirectProviderStream(
           })
           continue
         }
-        if (
-          attempt < attempts &&
-          String((error as any)?.message || '').includes('empty stream')
-        ) {
-          routeLog(
-            'retry',
-            route.providerId + '/' + route.model + ' empty stream retry',
-            {
-              attempt,
-              maxAttempts: attempts,
-            },
-          )
+        if (attempt < attempts && String((error as any)?.message || '').includes('empty stream')) {
+          routeLog('retry', route.providerId + '/' + route.model + ' empty stream retry', {
+            attempt,
+            maxAttempts: attempts,
+          })
           await sleep(Math.min(1000, 100 * attempt), signal, {
             abortError: () => new APIUserAbortError(),
           })
@@ -2375,13 +2406,11 @@ export async function* queryModelOpenAI(
           // Anthropic SDK path. Real usage (input + output tokens) is available
           // here and injected so tokenCountWithEstimation() can read it.
           if (partialMessage) {
-            const activeRoute = getActiveCcbRoute()
+            const activeRoute = getActiveCcbRoute();
             if (activeRoute?.model) {
-              partialMessage.model = activeRoute.model.includes('/')
+              partialMessage.model = activeRoute.model.includes("/")
                 ? activeRoute.model
-                : activeRoute.provider
-                  ? activeRoute.provider + '/' + activeRoute.model
-                  : activeRoute.model
+                : (activeRoute.provider ? (activeRoute.provider + "/" + activeRoute.model) : activeRoute.model);
             }
             for (const output of assembleFinalAssistantOutputs({
               partialMessage,

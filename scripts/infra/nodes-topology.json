@@ -1,0 +1,65 @@
+{
+  "description": "Multi-node heterogeneous cluster topology for CCB / OmniRoute / Nacos",
+  "nodes": [
+    {
+      "id": "pc-omniroute-source-b",
+      "role": "desktop",
+      "host": "127.0.0.1",
+      "port": 20148,
+      "weight": 100,
+      "latency_type": "ultra-low",
+      "health_url": "http://127.0.0.1:20148/health",
+      "capabilities": ["llm-inference", "source-api", "control-plane"],
+      "metadata": {
+        "device": "MSI-Raider-A18",
+        "cpu": "32c",
+        "vram": "16GB-RTX4090",
+        "region": "local"
+      }
+    },
+    {
+      "id": "pc-agentbox-gateway",
+      "role": "desktop",
+      "host": "127.0.0.1",
+      "port": 18800,
+      "weight": 90,
+      "latency_type": "ultra-low",
+      "health_url": "http://127.0.0.1:18800/health",
+      "capabilities": ["gateway", "codex-accounts", "model-pool"],
+      "metadata": {
+        "device": "MSI-Raider-A18",
+        "region": "local"
+      }
+    },
+    {
+      "id": "vps-edge-relay",
+      "role": "vps",
+      "host": "49.51.228.166",
+      "port": 22,
+      "weight": 30,
+      "latency_type": "medium",
+      "health_url": "",
+      "capabilities": ["ingress-relay", "reverse-tunnel", "public-relay"],
+      "metadata": {
+        "provider": "edge-vps",
+        "region": "ap-southeast",
+        "tunnel": "autossh"
+      }
+    },
+    {
+      "id": "termux-s23u-mobile",
+      "role": "mobile",
+      "host": "192.168.1.222",
+      "port": 5555,
+      "weight": 10,
+      "latency_type": "variable",
+      "health_url": "",
+      "capabilities": ["mobile-agent", "sensor", "a2a-bridge"],
+      "metadata": {
+        "device": "Samsung-S23-Ultra",
+        "battery_optimized": true,
+        "region": "lan"
+      }
+    }
+  ]
+}
